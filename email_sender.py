@@ -3,8 +3,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 def enviar_codigo(destinatario, codigo):
-    remitente = "reyes.martinez.ulisesjosue@gmail.com"
-    contrasena = "qokakmukvtfauigz"
+
+    remitente = "correo_envio@gmail.com"
+    contrasena = "contrasena_generada"
 
     mensaje = MIMEMultipart()
     mensaje['From'] = remitente
