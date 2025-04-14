@@ -1,8 +1,8 @@
-from db.conexion import obtener_conexion
+from loginP import App 
 
-conexion = obtener_conexion()
+App()
 
-if conexion.is_connected():
-    print("✅ Conexión exitosa a la base de datos")
-else:
-    print("❌ No se pudo conectar")
+
+
+
+    
