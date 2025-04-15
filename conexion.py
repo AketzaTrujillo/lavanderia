@@ -4,6 +4,7 @@ def conectar_bd():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="adminPass.29",
-        database="lavanderiadb"
+        password="tired2019",
+        database="lavanderiadb",
+        auth_plugin = 'mysql_native_password'
     )

@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
+from gestionar_usuarios import GestionUsuarios
+from gestionar_productos import GestionProductos
+from gestionar_clientes import GestionClientes
 
 class MasterPanel:
     def __init__(self):
@@ -46,15 +49,15 @@ class MasterPanel:
             )
             b.pack(pady=8)
 
-    # Funciones (puedes conectar a otras ventanas o módulos más adelante)
+    # Funciones actualizadas
     def gestionar_usuarios(self):
-        messagebox.showinfo("Usuarios", "Aquí irá la gestión de usuarios.")
+        GestionUsuarios(self.ventana)  # Pasar la ventana actual como padre
 
     def gestionar_productos(self):
-        messagebox.showinfo("Productos", "Aquí irá la gestión de productos.")
+        GestionProductos(self.ventana)  # Pasar la ventana actual como padre
 
     def gestionar_clientes(self):
-        messagebox.showinfo("Clientes", "Aquí irá la gestión de clientes.")
+        GestionClientes(self.ventana)  # Pasar la ventana actual como padre
 
     def ver_pedidos(self):
         messagebox.showinfo("Pedidos", "Aquí irá la vista de pedidos.")

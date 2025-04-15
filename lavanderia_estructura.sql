@@ -80,5 +80,49 @@ CREATE TABLE caja (
     FOREIGN KEY (responsable) REFERENCES usuarios(id_usuario)
 );
 
+CREATE TABLE servicios (
+    id_servicio INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    precio DECIMAL(10,2) NOT NULL,
+    tiempo_estimado INT, -- Estimated time in minutes
+    activo BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE pagos (
+    id_pago INT AUTO_INCREMENT PRIMARY KEY,
+    id_venta INT,
+    monto DECIMAL(10,2) NOT NULL,
+    metodo_pago ENUM('Efectivo', 'Tarjeta', 'Transferencia', 'Otro') NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    referencia VARCHAR(100),
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
+);
+
+CREATE TABLE gastos (
+    id_gasto INT AUTO_INCREMENT PRIMARY KEY,
+    concepto VARCHAR(100) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    fecha DATE NOT NULL,
+    id_usuario INT,
+    comprobante VARCHAR(255),
+    observaciones TEXT,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+CREATE TABLE movimientos_caja (
+    id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+    id_caja INT NOT NULL,
+    tipo ENUM('ingreso', 'egreso') NOT NULL,
+    concepto VARCHAR(100) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id_usuario INT,
+    FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+
 INSERT INTO usuarios (nombre, correo, contraseña, rol)
 VALUES ('Aketzaly', 'admin@lavanderia.com', '1234', 'admin');
+
