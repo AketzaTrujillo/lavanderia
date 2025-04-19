@@ -8,6 +8,13 @@ import os
 import sys
 import utileria as utl
 from datetime import datetime
+from email_sender_mejorado import (
+    enviar_correo_html,
+    obtener_plantilla_alta_cliente,
+    obtener_plantilla_actualizacion_puntos,
+    obtener_plantilla_baja_cliente
+)
+
 
 # Asegurar que podamos importar módulos
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -237,7 +244,7 @@ class GestionClientes:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
 
-    def buscar_clientes(self):
+    def buscar_clientes(self,event=None):
         """Busca clientes según el texto ingresado"""
         texto_busqueda = self.entry_buscar.get().strip()
 
@@ -270,7 +277,7 @@ class GestionClientes:
         except Exception as e:
             messagebox.showerror("Error", f"Error al buscar clientes: {str(e)}")
 
-    def nuevo_cliente(self):
+    def nuevo_cliente(self, event=None):
         """Abre ventana para crear un nuevo cliente"""
         # Crear una nueva ventana para añadir cliente
         ventana_nuevo = tk.Toplevel(self.ventana)
@@ -341,13 +348,24 @@ class GestionClientes:
                 cursor.execute(consulta, (nombre, telefono, correo))
 
                 conexion.commit()
+
+                # Obtener el ID del cliente recién creado
+                cursor.execute("SELECT LAST_INSERT_ID()")
+                id_cliente = cursor.fetchone()[0]
+
                 conexion.close()
+
+                # Enviar correo de bienvenida si hay dirección de correo
+                if correo:
+                    html = obtener_plantilla_alta_cliente(nombre, correo)
+                    enviar_correo_html(correo, f"Bienvenido/a a Lavandería, {nombre}", html)
 
                 messagebox.showinfo("Éxito", "Cliente registrado correctamente")
                 ventana_nuevo.destroy()
                 self.cargar_clientes()  # Refrescar tabla
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo registrar el cliente: {str(e)}")
+
 
         btn_guardar = tk.Button(
             frame_botones,
@@ -381,7 +399,7 @@ class GestionClientes:
         btn_cancelar.bind("<Enter>", lambda e: btn_cancelar.config(bg="#c62828"))
         btn_cancelar.bind("<Leave>", lambda e: btn_cancelar.config(bg="#e53935"))
 
-    def editar_cliente(self):
+    def editar_cliente(self, event=None):
         """Abre ventana para editar un cliente seleccionado"""
         # Obtener el cliente seleccionado
         seleccion = self.tabla.selection()
@@ -484,7 +502,7 @@ class GestionClientes:
         )
         btn_cancelar.pack(side=tk.LEFT, padx=5)
 
-    def ver_historial(self):
+    def ver_historial(self, event=None):
         """Abre la ventana de historial del cliente seleccionado"""
         # Obtener el cliente seleccionado
         seleccion = self.tabla.selection()
@@ -647,6 +665,68 @@ class GestionClientes:
                 if operacion.get() == "sumar":
                     nuevos_puntos = puntos_actuales + cantidad
                     mensaje_cambio = f"Se agregaron {cantidad} puntos."
+                    mensaje_correo = f"Se agregaron {cantidad} puntos a tu cuenta."
+                else:  # restar
+                    nuevos_puntos = puntos_actuales - cantidad
+                    if nuevos_puntos < 0:
+                        messagebox.showwarning(
+                            "Puntos insuficientes",
+                            f"El cliente solo tiene {puntos_actuales} puntos disponibles"
+                        )
+                        return
+                    mensaje_cambio = f"Se descontaron {cantidad} puntos."
+                    mensaje_correo = f"Se descontaron {cantidad} puntos de tu cuenta."
+
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Actualizar puntos del cliente
+                cursor.execute(
+                    "UPDATE clientes SET puntos = %s WHERE id_cliente = %s",
+                    (nuevos_puntos, id_cliente)
+                )
+
+                # Obtener el correo del cliente para enviar notificación
+                cursor.execute("SELECT correo FROM clientes WHERE id_cliente = %s", (id_cliente,))
+                resultado = cursor.fetchone()
+                correo_cliente = resultado[0] if resultado else None
+
+                conexion.commit()
+                conexion.close()
+
+                # Enviar correo de notificación si hay dirección de correo
+                if correo_cliente:
+                    html = obtener_plantilla_actualizacion_puntos(
+                        nombre_cliente,
+                        mensaje_correo,
+                        nuevos_puntos,
+                        motivo
+                    )
+                    enviar_correo_html(correo_cliente, "Actualización de puntos en Lavandería", html)
+
+                messagebox.showinfo("Éxito", f"{mensaje_cambio} Nuevos puntos: {nuevos_puntos}")
+                ventana_puntos.destroy()
+                self.cargar_clientes()  # Refrescar tabla
+
+            except ValueError:
+                messagebox.showwarning("Valor inválido", "Por favor ingresa un número entero")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo ajustar los puntos: {str(e)}")
+            try:
+                cantidad = int(entry_cantidad.get().strip())
+                if cantidad <= 0:
+                    messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
+                    return
+
+                motivo = entry_motivo.get().strip()
+                if not motivo:
+                    messagebox.showwarning("Campo requerido", "Por favor ingresa un motivo para el ajuste")
+                    return
+
+                # Calcular nuevos puntos
+                if operacion.get() == "sumar":
+                    nuevos_puntos = puntos_actuales + cantidad
+                    mensaje_cambio = f"Se agregaron {cantidad} puntos."
                 else:  # restar
                     nuevos_puntos = puntos_actuales - cantidad
                     if nuevos_puntos < 0:
@@ -710,8 +790,7 @@ class GestionClientes:
         btn_cancelar.bind("<Enter>", lambda e: btn_cancelar.config(bg="#c62828"))
         btn_cancelar.bind("<Leave>", lambda e: btn_cancelar.config(bg="#e53935"))
 
-    def eliminar_cliente(self):
-        """Elimina un cliente seleccionado"""
+    def eliminar_cliente(self, Event=None):
         # Obtener el cliente seleccionado
         seleccion = self.tabla.selection()
 
@@ -723,6 +802,7 @@ class GestionClientes:
         valores = self.tabla.item(seleccion[0], 'values')
         id_cliente = valores[0]
         nombre_cliente = valores[1]
+        correo_cliente = valores[3] if len(valores) > 3 else None
 
         # Confirmar eliminación
         confirmacion = messagebox.askyesno(
@@ -759,6 +839,11 @@ class GestionClientes:
 
             conexion.commit()
             conexion.close()
+
+            # Enviar correo de notificación si hay dirección de correo
+            if correo_cliente:
+                html = obtener_plantilla_baja_cliente(nombre_cliente)
+                enviar_correo_html(correo_cliente, "Confirmación de Baja", html)
 
             messagebox.showinfo("Éxito", f"Cliente '{nombre_cliente}' eliminado correctamente")
             self.cargar_clientes()  # Refrescar tabla
