@@ -1,50 +1,33 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+Sistema de inicio de sesión para la aplicación de Lavandería
+Con diseño mejorado y consistente con el resto de módulos
+"""
+
 import tkinter as tk
-from tkinter import messagebox
-from db.conexion import obtener_conexion
+from tkinter import ttk, messagebox, simpledialog
+import os
+import sys
+import utileria as utl
 
-def verificar_login():
-    usuario = entrada_usuario.get()
-    contraseña = entrada_contraseña.get()
+# Asegurar que podamos importar los módulos
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
 
-    try:
-        conexion = obtener_conexion()
-        cursor = conexion.cursor()
+# Importar módulos del sistema
+try:
+    from conexion import conectar_bd
+    from email_sender import enviar_codigo
+except ImportError as e:
+    print(f"Error al importar módulos: {e}")
 
-        query = "SELECT rol FROM usuarios WHERE correo = %s AND contraseña = %s"
-        cursor.execute(query, (usuario, contraseña))
-        resultado = cursor.fetchone()
 
-        if resultado:
-            rol = resultado[0]
-            messagebox.showinfo("Acceso correcto", f"Bienvenido, {rol}")
-            ventana.destroy()  # Cerrar ventana de login
-            # Aquí podrías abrir el menú principal después
-        else:
-            messagebox.showerror("Error", "Usuario o contraseña incorrectos")
+class App:
+    """Clase principal para la pantalla de inicio de sesión"""
 
-        cursor.close()
-        conexion.close()
-    except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error: {e}")
-
-# Crear ventana
-ventana = tk.Tk()
-ventana.title("Inicio de sesión - Lavandería")
-ventana.geometry("300x200")
-ventana.resizable(False, False)
-
-# Widgets
-tk.Label(ventana, text="Correo:").pack(pady=5)
-entrada_usuario = tk.Entry(ventana, width=30)
-entrada_usuario.pack()
-
-tk.Label(ventana, text="Contraseña:").pack(pady=5)
-entrada_contraseña = tk.Entry(ventana, show="*", width=30)
-entrada_contraseña.pack()
-
-tk.Button(ventana, text="Iniciar sesión", command=verificar_login).pack(pady=15)
-
-ventana.mainloop()
+    def __init__(self):
+        # Configuración de la ventana principal
+        self.ventana = tk.Tk()
+        self.ventana.title('Sistema de Lavandería - Inicio de sesión')
+        self.ventana.geometry('800x500')
+        self.ventana.config(bg='#f5f5f5')
+        self.ventana.resizable(width=0, height=0)

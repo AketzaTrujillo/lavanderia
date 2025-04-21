@@ -1,6 +1,6 @@
 """
 Panel de Administrador para el Sistema de Gestión de Lavandería
-Versión corregida para llamar correctamente al módulo de pedidos
+Con integración del módulo de seguimiento de pedidos
 """
 
 import tkinter as tk
@@ -8,7 +8,6 @@ from tkinter import ttk, messagebox
 import os
 import sys
 import utileria as utl
-
 
 # Asegurar que podamos importar los módulos
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -116,11 +115,18 @@ class MasterPanel:
                 "columna": 0
             },
             {
+                "texto": "Seguimiento Pedidos",
+                "comando": self.seguimiento_pedidos,
+                "icono": "📊",
+                "fila": 2,
+                "columna": 1
+            },
+            {
                 "texto": "Cerrar Sesión",
                 "comando": self.salir,
                 "icono": "🚪",
-                "fila": 2,
-                "columna": 1,
+                "fila": 3,
+                "columna": 0,
                 "es_salir": True
             }
         ]
@@ -237,7 +243,6 @@ class MasterPanel:
         """Abre la ventana de gestión de pedidos"""
         try:
             # Importación correcta del módulo de pedidos
-            # Asegúrate de que el nombre del archivo sea 'pedidos.py'
             from pedidos import Pedidos
             Pedidos(self.ventana)  # Crear instancia de la clase Pedidos
         except ImportError:
@@ -248,6 +253,19 @@ class MasterPanel:
             messagebox.showerror("Error de atributo",
                                 f"Error en el módulo de pedidos: {str(e)}\n"
                                 "Verifique que los métodos estén correctamente definidos.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+
+    def seguimiento_pedidos(self):
+        """Abre la ventana de seguimiento de pedidos"""
+        try:
+            # Importar el módulo de seguimiento
+            from seguimiento_pedidos import SeguimientoPedidos
+            SeguimientoPedidos(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de seguimiento de pedidos.\n"
+                                "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
