@@ -1,5 +1,6 @@
 """
 Panel de Cajero para el Sistema de Gestión de Lavandería
+Versión corregida para llamar correctamente al módulo de pedidos
 """
 
 import tkinter as tk
@@ -202,13 +203,21 @@ class CajeroPanel:
         # Convertir de nuevo a HEX
         return f"#{r:02x}{g:02x}{b:02x}"
 
-    # Funciones para abrir módulos
+    # Funciones para abrir módulos - CORREGIDAS CON MEJOR MANEJO DE ERRORES
     def registrar_pedido(self):
         """Abre la ventana para registrar pedidos"""
         try:
-            # Importar justo cuando se necesita para evitar errores de importación circular
+            # Importación correcta del módulo de pedidos
             from pedidos import Pedidos
-            Pedidos(self.ventana)
+            Pedidos(self.ventana)  # Crear instancia de la clase Pedidos
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de pedidos.\n"
+                                "Verifique que el archivo 'pedidos.py' existe.")
+        except AttributeError as e:
+            messagebox.showerror("Error de atributo",
+                                f"Error en el módulo de pedidos: {str(e)}\n"
+                                "Verifique que los métodos estén correctamente definidos.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
@@ -218,6 +227,13 @@ class CajeroPanel:
             # Importar justo cuando se necesita
             from clientes import GestionClientes
             GestionClientes(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de clientes.\n"
+                                "Verifique que el archivo 'clientes.py' existe.")
+        except AttributeError as e:
+            messagebox.showerror("Error de atributo",
+                                f"Error en el módulo de clientes: {str(e)}")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
@@ -227,6 +243,13 @@ class CajeroPanel:
             # Importar justo cuando se necesita
             from ventas import Ventas
             Ventas(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de ventas.\n"
+                                "Verifique que el archivo 'ventas.py' existe.")
+        except AttributeError as e:
+            messagebox.showerror("Error de atributo",
+                                f"Error en el módulo de ventas: {str(e)}")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
@@ -235,8 +258,12 @@ class CajeroPanel:
         if messagebox.askyesno("Confirmar salida", "¿Estás seguro de que deseas cerrar sesión?"):
             self.ventana.destroy()
             # Reabrir la pantalla de login
-            from loginP import App
-            App()
+            try:
+                from loginP import App
+                App()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir la pantalla de login: {str(e)}")
+                self.ventana.destroy()
 
 
 # Para probar de forma independiente

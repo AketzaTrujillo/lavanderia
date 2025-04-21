@@ -1,8 +1,23 @@
+"""
+Módulo de Ventas para el Sistema de Gestión de Lavandería
+Permite registrar ventas de productos y servicios, calcular totales,
+y generar tickets.
+"""
+
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
-from conexion import conectar_bd
+from tkinter import ttk, messagebox
+from tkinter.font import BOLD
+import os
+import sys
 import utileria as utl
 from datetime import datetime
+
+# Asegurar que podamos importar módulos
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
+
+# Importar módulos del sistema
+from conexion import conectar_bd
 
 
 class Ventas:
@@ -29,6 +44,7 @@ class Ventas:
         self.items_venta = []
         self.cliente_actual = None
         self.total_venta = 0.0
+        self.id_usuario_actual = 1  # Por defecto, se asume usuario ID 1, esto debe cambiarse al implementar sistema de sesiones
 
         self.construir_interfaz()
 
@@ -210,464 +226,6 @@ class Ventas:
 
     def configurar_tab_productos(self, tab):
         # Frame para búsqueda
-        frame_busqueda = tk.Frame(tab, bg="#e0f7fa")
-        frame_busqueda.pack(fill=tk.X, pady=10)
-
-        lbl_buscar = tk.Label(
-            frame_busqueda,
-            text="Buscar producto:",
-            font=("Helvetica", 11),
-            bg="#e0f7fa"
-        )
-        lbl_buscar.pack(side=tk.LEFT, padx=5)
-
-        self.entry_buscar_producto = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 11))
-        self.entry_buscar_producto.pack(side=tk.LEFT, padx=5)
-
-        btn_buscar_producto = tk.Button(
-            frame_busqueda,
-            text="Buscar",
-            font=("Helvetica", 10),
-            bg="#00796b",
-            fg="white",
-            command=lambda: self.buscar_productos(self.entry_buscar_producto.get().strip())
-        )
-        btn_buscar_producto.pack(side=tk.LEFT, padx=5)
-
-        # Tabla de productos
-        frame_tabla = tk.Frame(tab, bg="#e0f7fa")
-        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        columnas = ('id', 'nombre', 'precio', 'stock')
-
-        self.tabla_productos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=7)
-
-        # Configurar encabezados
-        self.tabla_productos.heading('id', text='ID')
-        self.tabla_productos.heading('nombre', text='Nombre')
-        self.tabla_productos.heading('precio', text='Precio')
-        self.tabla_productos.heading('stock', text='Stock')
-
-        # Configurar anchos
-        self.tabla_productos.column('id', width=50, anchor=tk.CENTER)
-        self.tabla_productos.column('nombre', width=300)
-        self.tabla_productos.column('precio', width=100, anchor=tk.CENTER)
-        self.tabla_productos.column('stock', width=100, anchor=tk.CENTER)
-
-        # Scrollbar para la tabla
-        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_productos.yview)
-        self.tabla_productos.configure(yscrollcommand=scrollbar.set)
-
-        # Empaquetar tabla y scrollbar
-        self.tabla_productos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Frame para agregar producto
-        frame_agregar = tk.Frame(tab, bg="#e0f7fa")
-        frame_agregar.pack(fill=tk.X, pady=10)
-
-        lbl_cantidad = tk.Label(
-            frame_agregar,
-            text="Cantidad:",
-            font=("Helvetica", 11),
-            bg="#e0f7fa"
-        )
-        lbl_cantidad.pack(side=tk.LEFT, padx=5)
-
-        self.entry_cantidad_producto = tk.Entry(frame_agregar, width=5, font=("Helvetica", 11))
-        self.entry_cantidad_producto.pack(side=tk.LEFT, padx=5)
-        self.entry_cantidad_producto.insert(0, "1")  # Valor por defecto
-
-        btn_agregar_producto = tk.Button(
-            frame_agregar,
-            text="Agregar a la venta",
-            font=("Helvetica", 10),
-            bg="#00796b",
-            fg="white",
-            command=self.agregar_producto_seleccionado
-        )
-        btn_agregar_producto.pack(side=tk.LEFT, padx=10)
-
-    def configurar_tab_servicios(self, tab):
-        # Frame para búsqueda
-        frame_busqueda = tk.Frame(tab, bg="#e0f7fa")
-        frame_busqueda.pack(fill=tk.X, pady=10)
-
-        lbl_buscar = tk.Label(
-            frame_busqueda,
-            text="Buscar servicio:",
-            font=("Helvetica", 11),
-            bg="#e0f7fa"
-        )
-        lbl_buscar.pack(side=tk.LEFT, padx=5)
-
-        self.entry_buscar_servicio = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 11))
-        self.entry_buscar_servicio.pack(side=tk.LEFT, padx=5)
-
-        btn_buscar_servicio = tk.Button(
-            frame_busqueda,
-            text="Buscar",
-            font=("Helvetica", 10),
-            bg="#00796b",
-            fg="white",
-            command=lambda: self.buscar_servicios(self.entry_buscar_servicio.get().strip())
-        )
-        btn_buscar_servicio.pack(side=tk.LEFT, padx=5)
-
-        # Tabla de servicios
-        frame_tabla = tk.Frame(tab, bg="#e0f7fa")
-        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo')
-
-        self.tabla_servicios = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=7)
-
-        # Configurar encabezados
-        self.tabla_servicios.heading('id', text='ID')
-        self.tabla_servicios.heading('nombre', text='Nombre')
-        self.tabla_servicios.heading('descripcion', text='Descripción')
-        self.tabla_servicios.heading('precio', text='Precio')
-        self.tabla_servicios.heading('tiempo', text='Tiempo Est.')
-
-        # Configurar anchos
-        self.tabla_servicios.column('id', width=50, anchor=tk.CENTER)
-        self.tabla_servicios.column('nombre', width=150)
-        self.tabla_servicios.column('descripcion', width=200)
-        self.tabla_servicios.column('precio', width=100, anchor=tk.CENTER)
-        self.tabla_servicios.column('tiempo', width=100, anchor=tk.CENTER)
-
-        # Scrollbar para la tabla
-        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_servicios.yview)
-        self.tabla_servicios.configure(yscrollcommand=scrollbar.set)
-
-        # Empaquetar tabla y scrollbar
-        self.tabla_servicios.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Frame para agregar servicio
-        frame_agregar = tk.Frame(tab, bg="#e0f7fa")
-        frame_agregar.pack(fill=tk.X, pady=10)
-
-        lbl_cantidad = tk.Label(
-            frame_agregar,
-            text="Cantidad:",
-            font=("Helvetica", 11),
-            bg="#e0f7fa"
-        )
-        lbl_cantidad.pack(side=tk.LEFT, padx=5)
-
-        self.entry_cantidad_servicio = tk.Entry(frame_agregar, width=5, font=("Helvetica", 11))
-        self.entry_cantidad_servicio.pack(side=tk.LEFT, padx=5)
-        self.entry_cantidad_servicio.insert(0, "1")  # Valor por defecto
-
-        btn_agregar_servicio = tk.Button(
-            frame_agregar,
-            text="Agregar a la venta",
-            font=("Helvetica", 10),
-            bg="#00796b",
-            fg="white",
-            command=self.agregar_servicio_seleccionado
-        )
-        btn_agregar_servicio.pack(side=tk.LEFT, padx=10)
-
-    def cargar_productos(self):
-        # Limpiar tabla
-        for item in self.tabla_productos.get_children():
-            self.tabla_productos.delete(item)
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-            cursor.execute("SELECT id_producto, nombre, precio, stock FROM productos WHERE stock > 0 ORDER BY nombre")
-
-            for producto in cursor.fetchall():
-                self.tabla_productos.insert('', tk.END, values=producto)
-
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar los productos: {str(e)}")
-
-    def cargar_servicios(self):
-        # Limpiar tabla
-        for item in self.tabla_servicios.get_children():
-            self.tabla_servicios.delete(item)
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-            cursor.execute("""
-                SELECT id_servicio, nombre, descripcion, precio, 
-                       CONCAT(tiempo_estimado, ' min') as tiempo 
-                FROM servicios 
-                WHERE activo = 1 
-                ORDER BY nombre
-            """)
-
-            for servicio in cursor.fetchall():
-                self.tabla_servicios.insert('', tk.END, values=servicio)
-
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar los servicios: {str(e)}")
-
-    def buscar_productos(self, texto_busqueda):
-        # Limpiar tabla
-        for item in self.tabla_productos.get_children():
-            self.tabla_productos.delete(item)
-
-        if not texto_busqueda:
-            self.cargar_productos()
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Búsqueda por nombre o ID
-            consulta = """
-            SELECT id_producto, nombre, precio, stock 
-            FROM productos 
-            WHERE stock > 0 AND (nombre LIKE %s OR id_producto = %s)
-            ORDER BY nombre
-            """
-
-            # Intenta convertir el texto de búsqueda a un número para buscar por ID
-            try:
-                id_busqueda = int(texto_busqueda)
-            except ValueError:
-                id_busqueda = -1  # Valor que no existirá como ID
-
-            cursor.execute(consulta, (f"%{texto_busqueda}%", id_busqueda))
-
-            for producto in cursor.fetchall():
-                self.tabla_productos.insert('', tk.END, values=producto)
-
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al buscar productos: {str(e)}")
-
-    def buscar_servicios(self, texto_busqueda):
-        # Limpiar tabla
-        for item in self.tabla_servicios.get_children():
-            self.tabla_servicios.delete(item)
-
-        if not texto_busqueda:
-            self.cargar_servicios()
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Búsqueda por nombre, descripción o ID
-            consulta = """
-            SELECT id_servicio, nombre, descripcion, precio, 
-                   CONCAT(tiempo_estimado, ' min') as tiempo 
-            FROM servicios 
-            WHERE activo = 1 AND (nombre LIKE %s OR descripcion LIKE %s OR id_servicio = %s)
-            ORDER BY nombre
-            """
-
-            # Intenta convertir el texto de búsqueda a un número para buscar por ID
-            try:
-                id_busqueda = int(texto_busqueda)
-            except ValueError:
-                id_busqueda = -1  # Valor que no existirá como ID
-
-            cursor.execute(consulta, (f"%{texto_busqueda}%", f"%{texto_busqueda}%", id_busqueda))
-
-            for servicio in cursor.fetchall():
-                self.tabla_servicios.insert('', tk.END, values=servicio)
-
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al buscar servicios: {str(e)}")
-
-    def agregar_producto_seleccionado(self):
-        # Obtener el producto seleccionado
-        seleccion = self.tabla_productos.selection()
-
-        if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un producto para agregar")
-            return
-
-        # Obtener datos del producto seleccionado
-        valores = self.tabla_productos.item(seleccion[0], 'values')
-        id_producto = valores[0]
-        nombre_producto = valores[1]
-        precio_producto = float(valores[2])
-        stock_disponible = int(valores[3])
-
-        # Obtener cantidad deseada
-        try:
-            cantidad = int(self.entry_cantidad_producto.get().strip())
-            if cantidad <= 0:
-                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
-                return
-            if cantidad > stock_disponible:
-                messagebox.showwarning("Stock insuficiente", f"Solo hay {stock_disponible} unidades disponibles")
-                return
-        except ValueError:
-            messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
-            return
-
-        # Calcular subtotal
-        subtotal = precio_producto * cantidad
-
-        # Agregar a la lista de items
-        item = {
-            'tipo': 'producto',
-            'id': id_producto,
-            'nombre': nombre_producto,
-            'cantidad': cantidad,
-            'precio_unitario': precio_producto,
-            'subtotal': subtotal
-        }
-
-        # Verificar si ya existe este producto en la lista y actualizar cantidad si es el caso
-        existe = False
-        for i, it in enumerate(self.items_venta):
-            if it['tipo'] == 'producto' and it['id'] == id_producto:
-                # Actualizar cantidad y subtotal
-                nueva_cantidad = it['cantidad'] + cantidad
-                if nueva_cantidad > stock_disponible:
-                    messagebox.showwarning("Stock insuficiente",
-                                           f"No se puede agregar {cantidad} más. Stock disponible: {stock_disponible}")
-                    return
-                self.items_venta[i]['cantidad'] = nueva_cantidad
-                self.items_venta[i]['subtotal'] = precio_producto * nueva_cantidad
-                existe = True
-                break
-
-        if not existe:
-            self.items_venta.append(item)
-
-        # Actualizar tabla y total
-        self.actualizar_tabla_items()
-        self.calcular_total()
-
-    def agregar_servicio_seleccionado(self):
-        # Obtener el servicio seleccionado
-        seleccion = self.tabla_servicios.selection()
-
-        if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un servicio para agregar")
-            return
-
-        # Obtener datos del servicio seleccionado
-        valores = self.tabla_servicios.item(seleccion[0], 'values')
-        id_servicio = valores[0]
-        nombre_servicio = valores[1]
-        precio_servicio = float(valores[3])
-
-        # Obtener cantidad deseada
-        try:
-            cantidad = int(self.entry_cantidad_servicio.get().strip())
-            if cantidad <= 0:
-                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
-                return
-        except ValueError:
-            messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
-            return
-
-        # Calcular subtotal
-        subtotal = precio_servicio * cantidad
-
-        # Agregar a la lista de items
-        item = {
-            'tipo': 'servicio',
-            'id': id_servicio,
-            'nombre': nombre_servicio,
-            'cantidad': cantidad,
-            'precio_unitario': precio_servicio,
-            'subtotal': subtotal
-        }
-
-        # Verificar si ya existe este servicio en la lista y actualizar cantidad si es el caso
-        existe = False
-        for i, it in enumerate(self.items_venta):
-            if it['tipo'] == 'servicio' and it['id'] == id_servicio:
-                # Actualizar cantidad y subtotal
-                nueva_cantidad = it['cantidad'] + cantidad
-                self.items_venta[i]['cantidad'] = nueva_cantidad
-                self.items_venta[i]['subtotal'] = precio_servicio * nueva_cantidad
-                existe = True
-                break
-
-        if not existe:
-            self.items_venta.append(item)
-
-        # Actualizar tabla y total
-        self.actualizar_tabla_items()
-        self.calcular_total()
-
-    def actualizar_tabla_items(self):
-        # Limpiar tabla
-        for item in self.tabla_items.get_children():
-            self.tabla_items.delete(item)
-
-        # Agregar items a la tabla
-        for item in self.items_venta:
-            valores = (
-                item['tipo'].capitalize(),
-                item['nombre'],
-                item['cantidad'],
-                f"${item['precio_unitario']:.2f}",
-                f"${item['subtotal']:.2f}"
-            )
-            self.tabla_items.insert('', tk.END, values=valores)
-
-    def calcular_total(self):
-        # Calcular total de la venta
-        self.total_venta = sum(item['subtotal'] for item in self.items_venta)
-        self.lbl_total.config(text=f"${self.total_venta:.2f}")
-
-    def quitar_item(self):
-        # Obtener el item seleccionado
-        seleccion = self.tabla_items.selection()
-
-        if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un item para quitar")
-            return
-
-        # Eliminar de la lista
-        indice = self.tabla_items.index(seleccion[0])
-        del self.items_venta[indice]
-
-        # Actualizar tabla y total
-        self.actualizar_tabla_items()
-        self.calcular_total()
-
-    def limpiar_venta(self):
-        # Confirmar acción
-        if messagebox.askyesno("Confirmar", "¿Estás seguro de limpiar todos los items?"):
-            self.items_venta = []
-            self.actualizar_tabla_items()
-            self.calcular_total()
-
-    def seleccionar_cliente(self):
-        # Abrir ventana para buscar y seleccionar cliente
-        ventana_buscar = tk.Toplevel(self.ventana)
-        ventana_buscar.title("Seleccionar Cliente")
-        ventana_buscar.geometry("700x500")
-        ventana_buscar.config(bg="#e0f7fa")
-        ventana_buscar.grab_set()  # Hacer modal
-
-        # Frame principal
-        frame_principal = tk.Frame(ventana_buscar, bg="#e0f7fa")
-        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-        # Título
-        titulo = tk.Label(
-            frame_principal,
-            text="Buscar y Seleccionar Cliente",
-            font=("Helvetica", 16, "bold"),
-            bg="#e0f7fa",
-            fg="#00796b"
-        )
-        titulo.pack(pady=10)
-
-        # Frame para búsqueda
         frame_busqueda = tk.Frame(frame_principal, bg="#e0f7fa")
         frame_busqueda.pack(fill=tk.X, pady=10)
 
@@ -681,6 +239,7 @@ class Ventas:
 
         entry_buscar = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 12))
         entry_buscar.pack(side=tk.LEFT, padx=5)
+        entry_buscar.bind("<Return>", lambda event: buscar_clientes(entry_buscar.get().strip()))
 
         btn_buscar = tk.Button(
             frame_busqueda,
@@ -700,6 +259,9 @@ class Ventas:
         columnas = ('id', 'nombre', 'telefono', 'correo', 'puntos')
 
         tabla_clientes = ttk.Treeview(frame_tabla, columns=columnas, show='headings')
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(tabla_clientes)
 
         # Configurar encabezados
         tabla_clientes.heading('id', text='ID')
@@ -840,6 +402,9 @@ class Ventas:
             ventana_nuevo.config(bg="#e0f7fa")
             ventana_nuevo.grab_set()  # Hacer modal
 
+            # Centrar ventana
+            utl.centrar_ventana(ventana_nuevo, 400, 300)
+
             # Frame para el formulario
             frame_form = tk.Frame(ventana_nuevo, bg="#e0f7fa")
             frame_form.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
@@ -927,3 +492,486 @@ class Ventas:
 
         # Cargar clientes al iniciar
         cargar_clientes()
+        frame_busqueda = tk.Frame(tab, bg="#e0f7fa")
+        frame_busqueda.pack(fill=tk.X, pady=10)
+
+        lbl_buscar = tk.Label(
+            frame_busqueda,
+            text="Buscar producto:",
+            font=("Helvetica", 11),
+            bg="#e0f7fa"
+        )
+        lbl_buscar.pack(side=tk.LEFT, padx=5)
+
+        self.entry_buscar_producto = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 11))
+        self.entry_buscar_producto.pack(side=tk.LEFT, padx=5)
+
+        # Vincular tecla Enter al buscador
+        self.entry_buscar_producto.bind("<Return>",
+                                        lambda event: self.buscar_productos(self.entry_buscar_producto.get().strip()))
+
+        btn_buscar_producto = tk.Button(
+            frame_busqueda,
+            text="Buscar",
+            font=("Helvetica", 10),
+            bg="#00796b",
+            fg="white",
+            command=lambda: self.buscar_productos(self.entry_buscar_producto.get().strip())
+        )
+        btn_buscar_producto.pack(side=tk.LEFT, padx=5)
+
+        # Tabla de productos
+        frame_tabla = tk.Frame(tab, bg="#e0f7fa")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        columnas = ('id', 'nombre', 'precio', 'stock')
+
+        self.tabla_productos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=7)
+
+        # Configurar encabezados
+        self.tabla_productos.heading('id', text='ID')
+        self.tabla_productos.heading('nombre', text='Nombre')
+        self.tabla_productos.heading('precio', text='Precio')
+        self.tabla_productos.heading('stock', text='Stock')
+
+        # Configurar anchos
+        self.tabla_productos.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_productos.column('nombre', width=300)
+        self.tabla_productos.column('precio', width=100, anchor=tk.CENTER)
+        self.tabla_productos.column('stock', width=100, anchor=tk.CENTER)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_productos.yview)
+        self.tabla_productos.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        self.tabla_productos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Frame para agregar producto
+        frame_agregar = tk.Frame(tab, bg="#e0f7fa")
+        frame_agregar.pack(fill=tk.X, pady=10)
+
+        lbl_cantidad = tk.Label(
+            frame_agregar,
+            text="Cantidad:",
+            font=("Helvetica", 11),
+            bg="#e0f7fa"
+        )
+        lbl_cantidad.pack(side=tk.LEFT, padx=5)
+
+        self.entry_cantidad_producto = tk.Entry(frame_agregar, width=5, font=("Helvetica", 11))
+        self.entry_cantidad_producto.pack(side=tk.LEFT, padx=5)
+        self.entry_cantidad_producto.insert(0, "1")  # Valor por defecto
+
+        btn_agregar_producto = tk.Button(
+            frame_agregar,
+            text="Agregar a la venta",
+            font=("Helvetica", 10),
+            bg="#00796b",
+            fg="white",
+            command=self.agregar_producto_seleccionado
+        )
+        btn_agregar_producto.pack(side=tk.LEFT, padx=10)
+
+    def configurar_tab_servicios(self, tab):
+        # Frame para búsqueda
+        frame_busqueda = tk.Frame(tab, bg="#e0f7fa")
+        frame_busqueda.pack(fill=tk.X, pady=10)
+
+        lbl_buscar = tk.Label(
+            frame_busqueda,
+            text="Buscar servicio:",
+            font=("Helvetica", 11),
+            bg="#e0f7fa"
+        )
+        lbl_buscar.pack(side=tk.LEFT, padx=5)
+
+        self.entry_buscar_servicio = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 11))
+        self.entry_buscar_servicio.pack(side=tk.LEFT, padx=5)
+
+        # Vincular tecla Enter al buscador
+        self.entry_buscar_servicio.bind("<Return>",
+                                        lambda event: self.buscar_servicios(self.entry_buscar_servicio.get().strip()))
+
+        btn_buscar_servicio = tk.Button(
+            frame_busqueda,
+            text="Buscar",
+            font=("Helvetica", 10),
+            bg="#00796b",
+            fg="white",
+            command=lambda: self.buscar_servicios(self.entry_buscar_servicio.get().strip())
+        )
+        btn_buscar_servicio.pack(side=tk.LEFT, padx=5)
+
+        # Tabla de servicios
+        frame_tabla = tk.Frame(tab, bg="#e0f7fa")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo')
+
+        self.tabla_servicios = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=7)
+
+        # Configurar encabezados
+        self.tabla_servicios.heading('id', text='ID')
+        self.tabla_servicios.heading('nombre', text='Nombre')
+        self.tabla_servicios.heading('descripcion', text='Descripción')
+        self.tabla_servicios.heading('precio', text='Precio')
+        self.tabla_servicios.heading('tiempo', text='Tiempo Est.')
+
+        # Configurar anchos
+        self.tabla_servicios.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_servicios.column('nombre', width=150)
+        self.tabla_servicios.column('descripcion', width=200)
+        self.tabla_servicios.column('precio', width=100, anchor=tk.CENTER)
+        self.tabla_servicios.column('tiempo', width=100, anchor=tk.CENTER)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_servicios.yview)
+        self.tabla_servicios.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        self.tabla_servicios.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Frame para agregar servicio
+        frame_agregar = tk.Frame(tab, bg="#e0f7fa")
+        frame_agregar.pack(fill=tk.X, pady=10)
+
+        lbl_cantidad = tk.Label(
+            frame_agregar,
+            text="Cantidad:",
+            font=("Helvetica", 11),
+            bg="#e0f7fa"
+        )
+        lbl_cantidad.pack(side=tk.LEFT, padx=5)
+
+        self.entry_cantidad_servicio = tk.Entry(frame_agregar, width=5, font=("Helvetica", 11))
+        self.entry_cantidad_servicio.pack(side=tk.LEFT, padx=5)
+        self.entry_cantidad_servicio.insert(0, "1")  # Valor por defecto
+
+        btn_agregar_servicio = tk.Button(
+            frame_agregar,
+            text="Agregar a la venta",
+            font=("Helvetica", 10),
+            bg="#00796b",
+            fg="white",
+            command=self.agregar_servicio_seleccionado
+        )
+        btn_agregar_servicio.pack(side=tk.LEFT, padx=10)
+
+    def cargar_productos(self):
+        # Limpiar tabla
+        for item in self.tabla_productos.get_children():
+            self.tabla_productos.delete(item)
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_producto, nombre, precio, stock FROM productos WHERE stock > 0 ORDER BY nombre")
+
+            for producto in cursor.fetchall():
+                # Formatear precio para mostrar
+                precio_formateado = f"${float(producto[2]):.2f}"
+                valores = (producto[0], producto[1], precio_formateado, producto[3])
+                self.tabla_productos.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar los productos: {str(e)}")
+
+    def cargar_servicios(self):
+        # Limpiar tabla
+        for item in self.tabla_servicios.get_children():
+            self.tabla_servicios.delete(item)
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id_servicio, nombre, descripcion, precio, 
+                       CONCAT(tiempo_estimado, ' min') as tiempo 
+                FROM servicios 
+                WHERE activo = 1 
+                ORDER BY nombre
+            """)
+
+            for servicio in cursor.fetchall():
+                # Formatear precio para mostrar
+                precio_formateado = f"${float(servicio[3]):.2f}"
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                self.tabla_servicios.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar los servicios: {str(e)}")
+
+    def buscar_productos(self, texto_busqueda):
+        # Limpiar tabla
+        for item in self.tabla_productos.get_children():
+            self.tabla_productos.delete(item)
+
+        if not texto_busqueda:
+            self.cargar_productos()
+            return
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Búsqueda por nombre o ID
+            consulta = """
+            SELECT id_producto, nombre, precio, stock 
+            FROM productos 
+            WHERE stock > 0 AND (nombre LIKE %s OR id_producto = %s)
+            ORDER BY nombre
+            """
+
+            # Intenta convertir el texto de búsqueda a un número para buscar por ID
+            try:
+                id_busqueda = int(texto_busqueda)
+            except ValueError:
+                id_busqueda = -1  # Valor que no existirá como ID
+
+            cursor.execute(consulta, (f"%{texto_busqueda}%", id_busqueda))
+
+            for producto in cursor.fetchall():
+                # Formatear precio para mostrar
+                precio_formateado = f"${float(producto[2]):.2f}"
+                valores = (producto[0], producto[1], precio_formateado, producto[3])
+                self.tabla_productos.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al buscar productos: {str(e)}")
+
+    def buscar_servicios(self, texto_busqueda):
+        # Limpiar tabla
+        for item in self.tabla_servicios.get_children():
+            self.tabla_servicios.delete(item)
+
+        if not texto_busqueda:
+            self.cargar_servicios()
+            return
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Búsqueda por nombre, descripción o ID
+            consulta = """
+            SELECT id_servicio, nombre, descripcion, precio, 
+                   CONCAT(tiempo_estimado, ' min') as tiempo 
+            FROM servicios 
+            WHERE activo = 1 AND (nombre LIKE %s OR descripcion LIKE %s OR id_servicio = %s)
+            ORDER BY nombre
+            """
+
+            # Intenta convertir el texto de búsqueda a un número para buscar por ID
+            try:
+                id_busqueda = int(texto_busqueda)
+            except ValueError:
+                id_busqueda = -1  # Valor que no existirá como ID
+
+            cursor.execute(consulta, (f"%{texto_busqueda}%", f"%{texto_busqueda}%", id_busqueda))
+
+            for servicio in cursor.fetchall():
+                # Formatear precio para mostrar
+                precio_formateado = f"${float(servicio[3]):.2f}"
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                self.tabla_servicios.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al buscar servicios: {str(e)}")
+
+    def agregar_producto_seleccionado(self):
+        # Obtener el producto seleccionado
+        seleccion = self.tabla_productos.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un producto para agregar")
+            return
+
+        # Obtener datos del producto seleccionado
+        valores = self.tabla_productos.item(seleccion[0], 'values')
+        id_producto = valores[0]
+        nombre_producto = valores[1]
+        # Convertir precio de string "$X.XX" a float
+        precio_producto = float(valores[2].replace('$', '').replace(',', ''))
+        stock_disponible = int(valores[3])
+
+        # Obtener cantidad deseada
+        try:
+            cantidad = int(self.entry_cantidad_producto.get().strip())
+            if cantidad <= 0:
+                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
+                return
+            if cantidad > stock_disponible:
+                messagebox.showwarning("Stock insuficiente", f"Solo hay {stock_disponible} unidades disponibles")
+                return
+        except ValueError:
+            messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
+            return
+
+        # Calcular subtotal
+        subtotal = precio_producto * cantidad
+
+        # Agregar a la lista de items
+        item = {
+            'tipo': 'producto',
+            'id': id_producto,
+            'nombre': nombre_producto,
+            'cantidad': cantidad,
+            'precio_unitario': precio_producto,
+            'subtotal': subtotal
+        }
+
+        # Verificar si ya existe este producto en la lista y actualizar cantidad si es el caso
+        existe = False
+        for i, it in enumerate(self.items_venta):
+            if it['tipo'] == 'producto' and it['id'] == id_producto:
+                # Actualizar cantidad y subtotal
+                nueva_cantidad = it['cantidad'] + cantidad
+                if nueva_cantidad > stock_disponible:
+                    messagebox.showwarning("Stock insuficiente",
+                                           f"No se puede agregar {cantidad} más. Stock disponible: {stock_disponible}")
+                    return
+                self.items_venta[i]['cantidad'] = nueva_cantidad
+                self.items_venta[i]['subtotal'] = precio_producto * nueva_cantidad
+                existe = True
+                break
+
+        if not existe:
+            self.items_venta.append(item)
+
+        # Actualizar tabla y total
+        self.actualizar_tabla_items()
+        self.calcular_total()
+
+    def agregar_servicio_seleccionado(self):
+        # Obtener el servicio seleccionado
+        seleccion = self.tabla_servicios.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un servicio para agregar")
+            return
+
+        # Obtener datos del servicio seleccionado
+        valores = self.tabla_servicios.item(seleccion[0], 'values')
+        id_servicio = valores[0]
+        nombre_servicio = valores[1]
+        # Convertir precio de string "$X.XX" a float
+        precio_servicio = float(valores[3].replace('$', '').replace(',', ''))
+
+        # Obtener cantidad deseada
+        try:
+            cantidad = int(self.entry_cantidad_servicio.get().strip())
+            if cantidad <= 0:
+                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
+                return
+        except ValueError:
+            messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
+            return
+
+        # Calcular subtotal
+        subtotal = precio_servicio * cantidad
+
+        # Agregar a la lista de items
+        item = {
+            'tipo': 'servicio',
+            'id': id_servicio,
+            'nombre': nombre_servicio,
+            'cantidad': cantidad,
+            'precio_unitario': precio_servicio,
+            'subtotal': subtotal
+        }
+
+        # Verificar si ya existe este servicio en la lista y actualizar cantidad si es el caso
+        existe = False
+        for i, it in enumerate(self.items_venta):
+            if it['tipo'] == 'servicio' and it['id'] == id_servicio:
+                # Actualizar cantidad y subtotal
+                nueva_cantidad = it['cantidad'] + cantidad
+                self.items_venta[i]['cantidad'] = nueva_cantidad
+                self.items_venta[i]['subtotal'] = precio_servicio * nueva_cantidad
+                existe = True
+                break
+
+        if not existe:
+            self.items_venta.append(item)
+
+        # Actualizar tabla y total
+        self.actualizar_tabla_items()
+        self.calcular_total()
+
+    def actualizar_tabla_items(self):
+        # Limpiar tabla
+        for item in self.tabla_items.get_children():
+            self.tabla_items.delete(item)
+
+        # Agregar items a la tabla
+        for item in self.items_venta:
+            valores = (
+                item['tipo'].capitalize(),
+                item['nombre'],
+                item['cantidad'],
+                f"${item['precio_unitario']:.2f}",
+                f"${item['subtotal']:.2f}"
+            )
+            self.tabla_items.insert('', tk.END, values=valores)
+
+    def calcular_total(self):
+        # Calcular total de la venta
+        self.total_venta = sum(item['subtotal'] for item in self.items_venta)
+        self.lbl_total.config(text=f"${self.total_venta:.2f}")
+
+    def quitar_item(self):
+        # Obtener el item seleccionado
+        seleccion = self.tabla_items.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un item para quitar")
+            return
+
+        # Eliminar de la lista
+        indice = self.tabla_items.index(seleccion[0])
+        del self.items_venta[indice]
+
+        # Actualizar tabla y total
+        self.actualizar_tabla_items()
+        self.calcular_total()
+
+    def limpiar_venta(self):
+        # Confirmar acción
+        if messagebox.askyesno("Confirmar", "¿Estás seguro de limpiar todos los items?"):
+            self.items_venta = []
+            self.actualizar_tabla_items()
+            self.calcular_total()
+
+    def seleccionar_cliente(self):
+        # Abrir ventana para buscar y seleccionar cliente
+        ventana_buscar = tk.Toplevel(self.ventana)
+        ventana_buscar.title("Seleccionar Cliente")
+        ventana_buscar.geometry("700x500")
+        ventana_buscar.config(bg="#e0f7fa")
+        ventana_buscar.grab_set()  # Hacer modal
+
+        # Centrar ventana
+        utl.centrar_ventana(ventana_buscar, 700, 500)
+
+        # Frame principal
+        frame_principal = tk.Frame(ventana_buscar, bg="#e0f7fa")
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Título
+        titulo = tk.Label(
+            frame_principal,
+            text="Buscar y Seleccionar Cliente",
+            font=("Helvetica", 16, "bold"),
+            bg="#e0f7fa",
+            fg="#00796b"
+        )
+        titulo.pack(pady=10)
+
+        # Frame para búsqueda

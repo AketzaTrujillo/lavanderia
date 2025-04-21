@@ -1,8 +1,21 @@
+"""
+Módulo de Pedidos para el Sistema de Gestión de Lavandería
+Permite crear, visualizar y gestionar el estado de los pedidos
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from conexion import conectar_bd
+import os
+import sys
 import utileria as utl
 from datetime import datetime
+
+# Asegurar que podamos importar módulos
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
+
+# Importar módulo de conexión
+from conexion import conectar_bd
 
 
 class Pedidos:
@@ -310,3 +323,1207 @@ class Pedidos:
             command=self.guardar_pedido
         )
         btn_guardar.pack(side=tk.RIGHT, padx=10)
+
+        # Cargar servicios al iniciar
+        self.cargar_servicios()
+
+    def configurar_tab_lista(self):
+        """Configura la pestaña para listar y gestionar pedidos"""
+        # Frame principal
+        frame_principal = tk.Frame(self.tab_lista, bg="#f5f5f5")
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Título
+        titulo = tk.Label(
+            frame_principal,
+            text="Listado de Pedidos",
+            font=("Helvetica", 20, "bold"),
+            bg="#f5f5f5",
+            fg="#303f9f"
+        )
+        titulo.pack(pady=10)
+
+        # Frame para filtros
+        frame_filtros = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_filtros.pack(fill=tk.X, pady=10)
+
+        # Filtro por estado
+        lbl_estado = tk.Label(
+            frame_filtros,
+            text="Filtrar por estado:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        lbl_estado.pack(side=tk.LEFT, padx=5)
+
+        self.combo_estado = ttk.Combobox(
+            frame_filtros,
+            values=["Todos", "Recibido", "En proceso", "Listo para entrega", "Entregado"],
+            width=15,
+            state="readonly"
+        )
+        self.combo_estado.pack(side=tk.LEFT, padx=5)
+        self.combo_estado.current(0)  # "Todos" por defecto
+        self.combo_estado.bind("<<ComboboxSelected>>", lambda _: self.cargar_pedidos())
+
+        # Filtro por cliente
+        lbl_cliente = tk.Label(
+            frame_filtros,
+            text="Buscar por cliente:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        lbl_cliente.pack(side=tk.LEFT, padx=(20, 5))
+
+        self.entry_buscar_cliente = tk.Entry(frame_filtros, width=20, font=("Helvetica", 11))
+        self.entry_buscar_cliente.pack(side=tk.LEFT, padx=5)
+
+        btn_buscar = tk.Button(
+            frame_filtros,
+            text="Buscar",
+            font=("Helvetica", 10),
+            bg="#303f9f",
+            fg="white",
+            command=self.buscar_pedidos_cliente
+        )
+        btn_buscar.pack(side=tk.LEFT, padx=5)
+
+        btn_refrescar = tk.Button(
+            frame_filtros,
+            text="🔄 Refrescar",
+            font=("Helvetica", 10),
+            bg="#303f9f",
+            fg="white",
+            command=self.cargar_pedidos
+        )
+        btn_refrescar.pack(side=tk.RIGHT, padx=5)
+
+        # Tabla de pedidos
+        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        columnas = ('id', 'cliente', 'fecha', 'total', 'estado', 'observaciones')
+
+        self.tabla_pedidos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(self.tabla_pedidos)
+
+        # Configurar encabezados
+        self.tabla_pedidos.heading('id', text='ID')
+        self.tabla_pedidos.heading('cliente', text='Cliente')
+        self.tabla_pedidos.heading('fecha', text='Fecha')
+        self.tabla_pedidos.heading('total', text='Total')
+        self.tabla_pedidos.heading('estado', text='Estado')
+        self.tabla_pedidos.heading('observaciones', text='Observaciones')
+
+        # Configurar anchos
+        self.tabla_pedidos.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_pedidos.column('cliente', width=200)
+        self.tabla_pedidos.column('fecha', width=150, anchor=tk.CENTER)
+        self.tabla_pedidos.column('total', width=100, anchor=tk.CENTER)
+        self.tabla_pedidos.column('estado', width=120, anchor=tk.CENTER)
+        self.tabla_pedidos.column('observaciones', width=250)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_pedidos.yview)
+        self.tabla_pedidos.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        self.tabla_pedidos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Frame para botones de acción
+        frame_acciones = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_acciones.pack(fill=tk.X, pady=10)
+
+        # Botones de acción
+        btn_ver_detalles = tk.Button(
+            frame_acciones,
+            text="Ver Detalles",
+            font=("Helvetica", 10),
+            bg="#303f9f",
+            fg="white",
+            command=self.ver_detalles_pedido
+        )
+        btn_ver_detalles.pack(side=tk.LEFT, padx=5)
+
+        btn_cambiar_estado = tk.Button(
+            frame_acciones,
+            text="Cambiar Estado",
+            font=("Helvetica", 10),
+            bg="#303f9f",
+            fg="white",
+            command=self.cambiar_estado_pedido
+        )
+        btn_cambiar_estado.pack(side=tk.LEFT, padx=5)
+
+        btn_eliminar = tk.Button(
+            frame_acciones,
+            text="Eliminar",
+            font=("Helvetica", 10),
+            bg="#e53935",
+            fg="white",
+            command=self.eliminar_pedido
+        )
+        btn_eliminar.pack(side=tk.LEFT, padx=5)
+
+        # Cargar pedidos al iniciar
+        self.cargar_pedidos()
+
+    def seleccionar_cliente(self):
+        """Abre ventana para seleccionar un cliente"""
+        # Crear ventana para seleccionar cliente
+        ventana_clientes = tk.Toplevel(self.ventana)
+        ventana_clientes.title("Seleccionar Cliente")
+        ventana_clientes.geometry("700x500")
+        ventana_clientes.config(bg="#f5f5f5")
+        ventana_clientes.grab_set()  # Hacer modal
+
+        # Centrar ventana
+        utl.centrar_ventana(ventana_clientes, 700, 500)
+
+        # Frame principal
+        frame_principal = tk.Frame(ventana_clientes, bg="#f5f5f5")
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Título
+        tk.Label(
+            frame_principal,
+            text="SELECCIONAR CLIENTE",
+            font=("Helvetica", 16, "bold"),
+            bg="#f5f5f5",
+            fg="#303f9f"
+        ).pack(pady=(0, 20))
+
+        # Frame para búsqueda
+        frame_busqueda = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_busqueda.pack(fill=tk.X, pady=10)
+
+        tk.Label(
+            frame_busqueda,
+            text="Buscar cliente:",
+            font=("Helvetica", 12),
+            bg="#f5f5f5"
+        ).pack(side=tk.LEFT, padx=5)
+
+        entry_buscar = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 12))
+        entry_buscar.pack(side=tk.LEFT, padx=5)
+
+        # Vincular tecla Enter al buscador
+        entry_buscar.bind("<Return>", lambda event: buscar_clientes(entry_buscar.get().strip()))
+
+        btn_buscar = tk.Button(
+            frame_busqueda,
+            text="🔍 Buscar",
+            font=("Helvetica", 10),
+            bg="#303f9f",
+            fg="white",
+            padx=10,
+            cursor="hand2",
+            command=lambda: buscar_clientes(entry_buscar.get().strip())
+        )
+        btn_buscar.pack(side=tk.LEFT, padx=5)
+
+        # Frame para la tabla
+        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Tabla de clientes
+        columnas = ('id', 'nombre', 'telefono', 'puntos')
+
+        tabla_clientes = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(tabla_clientes)
+
+        # Configurar encabezados
+        tabla_clientes.heading('id', text='ID')
+        tabla_clientes.heading('nombre', text='Nombre')
+        tabla_clientes.heading('telefono', text='Teléfono')
+        tabla_clientes.heading('puntos', text='Puntos')
+
+        # Configurar anchos
+        tabla_clientes.column('id', width=50, anchor=tk.CENTER)
+        tabla_clientes.column('nombre', width=300)
+        tabla_clientes.column('telefono', width=150, anchor=tk.CENTER)
+        tabla_clientes.column('puntos', width=100, anchor=tk.CENTER)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_clientes.yview)
+        tabla_clientes.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        tabla_clientes.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Frame para botones
+        frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_botones.pack(fill=tk.X, pady=10)
+
+        # Botones
+        btn_seleccionar = tk.Button(
+            frame_botones,
+            text="Seleccionar",
+            font=("Helvetica", 11),
+            bg="#303f9f",
+            fg="white",
+            width=12,
+            cursor="hand2",
+            command=lambda: seleccionar_cliente_accion(tabla_clientes)
+        )
+        btn_seleccionar.pack(side=tk.LEFT, padx=5)
+
+        btn_nuevo = tk.Button(
+            frame_botones,
+            text="Nuevo Cliente",
+            font=("Helvetica", 11),
+            bg="#303f9f",
+            fg="white",
+            width=12,
+            cursor="hand2",
+            command=lambda: abrir_nuevo_cliente(ventana_clientes)
+        )
+        btn_nuevo.pack(side=tk.LEFT, padx=5)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            font=("Helvetica", 11),
+            bg="#e53935",
+            fg="white",
+            width=10,
+            cursor="hand2",
+            command=ventana_clientes.destroy
+        )
+        btn_cancelar.pack(side=tk.RIGHT, padx=5)
+
+        # Función para cargar clientes
+        def cargar_clientes():
+            # Limpiar tabla
+            for item in tabla_clientes.get_children():
+                tabla_clientes.delete(item)
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute(
+                    "SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
+
+                for cliente in cursor.fetchall():
+                    tabla_clientes.insert('', tk.END, values=cliente)
+
+                conexion.close()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
+
+        # Función para buscar clientes
+        def buscar_clientes(texto_busqueda):
+            # Limpiar tabla
+            for item in tabla_clientes.get_children():
+                tabla_clientes.delete(item)
+
+            if not texto_busqueda:
+                cargar_clientes()
+                return
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Búsqueda por nombre o teléfono
+                consulta = """
+                SELECT id_cliente, nombre, telefono, puntos FROM clientes 
+                WHERE nombre LIKE %s OR telefono LIKE %s
+                ORDER BY nombre
+                """
+
+                cursor.execute(consulta, (f"%{texto_busqueda}%", f"%{texto_busqueda}%"))
+
+                for cliente in cursor.fetchall():
+                    tabla_clientes.insert('', tk.END, values=cliente)
+
+                conexion.close()
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al buscar clientes: {str(e)}")
+
+        # Función para seleccionar cliente
+        def seleccionar_cliente_accion(tabla):
+            seleccion = tabla.selection()
+
+            if not seleccion:
+                messagebox.showwarning("Selección requerida", "Por favor, selecciona un cliente")
+                return
+
+            # Obtener datos del cliente seleccionado
+            valores = tabla.item(seleccion[0], 'values')
+            self.cliente_actual = {
+                'id': valores[0],
+                'nombre': valores[1]
+            }
+
+            # Actualizar etiqueta en la ventana principal
+            self.lbl_cliente_seleccionado.config(
+                text=f"{self.cliente_actual['nombre']}",
+                fg="#303f9f"
+            )
+
+            # Cerrar ventana
+            ventana_clientes.destroy()
+
+        # Función para abrir formulario de nuevo cliente
+        def abrir_nuevo_cliente(ventana_padre):
+            # Crear ventana para nuevo cliente
+            ventana_nuevo = tk.Toplevel(ventana_padre)
+            ventana_nuevo.title("Nuevo Cliente")
+            ventana_nuevo.geometry("400x300")
+            ventana_nuevo.config(bg="#f5f5f5")
+            ventana_nuevo.grab_set()  # Hacer modal
+
+            # Centrar ventana
+            utl.centrar_ventana(ventana_nuevo, 400, 300)
+
+            # Frame principal
+            frame_principal = tk.Frame(ventana_nuevo, bg="#f5f5f5")
+            frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+            # Título
+            tk.Label(
+                frame_principal,
+                text="NUEVO CLIENTE",
+                font=("Helvetica", 14, "bold"),
+                bg="#f5f5f5",
+                fg="#303f9f"
+            ).pack(pady=(0, 20))
+
+            # Frame para formulario
+            frame_form = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_form.pack(fill=tk.X, pady=10)
+
+            # Campos del formulario
+            tk.Label(frame_form, text="Nombre:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W, pady=5)
+            entry_nombre = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
+            entry_nombre.grid(row=0, column=1, sticky=tk.W, pady=5)
+
+            tk.Label(frame_form, text="Teléfono:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=1, column=0, sticky=tk.W, pady=5)
+            entry_telefono = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
+            entry_telefono.grid(row=1, column=1, sticky=tk.W, pady=5)
+
+            tk.Label(frame_form, text="Correo:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=2, column=0, sticky=tk.W, pady=5)
+            entry_correo = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
+            entry_correo.grid(row=2, column=1, sticky=tk.W, pady=5)
+
+            # Frame para botones
+            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_botones.pack(fill=tk.X, pady=20)
+
+            # Función para guardar nuevo cliente
+            def guardar_cliente():
+                nombre = entry_nombre.get().strip()
+                telefono = entry_telefono.get().strip()
+                correo = entry_correo.get().strip()
+
+                if not nombre:
+                    messagebox.showwarning("Dato requerido", "El nombre del cliente es obligatorio")
+                    return
+
+                try:
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+                    consulta = "INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES (%s, %s, %s, 0)"
+                    cursor.execute(consulta, (nombre, telefono, correo))
+
+                    # Obtener el ID del cliente recién insertado
+                    cursor.execute("SELECT LAST_INSERT_ID()")
+                    id_cliente = cursor.fetchone()[0]
+
+                    conexion.commit()
+                    conexion.close()
+
+                    # Seleccionar el cliente recién creado
+                    self.cliente_actual = {
+                        'id': id_cliente,
+                        'nombre': nombre
+                    }
+
+                    # Actualizar etiqueta en la ventana principal
+                    self.lbl_cliente_seleccionado.config(
+                        text=f"{nombre}",
+                        fg="#303f9f"
+                    )
+
+                    messagebox.showinfo("Éxito", "Cliente registrado correctamente")
+                    ventana_nuevo.destroy()
+                    ventana_clientes.destroy()
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo registrar el cliente: {str(e)}")
+
+            # Botones
+            btn_guardar = tk.Button(
+                frame_botones,
+                text="Guardar",
+                font=("Helvetica", 11),
+                bg="#303f9f",
+                fg="white",
+                width=10,
+                cursor="hand2",
+                command=guardar_cliente
+            )
+            btn_guardar.pack(side=tk.LEFT, padx=5)
+
+            btn_cancelar = tk.Button(
+                frame_botones,
+                text="Cancelar",
+                font=("Helvetica", 11),
+                bg="#e53935",
+                fg="white",
+                width=10,
+                cursor="hand2",
+                command=ventana_nuevo.destroy
+            )
+            btn_cancelar.pack(side=tk.LEFT, padx=5)
+
+        # Cargar clientes al iniciar
+        cargar_clientes()
+
+    def cargar_servicios(self):
+        """Carga los servicios disponibles en la tabla"""
+        # Limpiar tabla
+        for item in self.tabla_servicios.get_children():
+            self.tabla_servicios.delete(item)
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener servicios activos
+            consulta = """
+            SELECT id_servicio, nombre, descripcion, precio, 
+                   CONCAT(tiempo_estimado, ' min') as tiempo 
+            FROM servicios 
+            WHERE activo = 1 
+            ORDER BY nombre
+            """
+
+            cursor.execute(consulta)
+
+            for servicio in cursor.fetchall():
+                # Formatear precio
+                precio_formateado = f"${float(servicio[3]):.2f}"
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                self.tabla_servicios.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar los servicios: {str(e)}")
+
+    def buscar_servicios(self, texto_busqueda):
+        """Busca servicios por nombre o descripción"""
+        # Limpiar tabla
+        for item in self.tabla_servicios.get_children():
+            self.tabla_servicios.delete(item)
+
+        if not texto_busqueda:
+            self.cargar_servicios()
+            return
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Búsqueda por nombre o descripción
+            consulta = """
+            SELECT id_servicio, nombre, descripcion, precio, 
+                   CONCAT(tiempo_estimado, ' min') as tiempo 
+            FROM servicios 
+            WHERE activo = 1 
+                  AND (nombre LIKE %s OR descripcion LIKE %s)
+            ORDER BY nombre
+            """
+
+            cursor.execute(consulta, (f"%{texto_busqueda}%", f"%{texto_busqueda}%"))
+
+            for servicio in cursor.fetchall():
+                # Formatear precio
+                precio_formateado = f"${float(servicio[3]):.2f}"
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                self.tabla_servicios.insert('', tk.END, values=valores)
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al buscar servicios: {str(e)}")
+
+    def agregar_servicio(self):
+        """Agrega un servicio al pedido actual"""
+        # Verificar si hay un cliente seleccionado
+        if not self.cliente_actual:
+            messagebox.showwarning("Cliente requerido", "Por favor, selecciona un cliente primero")
+            return
+
+        # Obtener el servicio seleccionado
+        seleccion = self.tabla_servicios.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un servicio para agregar")
+            return
+
+        # Obtener datos del servicio seleccionado
+        valores = self.tabla_servicios.item(seleccion[0], 'values')
+        id_servicio = valores[0]
+        nombre_servicio = valores[1]
+        precio_str = valores[3].replace(',', '')  # Quitar la coma del precio
+
+        try:
+            precio_unitario = float(precio_str)
+
+            # Obtener cantidad deseada
+            try:
+                cantidad = int(self.entry_cantidad.get().strip())
+                if cantidad <= 0:
+                    messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
+                    return
+            except ValueError:
+                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
+                return
+
+            # Calcular subtotal
+            subtotal = precio_unitario * cantidad
+
+            # Verificar si ya existe este servicio en la lista
+            existe = False
+            for i, item in enumerate(self.items_pedido):
+                if item['id_servicio'] == id_servicio:
+                    # Actualizar cantidad y subtotal
+                    nueva_cantidad = item['cantidad'] + cantidad
+                    self.items_pedido[i]['cantidad'] = nueva_cantidad
+                    self.items_pedido[i]['subtotal'] = precio_unitario * nueva_cantidad
+                    existe = True
+                    break
+
+            # Si no existe, agregarlo a la lista
+            if not existe:
+                self.items_pedido.append({
+                    'id_servicio': id_servicio,
+                    'nombre': nombre_servicio,
+                    'cantidad': cantidad,
+                    'precio_unitario': precio_unitario,
+                    'subtotal': subtotal
+                })
+
+            # Actualizar la tabla de detalles
+            self.actualizar_tabla_detalles()
+
+            # Calcular y mostrar el total
+            self.calcular_total()
+
+        except ValueError:
+            messagebox.showerror("Error", "No se pudo procesar el precio del servicio")
+
+    def actualizar_tabla_detalles(self):
+        """Actualiza la tabla de detalles del pedido"""
+        # Limpiar tabla
+        for item in self.tabla_detalles.get_children():
+            self.tabla_detalles.delete(item)
+
+        # Agregar cada item a la tabla
+        for item in self.items_pedido:
+            valores = (
+                item['nombre'],
+                item['cantidad'],
+                f"${item['precio_unitario']:.2f}",
+                f"${item['subtotal']:.2f}"
+            )
+            self.tabla_detalles.insert('', tk.END, values=valores)
+
+    def calcular_total(self):
+        """Calcula y muestra el total del pedido"""
+        self.total_pedido = sum(item['subtotal'] for item in self.items_pedido)
+        self.lbl_total.config(text=f"${self.total_pedido:.2f}")
+
+    def quitar_item(self):
+        """Quita un item seleccionado del pedido"""
+        seleccion = self.tabla_detalles.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un servicio para quitar")
+            return
+
+        # Obtener índice del item seleccionado
+        indice = self.tabla_detalles.index(seleccion[0])
+
+        # Eliminar el item de la lista
+        if 0 <= indice < len(self.items_pedido):
+            del self.items_pedido[indice]
+
+            # Actualizar tabla y total
+            self.actualizar_tabla_detalles()
+            self.calcular_total()
+
+    def limpiar_pedido(self):
+        """Limpia todos los items del pedido"""
+        if messagebox.askyesno("Confirmar", "¿Deseas limpiar todos los items del pedido?"):
+            self.items_pedido = []
+            self.actualizar_tabla_detalles()
+            self.calcular_total()
+
+    def guardar_pedido(self):
+        """Guarda el pedido en la base de datos"""
+        # Verificar si hay un cliente seleccionado
+        if not self.cliente_actual:
+            messagebox.showwarning("Cliente requerido", "Por favor, selecciona un cliente para el pedido")
+            return
+
+        # Verificar si hay items en el pedido
+        if not self.items_pedido:
+            messagebox.showwarning("Pedido vacío", "El pedido no tiene servicios agregados")
+            return
+
+        # Obtener observaciones
+        observaciones = self.txt_observaciones.get("1.0", tk.END).strip()
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Insertar encabezado del pedido
+            consulta_pedido = """
+            INSERT INTO pedidos (id_cliente, fecha_pedido, estado, observaciones)
+            VALUES (%s, NOW(), 'Recibido', %s)
+            """
+
+            cursor.execute(consulta_pedido, (self.cliente_actual['id'], observaciones))
+
+            # Obtener el ID del pedido recién insertado
+            cursor.execute("SELECT LAST_INSERT_ID()")
+            id_pedido = cursor.fetchone()[0]
+
+            # Insertar detalle del pedido
+            consulta_detalle = """
+            INSERT INTO detalle_pedido (id_pedido, tipo_item, id_item, cantidad, precio_unitario)
+            VALUES (%s, 'servicio', %s, %s, %s)
+            """
+
+            for item in self.items_pedido:
+                cursor.execute(
+                    consulta_detalle,
+                    (id_pedido, item['id_servicio'], item['cantidad'], item['precio_unitario'])
+                )
+
+            conexion.commit()
+            conexion.close()
+
+            messagebox.showinfo("Éxito", f"Pedido #{id_pedido} registrado correctamente")
+
+            # Limpiar formulario para un nuevo pedido
+            self.cliente_actual = None
+            self.lbl_cliente_seleccionado.config(text="No seleccionado", fg="#777777")
+            self.items_pedido = []
+            self.actualizar_tabla_detalles()
+            self.calcular_total()
+            self.txt_observaciones.delete("1.0", tk.END)
+
+            # Cambiar a la pestaña de listado de pedidos
+            self.notebook.select(self.tab_lista)
+
+            # Actualizar la lista de pedidos
+            self.cargar_pedidos()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo guardar el pedido: {str(e)}")
+
+    def cargar_pedidos(self):
+        """Carga los pedidos en la tabla según los filtros aplicados"""
+        # Limpiar tabla
+        for item in self.tabla_pedidos.get_children():
+            self.tabla_pedidos.delete(item)
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener filtro de estado
+            filtro_estado = self.combo_estado.get()
+
+            # Construir consulta según filtro
+            consulta = """
+            SELECT p.id_pedido, c.nombre, p.fecha_pedido, 
+                   (SELECT SUM(dp.cantidad * dp.precio_unitario) 
+                    FROM detalle_pedido dp 
+                    WHERE dp.id_pedido = p.id_pedido) as total,
+                   p.estado, p.observaciones
+            FROM pedidos p
+            INNER JOIN clientes c ON p.id_cliente = c.id_cliente
+            """
+
+            parametros = []
+
+            # Agregar condición de estado si no es "Todos"
+            if filtro_estado != "Todos":
+                consulta += " WHERE p.estado = %s"
+                parametros.append(filtro_estado)
+
+            consulta += " ORDER BY p.fecha_pedido DESC"
+
+            if parametros:
+                cursor.execute(consulta, parametros)
+            else:
+                cursor.execute(consulta)
+
+            for pedido in cursor.fetchall():
+                # Formatear fecha y total
+                fecha_formateada = utl.formatear_fecha(pedido[2], '%d/%m/%Y %H:%M')
+                total_formateado = f"${float(pedido[3] or 0):.2f}"
+
+                valores = (
+                    pedido[0],              # ID
+                    pedido[1],              # Cliente
+                    fecha_formateada,       # Fecha
+                    total_formateado,       # Total
+                    pedido[4],              # Estado
+                    pedido[5] or ""         # Observaciones
+                )
+
+                # Insertar en la tabla con etiqueta de estado para aplicar color
+                item_id = self.tabla_pedidos.insert('', tk.END, values=valores, tags=(pedido[4],))
+
+                # Aplicar color según estado
+                if pedido[4] in self.colores_estado:
+                    self.tabla_pedidos.tag_configure(pedido[4], background=self.colores_estado[pedido[4]])
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar los pedidos: {str(e)}")
+
+    def buscar_pedidos_cliente(self):
+        """Busca pedidos por nombre de cliente"""
+        texto_busqueda = self.entry_buscar_cliente.get().strip()
+
+        if not texto_busqueda:
+            self.cargar_pedidos()
+            return
+
+        # Limpiar tabla
+        for item in self.tabla_pedidos.get_children():
+            self.tabla_pedidos.delete(item)
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener filtro de estado
+            filtro_estado = self.combo_estado.get()
+
+            # Construir consulta según filtros
+            consulta = """
+            SELECT p.id_pedido, c.nombre, p.fecha_pedido, 
+                   (SELECT SUM(dp.cantidad * dp.precio_unitario) 
+                    FROM detalle_pedido dp 
+                    WHERE dp.id_pedido = p.id_pedido) as total,
+                   p.estado, p.observaciones
+            FROM pedidos p
+            INNER JOIN clientes c ON p.id_cliente = c.id_cliente
+            WHERE c.nombre LIKE %s
+            """
+
+            parametros = [f"%{texto_busqueda}%"]
+
+            # Agregar condición de estado si no es "Todos"
+            if filtro_estado != "Todos":
+                consulta += " AND p.estado = %s"
+                parametros.append(filtro_estado)
+
+            consulta += " ORDER BY p.fecha_pedido DESC"
+
+            cursor.execute(consulta, parametros)
+
+            for pedido in cursor.fetchall():
+                # Formatear fecha y total
+                fecha_formateada = utl.formatear_fecha(pedido[2], '%d/%m/%Y %H:%M')
+                total_formateado = f"${float(pedido[3] or 0):.2f}"
+
+                valores = (
+                    pedido[0],              # ID
+                    pedido[1],              # Cliente
+                    fecha_formateada,       # Fecha
+                    total_formateado,       # Total
+                    pedido[4],              # Estado
+                    pedido[5] or ""         # Observaciones
+                )
+
+                # Insertar en la tabla con etiqueta de estado para aplicar color
+                item_id = self.tabla_pedidos.insert('', tk.END, values=valores, tags=(pedido[4],))
+
+                # Aplicar color según estado
+                if pedido[4] in self.colores_estado:
+                    self.tabla_pedidos.tag_configure(pedido[4], background=self.colores_estado[pedido[4]])
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al buscar pedidos: {str(e)}")
+
+    def ver_detalles_pedido(self):
+        """Muestra los detalles de un pedido seleccionado"""
+        seleccion = self.tabla_pedidos.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para ver sus detalles")
+            return
+
+        # Obtener ID del pedido seleccionado
+        valores = self.tabla_pedidos.item(seleccion[0], 'values')
+        id_pedido = valores[0]
+        cliente = valores[1]
+
+        # Crear ventana de detalles
+        ventana_detalles = tk.Toplevel(self.ventana)
+        ventana_detalles.title(f"Detalles del Pedido #{id_pedido}")
+        ventana_detalles.geometry("700x500")
+        ventana_detalles.config(bg="#f5f5f5")
+        ventana_detalles.grab_set()  # Hacer modal
+
+        # Centrar ventana
+        utl.centrar_ventana(ventana_detalles, 700, 500)
+
+        # Frame principal
+        frame_principal = tk.Frame(ventana_detalles, bg="#f5f5f5")
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Título
+        tk.Label(
+            frame_principal,
+            text=f"DETALLES DEL PEDIDO #{id_pedido}",
+            font=("Helvetica", 16, "bold"),
+            bg="#f5f5f5",
+            fg="#303f9f"
+        ).pack(pady=(0, 5))
+
+        # Subtítulo
+        tk.Label(
+            frame_principal,
+            text=f"Cliente: {cliente}",
+            font=("Helvetica", 12),
+            bg="#f5f5f5",
+            fg="#303f9f"
+        ).pack(pady=(0, 20))
+
+        # Separador
+        ttk.Separator(frame_principal, orient="horizontal").pack(fill=tk.X, pady=10)
+
+        # Frame para la tabla
+        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Tabla de detalles
+        columnas = ('servicio', 'cantidad', 'precio_unitario', 'subtotal')
+
+        tabla_detalles = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(tabla_detalles)
+
+        # Configurar encabezados
+        tabla_detalles.heading('servicio', text='Servicio')
+        tabla_detalles.heading('cantidad', text='Cantidad')
+        tabla_detalles.heading('precio_unitario', text='Precio Unit.')
+        tabla_detalles.heading('subtotal', text='Subtotal')
+
+        # Configurar anchos
+        tabla_detalles.column('servicio', width=300)
+        tabla_detalles.column('cantidad', width=100, anchor=tk.CENTER)
+        tabla_detalles.column('precio_unitario', width=100, anchor=tk.CENTER)
+        tabla_detalles.column('subtotal', width=100, anchor=tk.CENTER)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_detalles.yview)
+        tabla_detalles.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        tabla_detalles.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Frame para información adicional
+        frame_info = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_info.pack(fill=tk.X, pady=10)
+
+        # Cargar detalles del pedido
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener detalles del pedido
+            consulta = """
+            SELECT s.nombre, dp.cantidad, dp.precio_unitario,
+                   (dp.cantidad * dp.precio_unitario) as subtotal
+            FROM detalle_pedido dp
+            JOIN servicios s ON dp.id_item = s.id_servicio
+            WHERE dp.id_pedido = %s AND dp.tipo_item = 'servicio'
+            """
+
+            cursor.execute(consulta, (id_pedido,))
+
+            total = 0.0
+
+            for detalle in cursor.fetchall():
+                # Formatear valores monetarios
+                precio_unitario = f"${float(detalle[2]):.2f}"
+                subtotal = f"${float(detalle[3]):.2f}"
+
+                valores = (
+                    detalle[0],         # Servicio
+                    detalle[1],         # Cantidad
+                    precio_unitario,    # Precio unitario
+                    subtotal            # Subtotal
+                )
+
+                tabla_detalles.insert('', tk.END, values=valores)
+                total += float(detalle[3])
+
+            # Obtener información general del pedido
+            consulta_pedido = """
+            SELECT estado, fecha_pedido, observaciones
+            FROM pedidos
+            WHERE id_pedido = %s
+            """
+
+            cursor.execute(consulta_pedido, (id_pedido,))
+            estado, fecha, observaciones = cursor.fetchone()
+
+            fecha_formateada = utl.formatear_fecha(fecha, '%d/%m/%Y %H:%M')
+
+            # Mostrar información general
+            tk.Label(
+                frame_info,
+                text=f"Estado: {estado}",
+                font=("Helvetica", 12, "bold"),
+                bg="#f5f5f5"
+            ).pack(anchor=tk.W, pady=5)
+
+            tk.Label(
+                frame_info,
+                text=f"Fecha: {fecha_formateada}",
+                font=("Helvetica", 12),
+                bg="#f5f5f5"
+            ).pack(anchor=tk.W, pady=5)
+
+            tk.Label(
+                frame_info,
+                text=f"Total: ${total:.2f}",
+                font=("Helvetica", 14, "bold"),
+                bg="#f5f5f5",
+                fg="#303f9f"
+            ).pack(anchor=tk.W, pady=5)
+
+            # Mostrar observaciones si existen
+            if observaciones:
+                tk.Label(
+                    frame_info,
+                    text="Observaciones:",
+                    font=("Helvetica", 12, "bold"),
+                    bg="#f5f5f5"
+                ).pack(anchor=tk.W, pady=(10, 5))
+
+                txt_obs = tk.Text(frame_info, height=3, font=("Helvetica", 11), wrap=tk.WORD)
+                txt_obs.pack(fill=tk.X, pady=5)
+                txt_obs.insert("1.0", observaciones)
+                txt_obs.config(state=tk.DISABLED)  # Solo lectura
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar los detalles del pedido: {str(e)}")
+
+        # Botón para cerrar
+        tk.Button(
+            frame_principal,
+            text="Cerrar",
+            font=("Helvetica", 11),
+            bg="#303f9f",
+            fg="white",
+            width=10,
+            command=ventana_detalles.destroy
+        ).pack(pady=20)
+
+    def cambiar_estado_pedido(self):
+        """Permite cambiar el estado de un pedido seleccionado"""
+        seleccion = self.tabla_pedidos.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para cambiar su estado")
+            return
+
+        # Obtener datos del pedido seleccionado
+        valores = self.tabla_pedidos.item(seleccion[0], 'values')
+        id_pedido = valores[0]
+        estado_actual = valores[4]
+
+        # Crear ventana para cambiar estado
+        ventana_estado = tk.Toplevel(self.ventana)
+        ventana_estado.title(f"Cambiar Estado del Pedido #{id_pedido}")
+        ventana_estado.geometry("400x250")
+        ventana_estado.config(bg="#f5f5f5")
+        ventana_estado.grab_set()  # Hacer modal
+
+        # Centrar ventana
+        utl.centrar_ventana(ventana_estado, 400, 250)
+
+        # Frame principal
+        frame_principal = tk.Frame(ventana_estado, bg="#f5f5f5")
+        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Título
+        tk.Label(
+            frame_principal,
+            text=f"CAMBIAR ESTADO DEL PEDIDO #{id_pedido}",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5",
+            fg="#303f9f"
+        ).pack(pady=(0, 20))
+
+        # Estado actual
+        frame_actual = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_actual.pack(fill=tk.X, pady=10)
+
+        tk.Label(
+            frame_actual,
+            text="Estado actual:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).pack(side=tk.LEFT, padx=5)
+
+        lbl_estado_actual = tk.Label(
+            frame_actual,
+            text=estado_actual,
+            font=("Helvetica", 11, "bold"),
+            bg="#f5f5f5",
+            fg=self.colores_estado.get(estado_actual, "#333333")
+        )
+        lbl_estado_actual.pack(side=tk.LEFT, padx=5)
+
+        # Nuevo estado
+        frame_nuevo = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_nuevo.pack(fill=tk.X, pady=10)
+
+        tk.Label(
+            frame_nuevo,
+            text="Nuevo estado:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).pack(side=tk.LEFT, padx=5)
+
+        # Lista de estados disponibles (quitar el estado actual)
+        estados = ["Recibido", "En proceso", "Listo para entrega", "Entregado"]
+        if estado_actual in estados:
+            estados.remove(estado_actual)
+
+        combo_nuevo_estado = ttk.Combobox(
+            frame_nuevo,
+            values=estados,
+            width=15,
+            state="readonly"
+        )
+        combo_nuevo_estado.pack(side=tk.LEFT, padx=5)
+
+        if estados:
+            combo_nuevo_estado.current(0)  # Seleccionar el primer estado disponible
+
+        # Botones
+        frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_botones.pack(fill=tk.X, pady=20)
+
+        def actualizar_estado():
+            nuevo_estado = combo_nuevo_estado.get()
+
+            if not nuevo_estado:
+                messagebox.showwarning("Estado requerido", "Por favor, selecciona un nuevo estado")
+                return
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Actualizar estado del pedido
+                consulta = "UPDATE pedidos SET estado = %s WHERE id_pedido = %s"
+                cursor.execute(consulta, (nuevo_estado, id_pedido))
+
+                conexion.commit()
+                conexion.close()
+
+                messagebox.showinfo("Éxito", f"Estado del pedido actualizado a: {nuevo_estado}")
+                ventana_estado.destroy()
+
+                # Actualizar la lista de pedidos
+                self.cargar_pedidos()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo actualizar el estado: {str(e)}")
+
+        btn_actualizar = tk.Button(
+            frame_botones,
+            text="Actualizar",
+            font=("Helvetica", 11),
+            bg="#303f9f",
+            fg="white",
+            width=10,
+            cursor="hand2",
+            command=actualizar_estado
+        )
+        btn_actualizar.pack(side=tk.LEFT, padx=5)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            font=("Helvetica", 11),
+            bg="#e53935",
+            fg="white",
+            width=10,
+            cursor="hand2",
+            command=ventana_estado.destroy
+        )
+        btn_cancelar.pack(side=tk.RIGHT, padx=5)
+
+    def eliminar_pedido(self):
+        """Elimina un pedido seleccionado"""
+        seleccion = self.tabla_pedidos.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para eliminar")
+            return
+
+        # Obtener datos del pedido seleccionado
+        valores = self.tabla_pedidos.item(seleccion[0], 'values')
+        id_pedido = valores[0]
+
+        # Confirmar eliminación
+        confirmacion = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Estás seguro de eliminar el pedido #{id_pedido}?\n\nEsta acción no se puede deshacer."
+        )
+
+        if not confirmacion:
+            return
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Eliminar primero los detalles del pedido (por las claves foráneas)
+            cursor.execute("DELETE FROM detalle_pedido WHERE id_pedido = %s", (id_pedido,))
+
+            # Eliminar el pedido
+            cursor.execute("DELETE FROM pedidos WHERE id_pedido = %s", (id_pedido,))
+
+            conexion.commit()
+            conexion.close()
+
+            messagebox.showinfo("Éxito", f"Pedido #{id_pedido} eliminado correctamente")
+
+            # Actualizar la lista de pedidos
+            self.cargar_pedidos()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar el pedido: {str(e)}")
+
+
+# Si se ejecuta este archivo directamente, crear la ventana
+if __name__ == "__main__":
+    Pedidos()

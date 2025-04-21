@@ -1,5 +1,6 @@
 """
 Panel de Administrador para el Sistema de Gestión de Lavandería
+Versión corregida para llamar correctamente al módulo de pedidos
 """
 
 import tkinter as tk
@@ -235,9 +236,18 @@ class MasterPanel:
     def gestionar_pedidos(self):
         """Abre la ventana de gestión de pedidos"""
         try:
-            # Importar justo cuando se necesita
+            # Importación correcta del módulo de pedidos
+            # Asegúrate de que el nombre del archivo sea 'pedidos.py'
             from pedidos import Pedidos
-            Pedidos(self.ventana)
+            Pedidos(self.ventana)  # Crear instancia de la clase Pedidos
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de pedidos.\n"
+                                "Verifique que el archivo 'pedidos.py' existe.")
+        except AttributeError as e:
+            messagebox.showerror("Error de atributo",
+                                f"Error en el módulo de pedidos: {str(e)}\n"
+                                "Verifique que los métodos estén correctamente definidos.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 

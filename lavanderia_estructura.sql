@@ -122,6 +122,23 @@ CREATE TABLE movimientos_caja (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
+CREATE TABLE IF NOT EXISTS servicios (
+    id_servicio INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    precio DECIMAL(10,2) NOT NULL,
+    tiempo_estimado INT NOT NULL,
+    activo TINYINT(1) DEFAULT 1
+);
+
+-- Insertar algunos servicios por defecto (opcional)
+INSERT INTO servicios (nombre, descripcion, precio, tiempo_estimado, activo) VALUES
+('Lavado Normal', 'Lavado estándar de ropa', 10.00, 60, 1),
+('Lavado Express', 'Lavado rápido', 15.00, 30, 1),
+('Planchado', 'Servicio de planchado', 8.00, 45, 1),
+('Lavado en Seco', 'Lavado especial para prendas delicadas', 20.00, 90, 1),
+('Teñido', 'Servicio de teñido de prendas', 25.00, 120, 1);
+
 
 INSERT INTO usuarios (nombre, correo, contraseña, rol)
 VALUES ('Aketzaly', 'admin@lavanderia.com', '1234', 'admin');
