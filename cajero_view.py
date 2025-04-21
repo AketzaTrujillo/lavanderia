@@ -1,6 +1,6 @@
 """
 Panel de Cajero para el Sistema de Gestión de Lavandería
-Versión corregida para llamar correctamente al módulo de pedidos
+Con integración del módulo de seguimiento de pedidos
 """
 
 import tkinter as tk
@@ -101,11 +101,18 @@ class CajeroPanel:
                 "columna": 0
             },
             {
+                "texto": "Seguimiento Pedidos",
+                "comando": self.seguimiento_pedidos,
+                "icono": "📊",
+                "fila": 1,
+                "columna": 1
+            },
+            {
                 "texto": "Cerrar Sesión",
                 "comando": self.salir,
                 "icono": "🚪",
-                "fila": 1,
-                "columna": 1,
+                "fila": 2,
+                "columna": 0,
                 "es_salir": True
             }
         ]
@@ -250,6 +257,19 @@ class CajeroPanel:
         except AttributeError as e:
             messagebox.showerror("Error de atributo",
                                 f"Error en el módulo de ventas: {str(e)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+
+    def seguimiento_pedidos(self):
+        """Abre la ventana de seguimiento de pedidos"""
+        try:
+            # Importar el módulo de seguimiento
+            from seguimiento_pedidos import SeguimientoPedidos
+            SeguimientoPedidos(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de seguimiento de pedidos.\n"
+                                "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
