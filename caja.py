@@ -1386,11 +1386,7 @@ class GestionCaja:
         self.tabla_cortes.heading('saldo', text='Saldo Final')
         self.tabla_cortes.heading('responsable', text='Responsable')
 
-        # Configurar anchos
-        self.tabla_cortes.column('id', width=50, anchor=tk.CENTER)
-        self.tabla_cortes.column('fecha', width=100, anchor=tk.CENTER)
-        self.tabla_cortes.column('apertura', width=80, anchor=tk.CENTER)
-        self.tabla_cortes.column('cierre', width=80, anchor=tk.CENTER)
+
 
     def verificar_estado_caja(self):
         """Verifica si hay una caja abierta para la fecha actual"""
