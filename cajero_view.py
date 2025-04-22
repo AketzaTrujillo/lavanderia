@@ -1,6 +1,6 @@
 """
 Panel de Cajero para el Sistema de Gestión de Lavandería
-Con integración del módulo de seguimiento de pedidos
+Versión actualizada con acceso a módulo de caja
 """
 
 import tkinter as tk
@@ -16,12 +16,15 @@ sys.path.append(script_dir)
 class CajeroPanel:
     """Clase que implementa el panel principal de cajero"""
 
-    def __init__(self):
+    def __init__(self, id_usuario=None):
         self.ventana = tk.Tk()
         self.ventana.title("Panel de Cajero - Lavandería")
         self.ventana.geometry("800x600")
         self.ventana.config(bg="#e0f7fa")
         self.ventana.resizable(False, False)
+
+        # ID del usuario actual (para registrar operaciones)
+        self.id_usuario = id_usuario
 
         # Centrar ventana
         utl.centrar_ventana(self.ventana, 800, 600)
@@ -101,9 +104,9 @@ class CajeroPanel:
                 "columna": 0
             },
             {
-                "texto": "Seguimiento Pedidos",
-                "comando": self.seguimiento_pedidos,
-                "icono": "📊",
+                "texto": "Gestionar Caja",
+                "comando": self.gestionar_caja,
+                "icono": "💵",
                 "fila": 1,
                 "columna": 1
             },
@@ -210,7 +213,7 @@ class CajeroPanel:
         # Convertir de nuevo a HEX
         return f"#{r:02x}{g:02x}{b:02x}"
 
-    # Funciones para abrir módulos - CORREGIDAS CON MEJOR MANEJO DE ERRORES
+    # Funciones para abrir módulos - Actualizadas con mejor manejo de errores
     def registrar_pedido(self):
         """Abre la ventana para registrar pedidos"""
         try:
@@ -260,18 +263,18 @@ class CajeroPanel:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
-    def seguimiento_pedidos(self):
-        """Abre la ventana de seguimiento de pedidos"""
+    def gestionar_caja(self):
+        """Abre la ventana de gestión de caja"""
         try:
-            # Importar el módulo de seguimiento
-            from seguimiento_pedidos import SeguimientoPedidos
-            SeguimientoPedidos(self.ventana)
+            # Importación del módulo de caja
+            from caja import abrir_caja
+            abrir_caja(self.ventana, self.id_usuario)
         except ImportError:
             messagebox.showerror("Error de importación",
-                                "No se pudo importar el módulo de seguimiento de pedidos.\n"
-                                "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
+                                "No se pudo importar el módulo de caja.\n"
+                                "Verifique que el archivo 'caja.py' existe.")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
 
     def salir(self):
         """Cierra la sesión y la ventana"""
@@ -288,4 +291,6 @@ class CajeroPanel:
 
 # Para probar de forma independiente
 if __name__ == "__main__":
-    CajeroPanel()
+    # Para pruebas, asignar un ID de usuario fijo
+    id_usuario_prueba = 2  # Suponiendo que 2 es un cajero
+    CajeroPanel(id_usuario_prueba)

@@ -1,17 +1,11 @@
-"""
-Panel de Administrador para el Sistema de Gestión de Lavandería
-Con integración del módulo de seguimiento de pedidos
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
-import sys
 import utileria as utl
 
-# Asegurar que podamos importar los módulos
+# Obtener el directorio del script
 script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(script_dir)
+
 
 class MasterPanel:
     """Clase que implementa el panel principal de administrador"""
@@ -22,6 +16,9 @@ class MasterPanel:
         self.ventana.geometry("800x600")
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(False, False)
+
+        # ID del usuario actual (para registrar operaciones)
+        self.id_usuario = 1  # Por defecto, asumimos usuario ID 1 (admin)
 
         # Centrar ventana
         utl.centrar_ventana(self.ventana, 800, 600)
@@ -69,13 +66,14 @@ class MasterPanel:
         separador = ttk.Separator(frame_principal, orient="horizontal")
         separador.pack(fill=tk.X, pady=(0, 20))
 
-        # Frame para botones con 2 columnas
+        # Frame para botones con 3 columnas
         botones_frame = tk.Frame(frame_principal, bg="#f5f5f5")
         botones_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Configurar grid de 2 columnas
+        # Configurar grid de 3 columnas
         botones_frame.columnconfigure(0, weight=1)
         botones_frame.columnconfigure(1, weight=1)
+        botones_frame.columnconfigure(2, weight=1)
 
         # Definir botones con iconos y mejores estilos
         botones = [
@@ -97,36 +95,57 @@ class MasterPanel:
                 "texto": "Gestionar Clientes",
                 "comando": self.gestionar_clientes,
                 "icono": "👥",
-                "fila": 1,
-                "columna": 0
+                "fila": 0,
+                "columna": 2
             },
             {
                 "texto": "Gestionar Pedidos",
                 "comando": self.gestionar_pedidos,
                 "icono": "📋",
                 "fila": 1,
-                "columna": 1
+                "columna": 0
             },
             {
                 "texto": "Registrar Ventas",
                 "comando": self.registrar_ventas,
                 "icono": "💰",
-                "fila": 2,
-                "columna": 0
+                "fila": 1,
+                "columna": 1
+            },
+            {
+                "texto": "Gestionar Caja",
+                "comando": self.gestionar_caja,
+                "icono": "💵",
+                "fila": 1,
+                "columna": 2
             },
             {
                 "texto": "Seguimiento Pedidos",
                 "comando": self.seguimiento_pedidos,
                 "icono": "📊",
                 "fila": 2,
+                "columna": 0
+            },
+            {
+                "texto": "Generar Reportes",
+                "comando": self.generar_reportes,
+                "icono": "📈",
+                "fila": 2,
                 "columna": 1
+            },
+            {
+                "texto": "Gestionar Respaldos",
+                "comando": self.gestionar_respaldos,
+                "icono": "💾",
+                "fila": 2,
+                "columna": 2
             },
             {
                 "texto": "Cerrar Sesión",
                 "comando": self.salir,
                 "icono": "🚪",
                 "fila": 3,
-                "columna": 0,
+                "columna": 1,
                 "es_salir": True
             }
         ]
@@ -142,8 +161,8 @@ class MasterPanel:
             frame_boton.grid(
                 row=boton["fila"],
                 column=boton["columna"],
-                padx=20,
-                pady=20,
+                padx=10,
+                pady=10,
                 sticky="nsew"
             )
 
@@ -157,7 +176,7 @@ class MasterPanel:
                 font=("Helvetica", 14),
                 bg=color_bg,
                 fg="white",
-                width=20,
+                width=16,
                 height=2,
                 cursor="hand2",
                 command=boton["comando"],
@@ -173,6 +192,19 @@ class MasterPanel:
         # Pie de página
         pie_frame = tk.Frame(frame_principal, bg="#f5f5f5")
         pie_frame.pack(fill=tk.X, pady=(20, 0))
+
+        # Fecha y hora actual
+        from datetime import datetime
+        fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
+        fecha_lbl = tk.Label(
+            pie_frame,
+            text=f"Fecha: {fecha_actual}",
+            font=("Helvetica", 10),
+            bg="#f5f5f5",
+            fg="#666a88"
+        )
+        fecha_lbl.pack(side=tk.LEFT)
 
         pie_texto = tk.Label(
             pie_frame,
@@ -201,7 +233,7 @@ class MasterPanel:
         """Ajusta el brillo de un color hexadecimal"""
         # Convertir HEX a RGB
         hex_color = hex_color.lstrip('#')
-        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
 
         # Ajustar brillo
         r = min(255, int(r * factor))
@@ -247,27 +279,40 @@ class MasterPanel:
             Pedidos(self.ventana)  # Crear instancia de la clase Pedidos
         except ImportError:
             messagebox.showerror("Error de importación",
-                                "No se pudo importar el módulo de pedidos.\n"
-                                "Verifique que el archivo 'pedidos.py' existe.")
+                                 "No se pudo importar el módulo de pedidos.\n"
+                                 "Verifique que el archivo 'pedidos.py' existe.")
         except AttributeError as e:
             messagebox.showerror("Error de atributo",
-                                f"Error en el módulo de pedidos: {str(e)}\n"
-                                "Verifique que los métodos estén correctamente definidos.")
+                                 f"Error en el módulo de pedidos: {str(e)}\n"
+                                 "Verifique que los métodos estén correctamente definidos.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
-    def seguimiento_pedidos(self):
-        """Abre la ventana de seguimiento de pedidos"""
+    def gestionar_caja(self):
+        """Abre la ventana de gestión de caja"""
         try:
-            # Importar el módulo de seguimiento
-            from seguimiento_pedidos import SeguimientoPedidos
-            SeguimientoPedidos(self.ventana)
+            # Importación del módulo de caja
+            from caja import abrir_caja
+            abrir_caja(self.ventana, self.id_usuario)
         except ImportError:
             messagebox.showerror("Error de importación",
-                                "No se pudo importar el módulo de seguimiento de pedidos.\n"
-                                "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
+                                 "No se pudo importar el módulo de caja.\n"
+                                 "Verifique que el archivo 'caja.py' existe.")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
+
+    def gestionar_respaldos(self):
+        """Abre la ventana de gestión de respaldos"""
+        try:
+            # Importar el módulo de respaldos
+            from respaldos import abrir_respaldos
+            abrir_respaldos(self.ventana, self.id_usuario)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                 "No se pudo importar el módulo de respaldos.\n"
+                                 "Verifique que el archivo 'respaldos.py' existe.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos: {str(e)}")
 
     def registrar_ventas(self):
         """Abre la ventana de registro de ventas"""
@@ -278,15 +323,42 @@ class MasterPanel:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
+    def generar_reportes(self):
+        """Abre la ventana de generación de reportes"""
+        try:
+            # Importar el módulo de reportes
+            from reportes import abrir_reportes
+            abrir_reportes(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                 "No se pudo importar el módulo de reportes.\n"
+                                 "Verifique que el archivo 'reportes.py' existe.")
+            messagebox.showinfo("Información", "El módulo de reportes está en desarrollo")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de reportes: {str(e)}")
+        # Aquí iría la implementación del módulo de reportes
+
+    def seguimiento_pedidos(self):
+        """Abre la ventana de seguimiento de pedidos"""
+        try:
+            # Importar el módulo de seguimiento
+            from seguimiento import abrir_seguimiento
+            abrir_seguimiento(self.ventana)
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                 "No se pudo importar el módulo de seguimiento.\n"
+                                 "Verifique que el archivo 'seguimiento.py' existe.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
+
     def salir(self):
         """Cierra la sesión y la ventana"""
         if messagebox.askyesno("Confirmar salida", "¿Estás seguro de que deseas cerrar sesión?"):
             self.ventana.destroy()
             # Reabrir la pantalla de login
-            from loginP import App
-            App()
-
-
-# Para probar de forma independiente
-if __name__ == "__main__":
-    MasterPanel()
+            try:
+                from loginP import App
+                App()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo abrir la pantalla de login: {str(e)}")
+                self.ventana.destroy()
