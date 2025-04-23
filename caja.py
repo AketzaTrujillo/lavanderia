@@ -1,758 +1,4 @@
-self.tabla_cortes.column('id', width=50, anchor=tk.CENTER)
-self.tabla_cortes.column('fecha', width=100, anchor=tk.CENTER)
-self.tabla_cortes.column('apertura', width=80, anchor=tk.CENTER)
-self.tabla_cortes.column('cierre', width=80, anchor=tk.CENTER)
-self.tabla_cortes.column('ingresos', width=100, anchor=tk.E)
-self.tabla_cortes.column('egresos', width=100, anchor=tk.E)
-self.tabla_cortes.column('saldo', width=100, anchor=tk.E)
-self.tabla_cortes.column('responsable', width=150)
-
-# Scrollbar para la tabla
-scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_cortes.yview)
-self.tabla_cortes.configure(yscrollcommand=scrollbar.set)
-
-# Empaquetar tabla y scrollbar
-self.tabla_cortes.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-# Frame para botones de acción
-frame_acciones = tk.Frame(self.tab_cortes, bg="#f5f5f5")
-frame_acciones.pack(fill=tk.X, pady=10)
-
-btn_ver_detalle = tk.Button(
-    frame_acciones,
-    text="Ver Detalle",
-    font=("Helvetica", 11),
-    bg="#3f51b5",
-    fg="white",
-    width=15,
-    cursor="hand2",
-    command=self.ver_detalle_corte
-)
-btn_ver_detalle.pack(side=tk.LEFT, padx=5)
-
-btn_imprimir_corte = tk.Button(
-    frame_acciones,
-    text="Imprimir Corte",
-    font=("Helvetica", 11),
-    bg="#3f51b5",
-    fg="white",
-    width=15,
-    cursor="hand2",
-    command=self.imprimir_corte
-)
-btn_imprimir_corte.pack(side=tk.LEFT, padx=5)
-
-# Cargar cortes iniciales
-self.cargar_cortes()
-
-
-def abrir_caja(self):
-    """Abre la caja registrando la hora de apertura y el monto inicial"""
-    if self.caja_abierta:
-        messagebox.showwarning("Aviso", "Ya hay una caja abierta para el día de hoy")
-        return
-
-    # Solicitar monto inicial
-    monto_inicial = simpledialog.askfloat(
-        "Apertura de Caja",
-        "Ingrese el monto inicial de caja:",
-        minvalue=0.0
-    )
-
-    if monto_inicial is None:  # Usuario canceló
-        return
-
-    try:
-        # Verificar que el usuario tenga ID asignado
-        if not self.id_usuario:
-            messagebox.showerror("Error", "No se ha identificado al usuario actual")
-            return
-
-        conexion = conectar_bd()
-        cursor = conexion.cursor()
-
-        # Insertar registro de apertura de caja
-        fecha_actual = date.today().strftime("%Y-%m-%d")
-        hora_actual = datetime.now().time()
-
-        # Crear registro de caja
-        cursor.execute("""
-                INSERT INTO caja (fecha, hora_apertura, total_ingresos, total_egresos, saldo_final, responsable)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (fecha_actual, hora_actual, monto_inicial, 0, monto_inicial, self.id_usuario))
-
-        # Obtener el ID de la caja recién creada
-        cursor.execute("SELECT LAST_INSERT_ID()")
-        self.id_caja_actual = cursor.fetchone()[0]
-
-        # Registrar el monto inicial como un movimiento de ingreso
-        cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-        self.id_caja_actual, "ingreso", "Monto inicial de caja", monto_inicial, datetime.now(), self.id_usuario))
-
-        conexion.commit()
-        conexion.close()
-
-        # Actualizar estado
-        self.caja_abierta = True
-        self.responsable_caja = self.id_usuario
-
-        messagebox.showinfo("Éxito", f"Caja abierta correctamente con monto inicial de ${monto_inicial:.2f}")
-
-        # Actualizar interfaz
-        self.actualizar_estado_caja()
-        self.configurar_tab_operaciones()  # Reconstruir pestaña de operaciones
-        self.cargar_movimientos()
-
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
-
-
-def cerrar_caja(self):
-    """Cierra la caja registrando la hora de cierre y generando el corte"""
-    if not self.caja_abierta:
-        messagebox.showwarning("Aviso", "No hay una caja abierta para cerrar")
-        return
-
-    # Confirmar cierre
-    confirmar = messagebox.askyesno(
-        "Confirmar cierre",
-        "¿Está seguro de cerrar la caja? Esta acción no se puede deshacer."
-    )
-
-    if not confirmar:
-        return
-
-    try:
-        conexion = conectar_bd()
-        cursor = conexion.cursor()
-
-        # Obtener totales actuales
-        cursor.execute("""
-                SELECT SUM(CASE WHEN tipo = 'ingreso' THEN monto ELSE 0 END) as ingresos,
-                       SUM(CASE WHEN tipo = 'egreso' THEN monto ELSE 0 END) as egresos
-                FROM movimientos_caja
-                WHERE id_caja = %s
-            """, (self.id_caja_actual,))
-
-        resultado = cursor.fetchone()
-
-        if resultado:
-            total_ingresos, total_egresos = resultado
-            # Calcular saldo final
-            saldo_final = total_ingresos - total_egresos
-
-            # Actualizar registro de caja con hora de cierre y totales finales
-            cursor.execute("""
-                    UPDATE caja 
-                    SET hora_cierre = %s, total_ingresos = %s, total_egresos = %s, saldo_final = %s
-                    WHERE id_caja = %s
-                """, (datetime.now().time(), total_ingresos, total_egresos, saldo_final, self.id_caja_actual))
-
-            conexion.commit()
-
-            # Mostrar resumen del cierre
-            messagebox.showinfo(
-                "Cierre de Caja",
-                f"Caja cerrada correctamente\n\n"
-                f"Total Ingresos: ${total_ingresos:.2f}\n"
-                f"Total Egresos: ${total_egresos:.2f}\n"
-                f"Saldo Final: ${saldo_final:.2f}\n\n"
-                "Se ha generado un corte de caja."
-            )
-
-            # Preguntar si desea imprimir el corte
-            if messagebox.askyesno("Imprimir Corte", "¿Desea imprimir el corte de caja?"):
-                self.imprimir_corte(self.id_caja_actual)
-
-            # Actualizar estado
-            self.caja_abierta = False
-            self.id_caja_actual = None
-            self.responsable_caja = None
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-            self.configurar_tab_operaciones()  # Reconstruir pestaña de operaciones
-            self.cargar_cortes()
-
-        else:
-            messagebox.showerror("Error", "No se pudieron obtener los totales de la caja")
-
-        conexion.close()
-
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo cerrar la caja: {str(e)}")
-
-
-def registrar_ingreso(self):
-    """Registra un ingreso en la caja actual"""
-    if not self.caja_abierta:
-        messagebox.showwarning("Aviso", "No hay una caja abierta. Abra la caja primero.")
-        return
-
-    # Ventana para ingresar datos
-    ventana_ingreso = tk.Toplevel(self.ventana)
-    ventana_ingreso.title("Registrar Ingreso")
-    ventana_ingreso.geometry("400x250")
-    ventana_ingreso.config(bg="#f5f5f5")
-    ventana_ingreso.resizable(False, False)
-    ventana_ingreso.grab_set()  # Hacer modal
-
-    # Centrar ventana
-    utl.centrar_ventana(ventana_ingreso, 400, 250)
-
-    # Frame para el formulario
-    frame_form = tk.Frame(ventana_ingreso, bg="#f5f5f5", padx=20, pady=20)
-    frame_form.pack(fill=tk.BOTH, expand=True)
-
-    # Etiquetas y campos
-    tk.Label(
-        frame_form,
-        text="Concepto:",
-        font=("Helvetica", 11),
-        bg="#f5f5f5"
-    ).grid(row=0, column=0, sticky=tk.W, pady=10)
-
-    entry_concepto = tk.Entry(frame_form, font=("Helvetica", 11), width=30)
-    entry_concepto.grid(row=0, column=1, sticky=tk.W, pady=10, padx=5)
-
-    tk.Label(
-        frame_form,
-        text="Monto ($):",
-        font=("Helvetica", 11),
-        bg="#f5f5f5"
-    ).grid(row=1, column=0, sticky=tk.W, pady=10)
-
-    entry_monto = tk.Entry(frame_form, font=("Helvetica", 11), width=15)
-    entry_monto.grid(row=1, column=1, sticky=tk.W, pady=10, padx=5)
-
-    # Frame para botones
-    frame_botones = tk.Frame(frame_form, bg="#f5f5f5")
-    frame_botones.grid(row=2, column=0, columnspan=2, pady=20)
-
-    def guardar_ingreso():
-        # Validar campos
-        concepto = entry_concepto.get().strip()
-        monto_texto = entry_monto.get().strip().replace(',', '.')
-
-        if not concepto:
-            messagebox.showwarning("Campo incompleto", "El concepto es obligatorio")
-            return
-
-        try:
-            monto = float(monto_texto)
-            if monto <= 0:
-                messagebox.showwarning("Valor inválido", "El monto debe ser un número positivo")
-                return
-        except ValueError:
-            messagebox.showwarning("Valor inválido", "El monto debe ser un número válido")
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Registrar movimiento
-            cursor.execute("""
-                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (self.id_caja_actual, "ingreso", concepto, monto, datetime.now(), self.id_usuario))
-
-            # Actualizar totales en la caja (opcional, se puede hacer en el cierre)
-            cursor.execute("""
-                    UPDATE caja 
-                    SET total_ingresos = total_ingresos + %s, saldo_final = saldo_final + %s
-                    WHERE id_caja = %s
-                """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            messagebox.showinfo("Éxito", f"Ingreso registrado correctamente por ${monto:.2f}")
-            ventana_ingreso.destroy()
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-            self.cargar_movimientos()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
-
-    btn_guardar = tk.Button(
-        frame_botones,
-        text="Guardar",
-        font=("Helvetica", 11),
-        bg="#4caf50",
-        fg="white",
-        width=10,
-        cursor="hand2",
-        command=guardar_ingreso
-    )
-    btn_guardar.pack(side=tk.LEFT, padx=5)
-
-    btn_cancelar = tk.Button(
-        frame_botones,
-        text="Cancelar",
-        font=("Helvetica", 11),
-        bg="#f44336",
-        fg="white",
-        width=10,
-        cursor="hand2",
-        command=ventana_ingreso.destroy
-    )
-    btn_cancelar.pack(side=tk.LEFT, padx=5)
-
-
-def registrar_egreso(self):
-    """Registra un egreso en la caja actual"""
-    if not self.caja_abierta:
-        messagebox.showwarning("Aviso", "No hay una caja abierta. Abra la caja primero.")
-        return
-
-    # Ventana para ingresar datos
-    ventana_egreso = tk.Toplevel(self.ventana)
-    ventana_egreso.title("Registrar Egreso")
-    ventana_egreso.geometry("400x250")
-    ventana_egreso.config(bg="#f5f5f5")
-    ventana_egreso.resizable(False, False)
-    ventana_egreso.grab_set()  # Hacer modal
-
-    # Centrar ventana
-    utl.centrar_ventana(ventana_egreso, 400, 250)
-
-    # Frame para el formulario
-    frame_form = tk.Frame(ventana_egreso, bg="#f5f5f5", padx=20, pady=20)
-    frame_form.pack(fill=tk.BOTH, expand=True)
-
-    # Etiquetas y campos
-    tk.Label(
-        frame_form,
-        text="Concepto:",
-        font=("Helvetica", 11),
-        bg="#f5f5f5"
-    ).grid(row=0, column=0, sticky=tk.W, pady=10)
-
-    entry_concepto = tk.Entry(frame_form, font=("Helvetica", 11), width=30)
-    entry_concepto.grid(row=0, column=1, sticky=tk.W, pady=10, padx=5)
-
-    tk.Label(
-        frame_form,
-        text="Monto ($):",
-        font=("Helvetica", 11),
-        bg="#f5f5f5"
-    ).grid(row=1, column=0, sticky=tk.W, pady=10)
-
-    entry_monto = tk.Entry(frame_form, font=("Helvetica", 11), width=15)
-    entry_monto.grid(row=1, column=1, sticky=tk.W, pady=10, padx=5)
-
-    # Frame para botones
-    frame_botones = tk.Frame(frame_form, bg="#f5f5f5")
-    frame_botones.grid(row=2, column=0, columnspan=2, pady=20)
-
-    def guardar_egreso():
-        # Validar campos
-        concepto = entry_concepto.get().strip()
-        monto_texto = entry_monto.get().strip().replace(',', '.')
-
-        if not concepto:
-            messagebox.showwarning("Campo incompleto", "El concepto es obligatorio")
-            return
-
-        try:
-            monto = float(monto_texto)
-            if monto <= 0:
-                messagebox.showwarning("Valor inválido", "El monto debe ser un número positivo")
-                return
-        except ValueError:
-            messagebox.showwarning("Valor inválido", "El monto debe ser un número válido")
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Verificar saldo disponible
-            cursor.execute("SELECT saldo_final FROM caja WHERE id_caja = %s", (self.id_caja_actual,))
-            saldo_actual = cursor.fetchone()[0]
-
-            if saldo_actual < monto:
-                messagebox.showwarning(
-                    "Saldo insuficiente",
-                    f"No hay suficiente saldo en caja. Saldo actual: ${saldo_actual:.2f}"
-                )
-                return
-
-            # Registrar movimiento
-            cursor.execute("""
-                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (self.id_caja_actual, "egreso", concepto, monto, datetime.now(), self.id_usuario))
-
-            # Actualizar totales en la caja
-            cursor.execute("""
-                    UPDATE caja 
-                    SET total_egresos = total_egresos + %s, saldo_final = saldo_final - %s
-                    WHERE id_caja = %s
-                """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            messagebox.showinfo("Éxito", f"Egreso registrado correctamente por ${monto:.2f}")
-            ventana_egreso.destroy()
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-            self.cargar_movimientos()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
-
-    btn_guardar = tk.Button(
-        frame_botones,
-        text="Guardar",
-        font=("Helvetica", 11),
-        bg="#4caf50",
-        fg="white",
-        width=10,
-        cursor="hand2",
-        command=guardar_egreso
-    )
-    btn_guardar.pack(side=tk.LEFT, padx=5)
-
-    btn_cancelar = tk.Button(
-        frame_botones,
-        text="Cancelar",
-        font=("Helvetica", 11),
-        bg="#f44336",
-        fg="white",
-        width=10,
-        cursor="hand2",
-        command=ventana_egreso.destroy
-    )
-    btn_cancelar.pack(side=tk.LEFT, padx=5)
-
-
-def cargar_movimientos(self):
-    """Carga los movimientos de caja según los filtros aplicados"""
-    # Limpiar tabla
-    for item in self.tabla_movimientos.get_children():
-        self.tabla_movimientos.delete(item)
-
-    try:
-        conexion = conectar_bd()
-        cursor = conexion.cursor()
-
-        # Obtener fecha de filtro
-        fecha = self.fecha_movimientos.get()
-        tipo = self.tipo_movimiento.get()
-
-        # Construir consulta según filtros
-        if tipo == "Todos":
-            consulta = """
-                    SELECT m.id_movimiento, m.hora, m.tipo, m.concepto, m.monto, u.nombre
-                    FROM movimientos_caja m
-                    JOIN caja c ON m.id_caja = c.id_caja
-                    LEFT JOIN usuarios u ON m.id_usuario = u.id_usuario
-                    WHERE DATE(c.fecha) = %s
-                    ORDER BY m.hora
-                """
-            cursor.execute(consulta, (fecha,))
-        else:
-            # Convertir nombre del filtro a valor en la base de datos
-            tipo_bd = tipo.lower()
-
-            consulta = """
-                    SELECT m.id_movimiento, m.hora, m.tipo, m.concepto, m.monto, u.nombre
-                    FROM movimientos_caja m
-                    JOIN caja c ON m.id_caja = c.id_caja
-                    LEFT JOIN usuarios u ON m.id_usuario = u.id_usuario
-                    WHERE DATE(c.fecha) = %s AND m.tipo = %s
-                    ORDER BY m.hora
-                """
-            cursor.execute(consulta, (fecha, tipo_bd))
-
-        # Variables para calcular totales
-        total_ing = 0.0
-        total_egr = 0.0
-
-        # Insertar datos en la tabla
-        for movimiento in cursor.fetchall():
-            id_mov, hora, tipo_mov, concepto, monto, usuario = movimiento
-
-            # Formatear hora
-            hora_formateada = hora.strftime("%H:%M:%S") if hora else ""
-
-            # Formatear tipo
-            tipo_formateado = tipo_mov.capitalize()
-
-            # Formatear monto
-            monto_formateado = f"${float(monto):.2f}"
-
-            # Actualizar totales
-            if tipo_mov == "ingreso":
-                total_ing += float(monto)
-                tag_color = "ingreso"
-            else:
-                total_egr += float(monto)
-                tag_color = "egreso"
-
-            # Insertar en la tabla con color según tipo
-            self.tabla_movimientos.insert(
-                '', tk.END,
-                values=(id_mov, hora_formateada, tipo_formateado, concepto, monto_formateado, usuario or ""),
-                tags=(tag_color,)
-            )
-
-        # Configurar colores para los tipos
-        self.tabla_movimientos.tag_configure("ingreso", background="#e8f5e9")
-        self.tabla_movimientos.tag_configure("egreso", background="#ffebee")
-
-        # Actualizar totales mostrados
-        self.total_ingresos.set(f"${total_ing:.2f}")
-        self.total_egresos.set(f"${total_egr:.2f}")
-        self.saldo_del_dia.set(f"${(total_ing - total_egr):.2f}")
-
-        conexion.close()
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Error al cargar movimientos: {str(e)}")
-
-
-def cargar_cortes(self):
-    """Carga los cortes de caja según la fecha filtrada"""
-    # Limpiar tabla
-    for item in self.tabla_cortes.get_children():
-        self.tabla_cortes.delete(item)
-
-    try:
-        conexion = conectar_bd()
-        cursor = conexion.cursor()
-
-        # Obtener fecha de filtro
-        fecha = self.fecha_cortes.get()
-
-        # Consultar cortes de caja (cajas cerradas)
-        consulta = """
-                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
-                       c.total_ingresos, c.total_egresos, c.saldo_final, u.nombre
-                FROM caja c
-                LEFT JOIN usuarios u ON c.responsable = u.id_usuario
-                WHERE DATE(c.fecha) = %s AND c.hora_cierre IS NOT NULL
-                ORDER BY c.hora_apertura
-            """
-
-        cursor.execute(consulta, (fecha,))
-
-        for corte in cursor.fetchall():
-            id_caja, fecha, hora_apertura, hora_cierre, ingresos, egresos, saldo, responsable = corte
-
-            # Formatear datos
-            fecha_formateada = utl.formatear_fecha(fecha)
-            hora_apertura_str = hora_apertura.strftime("%H:%M") if hora_apertura else ""
-            hora_cierre_str = hora_cierre.strftime("%H:%M") if hora_cierre else ""
-
-            # Formatear montos
-            ingresos_str = f"${float(ingresos):.2f}"
-            egresos_str = f"${float(egresos):.2f}"
-            saldo_str = f"${float(saldo):.2f}"
-
-            # Insertar en tabla
-            self.tabla_cortes.insert(
-                '', tk.END,
-                values=(
-                    id_caja,
-                    fecha_formateada,
-                    hora_apertura_str,
-                    hora_cierre_str,
-                    ingresos_str,
-                    egresos_str,
-                    saldo_str,
-                    responsable or ""
-                )
-            )
-
-        conexion.close()
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Error al cargar cortes de caja: {str(e)}")
-
-
-def ver_ultimo_corte(self):
-    """Muestra el último corte de caja realizado"""
-    try:
-        conexion = conectar_bd()
-        cursor = conexion.cursor()
-
-        # Obtener el último corte de caja (la última caja cerrada)
-        consulta = """
-                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
-                       c.total_ingresos, c.total_egresos, c.saldo_final, u.nombre
-                FROM caja c
-                LEFT JOIN usuarios u ON c.responsable = u.id_usuario
-                WHERE c.hora_cierre IS NOT NULL
-                ORDER BY c.fecha DESC, c.hora_cierre DESC
-                LIMIT 1
-            """
-
-        cursor.execute(consulta)
-        ultimo_corte = cursor.fetchone()
-
-        if not ultimo_corte:
-            messagebox.showinfo("Información", "No hay cortes de caja registrados")
-            conexion.close()
-            return
-
-        # Mostrar detalles del último corte
-        id_caja, fecha, hora_apertura, hora_cierre, ingresos, egresos, saldo, responsable = ultimo_corte
-
-        # Formatear datos
-        fecha_formateada = utl.formatear_fecha(fecha)
-        hora_apertura_str = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
-        hora_cierre_str = hora_cierre.strftime("%H:%M:%S") if hora_cierre else ""
-
-        mensaje = f"""Último Corte de Caja:
-
-ID Caja: {id_caja}
-Fecha: {fecha_formateada}
-Apertura: {hora_apertura_str}
-Cierre: {hora_cierre_str}
-Responsable: {responsable}
-
-Ingresos: ${float(ingresos):.2f}
-Egresos: ${float(egresos):.2f}
-Saldo Final: ${float(saldo):.2f}
-
-¿Desea ver los movimientos detallados de este corte?"""
-
-        if messagebox.askyesno("Último Corte", mensaje):
-            # Cambiar a la pestaña de movimientos y cargar la fecha correspondiente
-            self.fecha_movimientos.set(fecha.strftime("%Y-%m-%d"))
-            self.notebook.select(1)  # Seleccionar pestaña de movimientos
-            self.cargar_movimientos()
-
-        conexion.close()
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Error al obtener último corte: {str(e)}")
-
-
-def ver_detalle_corte(self):
-    """Muestra el detalle de un corte de caja seleccionado"""
-    seleccion = self.tabla_cortes.selection()
-
-    if not seleccion:
-        messagebox.showwarning("Selección requerida", "Por favor, seleccione un corte para ver su detalle")
-        return
-
-    # Obtener ID del corte seleccionado
-    valores = self.tabla_cortes.item(seleccion[0], 'values')
-    id_corte = valores[0]
-    fecha = valores[1]  # La fecha formateada
-
-    # Cambiar a la pestaña de movimientos y cargar los movimientos de ese corte
-    try:
-        # Convertir la fecha formateada de nuevo al formato YYYY-MM-DD
-        partes_fecha = fecha.split('/')
-        if len(partes_fecha) == 3:
-            fecha_iso = f"{partes_fecha[2]}-{partes_fecha[1]}-{partes_fecha[0]}"
-            self.fecha_movimientos.set(fecha_iso)
-            self.notebook.select(1)  # Seleccionar pestaña de movimientos
-            self.cargar_movimientos()
-
-            # Informar al usuario
-            messagebox.showinfo(
-                "Detalle de Corte",
-                f"Mostrando movimientos del corte #{id_corte} realizado el {fecha}"
-            )
-        else:
-            messagebox.showerror("Error", "Formato de fecha incorrecto")
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Error al mostrar detalle del corte: {str(e)}")
-
-
-def imprimir_estado_caja(self):
-    """Imprime el estado actual de la caja"""
-    if not self.caja_abierta:
-        messagebox.showwarning("Aviso", "No hay una caja abierta actualmente")
-        return
-
-    # En una implementación real, aquí se generaría un PDF o se enviaría a la impresora
-    # Usaríamos el módulo ticket.py para esto
-
-    # Por ahora, solo mostramos un mensaje
-    messagebox.showinfo(
-        "Impresión de Estado",
-        "En una implementación real, aquí se imprimiría el estado actual de la caja.\n\n"
-        "Se incluiría la fecha, hora de apertura, responsable, ingresos, egresos y saldo actual."
-    )
-
-
-def imprimir_movimientos(self):
-    """Imprime los movimientos de caja del día seleccionado"""
-    # Verificar si hay movimientos
-    if not self.tabla_movimientos.get_children():
-        messagebox.showwarning("Sin datos", "No hay movimientos para imprimir")
-        return
-
-    # En una implementación real, aquí se generaría un PDF o se enviaría a la impresora
-    # Usaríamos el módulo ticket.py para esto
-
-    # Por ahora, solo mostramos un mensaje
-    fecha = self.fecha_movimientos.get()
-    ingresos = self.total_ingresos.get()
-    egresos = self.total_egresos.get()
-    saldo = self.saldo_del_dia.get()
-
-    messagebox.showinfo(
-        "Impresión de Movimientos",
-        f"En una implementación real, aquí se imprimirían los movimientos del {fecha}.\n\n"
-        f"Total Ingresos: {ingresos}\n"
-        f"Total Egresos: {egresos}\n"
-        f"Saldo del Día: {saldo}"
-    )
-
-
-def imprimir_corte(self, id_corte=None):
-    """Imprime un corte de caja específico"""
-    # Si no se proporciona ID, obtenerlo de la selección de la tabla
-    if id_corte is None:
-        seleccion = self.tabla_cortes.selection()
-
-        if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, seleccione un corte para imprimir")
-            return
-
-        # Obtener ID del corte seleccionado
-        valores = self.tabla_cortes.item(seleccion[0], 'values')
-        id_corte = valores[0]
-
-    # En una implementación real, aquí se generaría un PDF o se enviaría a la impresora
-    # Usaríamos el módulo ticket.py para esto
-
-    # Por ahora, solo mostramos un mensaje
-    messagebox.showinfo(
-        "Impresión de Corte",
-        f"En una implementación real, aquí se imprimiría el corte de caja #{id_corte}.\n\n"
-        "Se incluiría un reporte detallado con fecha, hora, responsable, ingresos, egresos y saldo final."
-    )
-
-
-# Función para abrir la gestión de caja desde otras partes del sistema
-def abrir_caja(ventana_padre=None, id_usuario=None):
-    return GestionCaja(ventana_padre, id_usuario)
-
-
-# Para pruebas independientes
-if __name__ == "__main__":
-    # Para pruebas, asignar un ID de usuario fijo
-    id_usuario_prueba = 1
-    GestionCaja(id_usuario=id_usuario_prueba)
-    """
+"""
 Módulo de Caja para el Sistema de Gestión de Lavandería
 Permite gestionar apertura y cierre de caja, registrar movimientos,
 y generar reportes de cortes de caja.
@@ -1008,6 +254,1258 @@ class GestionCaja:
                 font=("Helvetica", 12),
                 bg="#f5f5f5"
             ).pack(side=tk.LEFT, padx=15, pady=10)
+
+    def imprimir_estado_caja(self):
+        """Imprime el estado actual de la caja"""
+        try:
+            if self.caja_abierta:
+                # Obtener información detallada de la caja actual
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                cursor.execute("""
+                    SELECT c.fecha, c.hora_apertura, u.nombre, 
+                           c.total_ingresos, c.total_egresos, c.saldo_final
+                    FROM caja c
+                    JOIN usuarios u ON c.responsable = u.id_usuario
+                    WHERE c.id_caja = %s
+                """, (self.id_caja_actual,))
+
+                caja = cursor.fetchone()
+                conexion.close()
+
+                if caja:
+                    fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
+
+                    # Formatear la información para imprimir
+                    ticket = Ticket()
+
+                    # Encabezado
+                    ticket.agregar_encabezado()
+                    ticket.agregar_titulo("ESTADO DE CAJA")
+                    ticket.agregar_texto(f"Fecha: {utl.formatear_fecha(fecha)}")
+                    ticket.agregar_texto(f"Hora apertura: {hora_apertura.strftime('%H:%M:%S')}")
+                    ticket.agregar_texto(f"Responsable: {responsable}")
+                    ticket.agregar_linea()
+
+                    # Detalle
+                    ticket.agregar_texto(f"Total ingresos: ${ingresos:.2f}")
+                    ticket.agregar_texto(f"Total egresos: ${egresos:.2f}")
+                    ticket.agregar_linea()
+
+                    # Total
+                    ticket.agregar_texto(f"Saldo actual: ${saldo:.2f}")
+
+                    # Pie
+                    ticket.agregar_espacio()
+                    ticket.agregar_texto("Generado el: " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+
+                    # Generar nombre del archivo
+                    nombre_archivo = f"estado_caja_{self.id_caja_actual}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+                    # Generar PDF
+                    ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+                    # Mostrar vista previa
+                    ticket.mostrar_vista_previa(ruta_pdf)
+
+                    messagebox.showinfo("Vista Previa", "Se ha generado la vista previa del estado de caja")
+                else:
+                    messagebox.showwarning("Advertencia", "No se pudo obtener la información de la caja actual")
+            else:
+                messagebox.showinfo("Información", "La caja está cerrada, no hay estado para imprimir")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el estado: {str(e)}")
+            print(f"Error al imprimir estado: {e}")
+
+    def registrar_ingreso(self):
+        """Registra un ingreso en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Solicitar información del ingreso
+            concepto = simpledialog.askstring(
+                "Ingreso",
+                "Ingrese el concepto del ingreso:"
+            )
+
+            if not concepto:
+                return
+
+            monto = simpledialog.askfloat(
+                "Ingreso",
+                "Ingrese el monto del ingreso:",
+                minvalue=0.01
+            )
+
+            if monto is None:
+                return
+
+            # Registrar en la base de datos
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Insertar en la tabla de movimientos
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                date.today().strftime("%Y-%m-%d"),
+                datetime.now(),
+                'ingreso',  # Debe ser 'ingreso' (minúsculas)
+                concepto,
+                monto,
+                self.id_usuario
+            ))
+
+            # Actualizar el total de ingresos en la caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_ingresos = total_ingresos + %s,
+                    saldo_final = saldo_final + %s
+                WHERE id_caja = %s
+            """, (monto, monto, self.id_caja_actual))
+
+            conexion.commit()
+            conexion.close()
+
+            # Actualizar interfaz
+            self.actualizar_estado_caja()
+
+            # Recargar movimientos si estamos en esa pestaña
+            if hasattr(self, 'cargar_movimientos'):
+                self.cargar_movimientos()
+
+            messagebox.showinfo(
+                "Registro Exitoso",
+                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
+            print(f"Error al registrar ingreso: {e}")
+
+    def registrar_egreso(self):
+        """Registra un egreso en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Solicitar información del egreso
+            concepto = simpledialog.askstring(
+                "Egreso",
+                "Ingrese el concepto del egreso:"
+            )
+
+            if not concepto:
+                return
+
+            monto = simpledialog.askfloat(
+                "Egreso",
+                "Ingrese el monto del egreso:",
+                minvalue=0.01
+            )
+
+            if monto is None:
+                return
+
+            # Verificar que haya saldo suficiente
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT total_ingresos - total_egresos AS saldo_actual
+                FROM caja
+                WHERE id_caja = %s
+            """, (self.id_caja_actual,))
+
+            resultado = cursor.fetchone()
+
+            if resultado and resultado[0] < monto:
+                messagebox.showerror(
+                    "Saldo Insuficiente",
+                    f"No hay saldo suficiente para este egreso.\nSaldo actual: ${resultado[0]:.2f}"
+                )
+                conexion.close()
+                return
+
+            # Registrar en la base de datos
+            # Insertar en la tabla de movimientos
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                date.today().strftime("%Y-%m-%d"),
+                datetime.now(),
+                'egreso',  # Debe ser 'egreso' (minúsculas)
+                concepto,
+                monto,
+                self.id_usuario
+            ))
+
+            # Actualizar el total de egresos en la caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_egresos = total_egresos + %s,
+                    saldo_final = saldo_final - %s
+                WHERE id_caja = %s
+            """, (monto, monto, self.id_caja_actual))
+
+            conexion.commit()
+            conexion.close()
+
+            # Actualizar interfaz
+            self.actualizar_estado_caja()
+
+            # Recargar movimientos si estamos en esa pestaña
+            if hasattr(self, 'cargar_movimientos'):
+                self.cargar_movimientos()
+
+            messagebox.showinfo(
+                "Registro Exitoso",
+                f"Se ha registrado un egreso de ${monto:.2f} por concepto de {concepto}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
+            print(f"Error al registrar egreso: {e}")
+
+    def cerrar_caja(self):
+        """Método para cerrar la caja actual"""
+        try:
+            if self.caja_abierta:
+                # Confirmar cierre
+                if not messagebox.askyesno("Confirmar Cierre", "¿Estás seguro de que deseas cerrar la caja?"):
+                    return
+
+                # Obtener el saldo final actual
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                cursor.execute("""
+                    SELECT total_ingresos, total_egresos, saldo_final
+                    FROM caja
+                    WHERE id_caja = %s
+                """, (self.id_caja_actual,))
+
+                caja = cursor.fetchone()
+
+                if caja:
+                    ingresos, egresos, saldo_final = caja
+
+                    # Actualizar la caja con la hora de cierre
+                    cursor.execute("""
+                        UPDATE caja 
+                        SET hora_cierre = %s
+                        WHERE id_caja = %s
+                    """, (
+                        datetime.now().strftime("%H:%M:%S"),
+                        self.id_caja_actual
+                    ))
+
+                    conexion.commit()
+
+                    # Preguntar si desea imprimir el corte
+                    if messagebox.askyesno("Imprimir Corte", "¿Deseas imprimir el corte de caja?"):
+                        self.imprimir_corte(self.id_caja_actual)
+
+                    # Cambiar estado
+                    self.caja_abierta = False
+                    self.id_caja_actual = None
+
+                    # Actualizar interfaz
+                    self.actualizar_estado_caja()
+                    self.configurar_tab_operaciones()
+
+                    messagebox.showinfo(
+                        "Cierre Exitoso",
+                        f"La caja se ha cerrado correctamente con un saldo final de ${saldo_final:.2f}"
+                    )
+                else:
+                    messagebox.showerror("Error", "No se pudo obtener la información de la caja actual")
+
+                conexion.close()
+            else:
+                messagebox.showinfo("Información", "No hay una caja abierta para cerrar")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cerrar la caja: {str(e)}")
+            print(f"Error al cerrar caja: {e}")
+
+    def imprimir_corte(self, id_caja):
+        """Imprime un corte de caja específico"""
+        try:
+            # Obtener información del corte
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
+                       c.total_ingresos, c.total_egresos, c.saldo_final,
+                       u.nombre
+                FROM caja c
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.id_caja = %s
+            """, (id_caja,))
+
+            corte = cursor.fetchone()
+
+            # Obtener los movimientos de ese corte
+            cursor.execute("""
+                SELECT m.hora, m.tipo, m.concepto, m.monto, u.nombre
+                FROM movimientos_caja m
+                JOIN usuarios u ON m.id_usuario = u.id_usuario
+                WHERE m.id_caja = %s
+                ORDER BY m.hora
+            """, (id_caja,))
+
+            movimientos = cursor.fetchall()
+            conexion.close()
+
+            if corte:
+                id_caja, fecha, hora_apertura, hora_cierre, ingresos, egresos, saldo, responsable = corte
+
+                # Crear ticket
+                ticket = Ticket()
+
+                # Encabezado
+                ticket.agregar_encabezado()
+                ticket.agregar_titulo("CORTE DE CAJA")
+                ticket.agregar_texto(f"Caja #: {id_caja}")
+                ticket.agregar_texto(f"Fecha: {utl.formatear_fecha(fecha)}")
+                ticket.agregar_texto(f"Apertura: {hora_apertura.strftime('%H:%M:%S')}")
+                if hora_cierre:
+                    ticket.agregar_texto(f"Cierre: {hora_cierre.strftime('%H:%M:%S')}")
+                ticket.agregar_texto(f"Responsable: {responsable}")
+                ticket.agregar_linea()
+
+                # Resumen
+                ticket.agregar_texto_centrado("RESUMEN:")
+                ticket.agregar_texto(f"Total ingresos: ${ingresos:.2f}")
+                ticket.agregar_texto(f"Total egresos: ${egresos:.2f}")
+                ticket.agregar_texto(f"Saldo final: ${saldo:.2f}")
+                ticket.agregar_linea()
+
+                # Detalle de movimientos
+                if movimientos:
+                    ticket.agregar_texto_centrado("DETALLE DE MOVIMIENTOS:")
+
+                    # Agregar cada movimiento
+                    for mov in movimientos:
+                        hora, tipo_mov, concepto, monto, usuario = mov
+                        hora_str = hora.strftime('%H:%M:%S')
+
+                        # Formatear tipo de movimiento
+                        tipo_texto = "Ingreso" if tipo_mov == 'ingreso' else "Egreso"
+
+                        # Agregar línea de movimiento
+                        ticket.agregar_texto(f"{hora_str} - {tipo_texto}: {concepto}")
+
+                        # Signo según el tipo
+                        signo = "+" if tipo_mov == 'ingreso' else "-"
+                        ticket.agregar_texto_derecha(f"{signo}${monto:.2f}")
+
+                # Pie
+                ticket.agregar_espacio()
+                ticket.agregar_texto_centrado("Firma del Responsable: ___________________")
+                ticket.agregar_espacio()
+
+                # Generar nombre del archivo
+                nombre_archivo = f"corte_caja_{id_caja}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+                # Generar el PDF
+                ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+                # Mostrar vista previa
+                ticket.mostrar_vista_previa(ruta_pdf)
+
+                messagebox.showinfo("Vista Previa", "Se ha generado la vista previa del corte de caja")
+            else:
+                messagebox.showwarning("Advertencia", "No se pudo obtener la información del corte")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el corte: {str(e)}")
+            print(f"Error al imprimir corte: {e}")
+
+    def cargar_cortes(self):
+        """Carga los cortes de caja según la fecha seleccionada"""
+        try:
+            # Limpiar tabla si existe
+            if hasattr(self, 'tabla_cortes'):
+                for item in self.tabla_cortes.get_children():
+                    self.tabla_cortes.delete(item)
+
+            # Obtener fecha de filtro
+            fecha = self.fecha_cortes.get() if hasattr(self, 'fecha_cortes') else date.today().strftime("%Y-%m-%d")
+
+            # Validar fecha
+            try:
+                datetime.strptime(fecha, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Error", "Formato de fecha incorrecto. Use YYYY-MM-DD")
+                return
+
+            # Conectar a la BD
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Consultar cortes
+            cursor.execute("""
+                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
+                       c.total_ingresos, c.total_egresos, c.saldo_final, u.nombre
+                FROM caja c
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE DATE(c.fecha) = %s
+                ORDER BY c.hora_apertura
+            """, (fecha,))
+
+            cortes = cursor.fetchall()
+            conexion.close()
+
+            # Insertar datos en la tabla
+            if hasattr(self, 'tabla_cortes'):
+                for corte in cortes:
+                    id_caja, fecha, hora_ap, hora_ci, ingresos, egresos, saldo, responsable = corte
+
+                    # Formatear fechas y horas
+                    fecha_str = utl.formatear_fecha(fecha) if callable(getattr(utl, 'formatear_fecha', None)) else str(
+                        fecha)
+                    hora_ap_str = hora_ap.strftime("%H:%M:%S") if hora_ap else ""
+                    hora_ci_str = hora_ci.strftime("%H:%M:%S") if hora_ci else "Abierta"
+
+                    # Agregar a tabla
+                    self.tabla_cortes.insert('', tk.END, values=(
+                        id_caja, fecha_str, hora_ap_str, hora_ci_str,
+                        f"${ingresos:.2f}", f"${egresos:.2f}", f"${saldo:.2f}",
+                        responsable
+                    ))
+
+            # Mensaje si no hay datos
+            if not cortes and hasattr(self, 'tabla_cortes'):
+                messagebox.showinfo("Información", "No se encontraron cortes para la fecha seleccionada")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar los cortes: {str(e)}")
+            print(f"Error al cargar cortes: {e}")
+
+    def cargar_movimientos(self):
+        """Carga los movimientos de caja según los filtros seleccionados"""
+        try:
+            # Limpiar tabla si existe
+            if hasattr(self, 'tabla_movimientos'):
+                for item in self.tabla_movimientos.get_children():
+                    self.tabla_movimientos.delete(item)
+
+            # Obtener parámetros de filtro
+            fecha = self.fecha_movimientos.get() if hasattr(self, 'fecha_movimientos') else date.today().strftime(
+                "%Y-%m-%d")
+            tipo = self.tipo_movimiento.get() if hasattr(self, 'tipo_movimiento') else "Todos"
+
+            # Validar fecha
+            try:
+                datetime.strptime(fecha, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Error", "Formato de fecha incorrecto. Use YYYY-MM-DD")
+                return
+
+            # Conectar a la BD
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Preparar consulta según filtros
+            consulta = """
+                SELECT m.id_movimiento, m.hora, m.tipo, m.concepto, m.monto, u.nombre
+                FROM movimientos_caja m
+                JOIN usuarios u ON m.id_usuario = u.id_usuario
+                WHERE DATE(m.hora) = %s
+            """
+
+            parametros = [fecha]
+
+            if tipo != "Todos":
+                consulta += " AND m.tipo = %s"
+                tipo_bd = tipo.lower()  # convertir a minúsculas para coincidir con la BD
+                parametros.append(tipo_bd)
+
+            consulta += " ORDER BY m.hora"
+
+            # Ejecutar consulta
+            cursor.execute(consulta, parametros)
+            movimientos = cursor.fetchall()
+
+            # Calcular totales
+            total_ing = 0
+            total_egr = 0
+
+            # Insertar datos en la tabla si existe
+            if hasattr(self, 'tabla_movimientos'):
+                for mov in movimientos:
+                    id_mov, hora, tipo_mov, concepto, monto, usuario = mov
+
+                    # Formatear hora
+                    hora_str = hora.strftime("%H:%M:%S") if isinstance(hora, datetime) else str(hora)
+
+                    # Agregar a tabla
+                    self.tabla_movimientos.insert('', tk.END, values=(
+                        id_mov, hora_str, tipo_mov.capitalize(), concepto, f"${monto:.2f}", usuario
+                    ))
+
+                    # Acumular totales
+                    if tipo_mov == 'ingreso':
+                        total_ing += float(monto)
+                    else:
+                        total_egr += float(monto)
+
+                # Actualizar variables de totales si existen
+                if hasattr(self, 'total_ingresos'):
+                    self.total_ingresos.set(f"${total_ing:.2f}")
+                if hasattr(self, 'total_egresos'):
+                    self.total_egresos.set(f"${total_egr:.2f}")
+                if hasattr(self, 'saldo_del_dia'):
+                    self.saldo_del_dia.set(f"${(total_ing - total_egr):.2f}")
+
+            conexion.close()
+
+            # Mensaje si no hay datos y si tenemos la tabla
+            if not movimientos and hasattr(self, 'tabla_movimientos'):
+                messagebox.showinfo("Información", "No se encontraron movimientos con los filtros seleccionados")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar los movimientos: {str(e)}")
+            print(f"Error al cargar movimientos: {e}")
+
+    def imprimir_movimientos(self):
+        """Imprime los movimientos de caja mostrados actualmente"""
+        try:
+            # Obtener fecha actual de filtro
+            fecha = self.fecha_movimientos.get() if hasattr(self, 'fecha_movimientos') else date.today().strftime(
+                "%Y-%m-%d")
+            tipo = self.tipo_movimiento.get() if hasattr(self, 'tipo_movimiento') else "Todos"
+
+            # Verificar si hay datos en la tabla
+            if hasattr(self, 'tabla_movimientos') and len(self.tabla_movimientos.get_children()) == 0:
+                messagebox.showinfo("Información", "No hay movimientos para imprimir")
+                return
+
+            # Crear ticket
+            ticket = Ticket()
+
+            # Encabezado
+            ticket.agregar_encabezado()
+            ticket.agregar_titulo("MOVIMIENTOS DE CAJA")
+            ticket.agregar_texto(f"Fecha: {utl.formatear_fecha(fecha)}")
+            if tipo != "Todos":
+                ticket.agregar_texto(f"Tipo: {tipo}")
+            ticket.agregar_linea()
+
+            # Obtener datos de la tabla o directamente de la base de datos
+            total_ingresos = 0
+            total_egresos = 0
+
+            # Si tenemos tabla, usamos sus datos
+            if hasattr(self, 'tabla_movimientos'):
+                # Encabezados de columnas
+                ticket.agregar_texto("Hora      Tipo      Concepto                 Monto")
+                ticket.agregar_linea()
+
+                for item in self.tabla_movimientos.get_children():
+                    datos = self.tabla_movimientos.item(item, 'values')
+                    if len(datos) >= 5:  # Asegurarse de que hay suficientes datos
+                        hora = datos[1]
+                        tipo_mov = datos[2]
+                        concepto = datos[3]
+                        monto_str = datos[4]
+
+                        # Extraer el valor numérico del monto (quitar el símbolo $)
+                        monto = float(monto_str.replace('$', '').replace(',', '.'))
+
+                        # Formatear concepto para que no sea muy largo
+                        if len(concepto) > 20:
+                            concepto = concepto[:17] + "..."
+
+                        # Agregar línea al ticket
+                        ticket.agregar_texto(f"{hora}  {tipo_mov.ljust(8)}  {concepto.ljust(20)}  ${monto:.2f}")
+
+                        # Acumular totales
+                        if tipo_mov.lower() == 'ingreso':
+                            total_ingresos += monto
+                        else:
+                            total_egresos += monto
+            else:
+                # Si no hay tabla, obtener datos directamente de la BD
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Consulta similar a la de cargar_movimientos
+                consulta = """
+                    SELECT m.hora, m.tipo, m.concepto, m.monto, u.nombre
+                    FROM movimientos_caja m
+                    JOIN usuarios u ON m.id_usuario = u.id_usuario
+                    WHERE DATE(m.hora) = %s
+                """
+
+                parametros = [fecha]
+
+                if tipo != "Todos":
+                    consulta += " AND m.tipo = %s"
+                    tipo_bd = tipo.lower()
+                    parametros.append(tipo_bd)
+
+                consulta += " ORDER BY m.hora"
+
+                cursor.execute(consulta, parametros)
+                movimientos = cursor.fetchall()
+
+                # Encabezados de columnas
+                ticket.agregar_texto("Hora      Tipo      Concepto                 Monto")
+                ticket.agregar_linea()
+
+                for mov in movimientos:
+                    hora, tipo_mov, concepto, monto, usuario = mov
+
+                    # Formatear hora
+                    hora_str = hora.strftime("%H:%M:%S") if isinstance(hora, datetime) else str(hora)
+
+                    # Formatear concepto
+                    if len(concepto) > 20:
+                        concepto = concepto[:17] + "..."
+
+                    # Agregar línea al ticket
+                    ticket.agregar_texto(
+                        f"{hora_str}  {tipo_mov.capitalize().ljust(8)}  {concepto.ljust(20)}  ${monto:.2f}")
+
+                    # Acumular totales
+                    if tipo_mov == 'ingreso':
+                        total_ingresos += monto
+                    else:
+                        total_egresos += monto
+
+                conexion.close()
+
+            # Totales
+            ticket.agregar_linea()
+            ticket.agregar_texto(f"Total Ingresos: ${total_ingresos:.2f}")
+            ticket.agregar_texto(f"Total Egresos: ${total_egresos:.2f}")
+            ticket.agregar_texto(f"Saldo: ${(total_ingresos - total_egresos):.2f}")
+
+            # Pie
+            ticket.agregar_espacio()
+            ticket.agregar_texto("Generado el: " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+
+            # Generar nombre del archivo
+            nombre_archivo = f"movimientos_caja_{fecha}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+            # Generar PDF
+            ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+            # Mostrar vista previa
+            ticket.mostrar_vista_previa(ruta_pdf)
+
+            messagebox.showinfo("Vista Previa", "Se ha generado la vista previa de los movimientos")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir los movimientos: {str(e)}")
+            print(f"Error al imprimir movimientos: {e}")
+
+    def registrar_ingreso(self):
+        """Registra un ingreso en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Solicitar información del ingreso
+            concepto = simpledialog.askstring(
+                "Ingreso",
+                "Ingrese el concepto del ingreso:"
+            )
+
+            if not concepto:
+                return
+
+            monto = simpledialog.askfloat(
+                "Ingreso",
+                "Ingrese el monto del ingreso:",
+                minvalue=0.01
+            )
+
+            if monto is None:
+                return
+
+            # Registrar en la base de datos
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Insertar en la tabla de movimientos
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                date.today().strftime("%Y-%m-%d"),
+                datetime.now(),
+                'ingreso',  # Debe ser 'ingreso' (minúsculas)
+                concepto,
+                monto,
+                self.id_usuario
+            ))
+
+            # Actualizar el total de ingresos en la caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_ingresos = total_ingresos + %s,
+                    saldo_final = saldo_final + %s
+                WHERE id_caja = %s
+            """, (monto, monto, self.id_caja_actual))
+
+            conexion.commit()
+            conexion.close()
+
+            # Actualizar interfaz
+            self.actualizar_estado_caja()
+
+            # Recargar movimientos si estamos en esa pestaña
+            if hasattr(self, 'cargar_movimientos'):
+                self.cargar_movimientos()
+
+            messagebox.showinfo(
+                "Registro Exitoso",
+                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
+            print(f"Error al registrar ingreso: {e}")
+
+    # Agrega este método a la clase GestionCaja en caja.py
+
+    def abrir_caja(self):
+        """Método para abrir la caja"""
+        try:
+            if not self.caja_abierta:
+                # Preguntar por el monto inicial
+                monto_inicial = simpledialog.askfloat(
+                    "Apertura de Caja",
+                    "Ingrese el monto inicial en caja:",
+                    minvalue=0.0
+                )
+
+                if monto_inicial is not None:
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+
+                    # Registrar apertura en la tabla de caja - sin usar la columna monto_inicial
+                    cursor.execute("""
+                        INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        date.today().strftime("%Y-%m-%d"),
+                        datetime.now().strftime("%H:%M:%S"),
+                        self.id_usuario,
+                        0.0,  # Total ingresos inicia en 0
+                        0.0,  # Total egresos inicia en 0
+                        monto_inicial  # Saldo inicial igual al monto inicial
+                    ))
+
+                    # Obtener el ID de la caja recién abierta
+                    self.id_caja_actual = cursor.lastrowid
+                    self.caja_abierta = True
+
+                    # Si quieres registrar el monto inicial como un ingreso inicial
+                    cursor.execute("""
+                        INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        self.id_caja_actual,
+                        'ingreso',  # Tipo debe ser 'ingreso' o 'egreso' (minúsculas)
+                        'Saldo inicial',
+                        monto_inicial,
+                        datetime.now(),
+                        self.id_usuario
+                    ))
+
+                    # Actualizar el total de ingresos y saldo final
+                    cursor.execute("""
+                        UPDATE caja 
+                        SET total_ingresos = %s, saldo_final = %s
+                        WHERE id_caja = %s
+                    """, (monto_inicial, monto_inicial, self.id_caja_actual))
+
+                    conexion.commit()
+                    conexion.close()
+
+                    messagebox.showinfo(
+                        "Apertura Exitosa",
+                        f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
+                    )
+
+                    # Actualizar la interfaz
+                    self.actualizar_estado_caja()
+                    self.configurar_tab_operaciones()
+            else:
+                messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
+            print(f"Error al abrir caja: {e}")
+
+    def registrar_egreso(self):
+        """Registra un egreso en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Solicitar información del egreso
+            concepto = simpledialog.askstring(
+                "Egreso",
+                "Ingrese el concepto del egreso:"
+            )
+
+            if not concepto:
+                return
+
+            monto = simpledialog.askfloat(
+                "Egreso",
+                "Ingrese el monto del egreso:",
+                minvalue=0.01
+            )
+
+            if monto is None:
+                return
+
+            # Verificar que haya saldo suficiente
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT monto_inicial + total_ingresos - total_egresos AS saldo_actual
+                FROM caja
+                WHERE id_caja = %s
+            """, (self.id_caja_actual,))
+
+            resultado = cursor.fetchone()
+
+            if resultado and resultado[0] < monto:
+                messagebox.showerror(
+                    "Saldo Insuficiente",
+                    f"No hay saldo suficiente para este egreso.\nSaldo actual: ${resultado[0]:.2f}"
+                )
+                conexion.close()
+                return
+
+            # Registrar en la base de datos
+            # Insertar en la tabla de movimientos
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                date.today().strftime("%Y-%m-%d"),
+                datetime.now().strftime("%H:%M:%S"),
+                "Egreso",
+                concepto,
+                monto,
+                self.id_usuario
+            ))
+
+            # Actualizar el total de egresos en la caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_egresos = total_egresos + %s,
+                    saldo_final = saldo_final - %s
+                WHERE id_caja = %s
+            """, (monto, monto, self.id_caja_actual))
+
+            conexion.commit()
+            conexion.close()
+
+            # Actualizar interfaz
+            self.actualizar_estado_caja()
+
+            # Recargar movimientos
+            self.cargar_movimientos()
+
+            messagebox.showinfo(
+                "Registro Exitoso",
+                f"Se ha registrado un egreso de ${monto:.2f} por concepto de {concepto}"
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
+            print(f"Error al registrar egreso: {e}")
+
+    def configurar_tab_cortes(self):
+        """Configura la pestaña de cortes de caja"""
+        # Frame para filtros
+        frame_filtros = tk.Frame(self.tab_cortes, bg="#f5f5f5")
+        frame_filtros.pack(fill=tk.X, pady=10)
+
+        # Filtro por fecha
+        tk.Label(
+            frame_filtros,
+            text="Fecha:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).grid(row=0, column=0, padx=5, pady=5)
+
+        self.fecha_cortes = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
+
+        entry_fecha_cortes = tk.Entry(
+            frame_filtros,
+            textvariable=self.fecha_cortes,
+            font=("Helvetica", 11),
+            width=12
+        )
+        entry_fecha_cortes.grid(row=0, column=1, padx=5, pady=5)
+
+        # Botón para seleccionar fecha con un calendario (simplificado)
+        btn_fecha_cortes = tk.Button(
+            frame_filtros,
+            text="📅",
+            font=("Helvetica", 11),
+            bg="#3f51b5",
+            fg="white",
+            cursor="hand2",
+            command=lambda: messagebox.showinfo("Calendario",
+                                                "En una implementación real, se mostraría un selector de fecha")
+        )
+        btn_fecha_cortes.grid(row=0, column=2, padx=2, pady=5)
+
+        # Botón de búsqueda
+        btn_buscar_cortes = tk.Button(
+            frame_filtros,
+            text="Buscar",
+            font=("Helvetica", 11),
+            bg="#3f51b5",
+            fg="white",
+            width=8,
+            cursor="hand2",
+            command=self.cargar_cortes
+        )
+        btn_buscar_cortes.grid(row=0, column=3, padx=15, pady=5)
+
+        # Tabla de cortes
+        frame_tabla = tk.Frame(self.tab_cortes, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10, padx=5)
+
+        # Columnas de la tabla
+        columnas = ('id', 'fecha', 'apertura', 'cierre', 'ingresos', 'egresos', 'saldo', 'responsable')
+
+        self.tabla_cortes = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(self.tabla_cortes)
+
+        # Configurar encabezados
+        self.tabla_cortes.heading('id', text='ID')
+        self.tabla_cortes.heading('fecha', text='Fecha')
+        self.tabla_cortes.heading('apertura', text='Apertura')
+        self.tabla_cortes.heading('cierre', text='Cierre')
+        self.tabla_cortes.heading('ingresos', text='Ingresos')
+        self.tabla_cortes.heading('egresos', text='Egresos')
+        self.tabla_cortes.heading('saldo', text='Saldo Final')
+        self.tabla_cortes.heading('responsable', text='Responsable')
+
+        # Configurar anchos
+        self.tabla_cortes.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_cortes.column('fecha', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('apertura', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('cierre', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('ingresos', width=100, anchor=tk.E)
+        self.tabla_cortes.column('egresos', width=100, anchor=tk.E)
+        self.tabla_cortes.column('saldo', width=100, anchor=tk.E)
+        self.tabla_cortes.column('responsable', width=150)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_cortes.yview)
+        self.tabla_cortes.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        self.tabla_cortes.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Eventos de la tabla
+        self.tabla_cortes.bind("<Double-1>", lambda event: self.ver_detalle_corte())
+
+        # Frame para botones de acción
+        frame_botones = tk.Frame(self.tab_cortes, bg="#f5f5f5")
+        frame_botones.pack(fill=tk.X, pady=10, padx=5)
+
+        # Botones para acciones sobre cortes
+        btn_detalle = tk.Button(
+            frame_botones,
+            text="Ver Detalle",
+            font=("Helvetica", 11),
+            bg="#3f51b5",
+            fg="white",
+            width=12,
+            cursor="hand2",
+            command=self.ver_detalle_corte
+        )
+        btn_detalle.pack(side=tk.LEFT, padx=5)
+
+        btn_imprimir = tk.Button(
+            frame_botones,
+            text="Imprimir Corte",
+            font=("Helvetica", 11),
+            bg="#3f51b5",
+            fg="white",
+            width=12,
+            cursor="hand2",
+            command=self.imprimir_corte_seleccionado
+        )
+        btn_imprimir.pack(side=tk.LEFT, padx=5)
+
+        # Cargar cortes iniciales
+        self.cargar_cortes()
+
+    def ver_detalle_corte(self):
+        """Muestra los detalles de un corte seleccionado"""
+        try:
+            # Obtener el item seleccionado
+            seleccion = self.tabla_cortes.selection()
+
+            if not seleccion:
+                messagebox.showinfo("Información", "Seleccione un corte para ver sus detalles")
+                return
+
+            # Obtener el ID del corte seleccionado
+            item = self.tabla_cortes.item(seleccion[0])
+            id_corte = item['values'][0]
+
+            # Mostrar detalles del corte (similar a ver_ultimo_corte pero con el ID específico)
+            self.mostrar_detalle_corte(id_corte)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo mostrar el detalle del corte: {str(e)}")
+            print(f"Error al mostrar detalle del corte: {e}")
+
+    def mostrar_detalle_corte(self, id_corte):
+        """Muestra información detallada de un corte específico"""
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener información del corte
+            cursor.execute("""
+                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
+                       c.monto_inicial, c.total_ingresos, c.total_egresos, c.saldo_final,
+                       u.nombre
+                FROM caja c
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.id_caja = %s
+            """, (id_corte,))
+
+            corte = cursor.fetchone()
+
+            # Obtener los movimientos asociados al corte
+            cursor.execute("""
+                SELECT m.hora, m.tipo, m.concepto, m.monto, u.nombre
+                FROM movimientos_caja m
+                JOIN usuarios u ON m.id_usuario = u.id_usuario
+                WHERE m.id_caja = %s
+                ORDER BY m.hora
+            """, (id_corte,))
+
+            movimientos = cursor.fetchall()
+            conexion.close()
+
+            if corte:
+                id_caja, fecha, hora_apertura, hora_cierre, monto_inicial, ingresos, egresos, saldo, responsable = corte
+
+                # Formatear fechas y horas para mejor visualización
+                fecha_formateada = utl.formatear_fecha(fecha)
+                hora_ap = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
+                hora_ci = hora_cierre.strftime("%H:%M:%S") if hora_cierre else "Abierta"
+
+                # Crear una ventana para mostrar el corte
+                ventana_corte = tk.Toplevel(self.ventana)
+                ventana_corte.title(f"Detalle de Corte #{id_caja}")
+                ventana_corte.geometry("600x500")
+                ventana_corte.config(bg="#f5f5f5")
+                ventana_corte.resizable(False, False)
+
+                # Centrar la ventana
+                utl.centrar_ventana(ventana_corte, 600, 500)
+
+                # Hacer la ventana modal
+                ventana_corte.transient(self.ventana)
+                ventana_corte.grab_set()
+
+                # Contenido
+                frame_corte = tk.Frame(ventana_corte, bg="#f5f5f5", padx=20, pady=20)
+                frame_corte.pack(fill=tk.BOTH, expand=True)
+
+                # Título
+                tk.Label(
+                    frame_corte,
+                    text=f"DETALLE DE CORTE #{id_caja}",
+                    font=("Helvetica", 14, "bold"),
+                    bg="#f5f5f5",
+                    fg="#3a7ff6"
+                ).pack(pady=(0, 20))
+
+                # Notebook para pestañas de resumen y movimientos
+                notebook = ttk.Notebook(frame_corte)
+                notebook.pack(fill=tk.BOTH, expand=True)
+
+                # Pestaña de resumen
+                tab_resumen = tk.Frame(notebook, bg="#f5f5f5")
+                notebook.add(tab_resumen, text="Resumen")
+
+                # Pestaña de movimientos
+                tab_movimientos = tk.Frame(notebook, bg="#f5f5f5")
+                notebook.add(tab_movimientos, text="Movimientos")
+
+                # Información del corte en formato de tabla (pestaña resumen)
+                info_frame = tk.Frame(tab_resumen, bg="#f0f7ff", padx=15, pady=15, relief=tk.GROOVE, bd=1)
+                info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+                # Datos en dos columnas
+                datos = [
+                    ("ID de Caja:", f"{id_caja}"),
+                    ("Fecha:", fecha_formateada),
+                    ("Hora de Apertura:", hora_ap),
+                    ("Hora de Cierre:", hora_ci),
+                    ("Responsable:", responsable),
+                    ("Monto Inicial:", f"${monto_inicial:.2f}"),
+                    ("Total Ingresos:", f"${ingresos:.2f}"),
+                    ("Total Egresos:", f"${egresos:.2f}"),
+                    ("Saldo Final:", f"${saldo:.2f}")
+                ]
+
+                for i, (etiqueta, valor) in enumerate(datos):
+                    tk.Label(
+                        info_frame,
+                        text=etiqueta,
+                        font=("Helvetica", 11, "bold"),
+                        bg="#f0f7ff",
+                        anchor=tk.W
+                    ).grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+
+                    tk.Label(
+                        info_frame,
+                        text=valor,
+                        font=("Helvetica", 11),
+                        bg="#f0f7ff",
+                        anchor=tk.W
+                    ).grid(row=i, column=1, sticky=tk.W, padx=5, pady=5)
+
+                # Tabla de movimientos (pestaña movimientos)
+                mov_frame = tk.Frame(tab_movimientos, bg="#f5f5f5", padx=10, pady=10)
+                mov_frame.pack(fill=tk.BOTH, expand=True)
+
+                if movimientos:
+                    # Crear tabla
+                    columnas = ('hora', 'tipo', 'concepto', 'monto', 'usuario')
+
+                    tabla_mov = ttk.Treeview(mov_frame, columns=columnas, show='headings', height=12)
+
+                    # Aplicar estilo
+                    utl.aplicar_estilo_tabla(tabla_mov)
+
+                    # Configurar encabezados
+                    tabla_mov.heading('hora', text='Hora')
+                    tabla_mov.heading('tipo', text='Tipo')
+                    tabla_mov.heading('concepto', text='Concepto')
+                    tabla_mov.heading('monto', text='Monto')
+                    tabla_mov.heading('usuario', text='Usuario')
+
+                    # Configurar anchos
+                    tabla_mov.column('hora', width=80, anchor=tk.CENTER)
+                    tabla_mov.column('tipo', width=80, anchor=tk.CENTER)
+                    tabla_mov.column('concepto', width=200)
+                    tabla_mov.column('monto', width=80, anchor=tk.E)
+                    tabla_mov.column('usuario', width=120)
+
+                    # Scrollbar
+                    scrollbar = ttk.Scrollbar(mov_frame, orient=tk.VERTICAL, command=tabla_mov.yview)
+                    tabla_mov.configure(yscrollcommand=scrollbar.set)
+
+                    # Empaquetar
+                    tabla_mov.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+                    # Insertar datos
+                    for mov in movimientos:
+                        hora, tipo, concepto, monto, usuario = mov
+                        hora_str = hora.strftime("%H:%M:%S")
+
+                        tabla_mov.insert('', tk.END, values=(
+                            hora_str, tipo, concepto, f"${monto:.2f}", usuario
+                        ))
+                else:
+                    # Mensaje si no hay movimientos
+                    tk.Label(
+                        mov_frame,
+                        text="No hay movimientos registrados para este corte",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5",
+                        fg="#666"
+                    ).pack(pady=50)
+
+                # Botones
+                frame_botones = tk.Frame(frame_corte, bg="#f5f5f5")
+                frame_botones.pack(pady=15)
+
+                btn_imprimir = tk.Button(
+                    frame_botones,
+                    text="Imprimir Corte",
+                    font=("Helvetica", 11),
+                    bg="#3f51b5",
+                    fg="white",
+                    width=15,
+                    cursor="hand2",
+                    command=lambda: self.imprimir_corte(id_caja)
+                )
+                btn_imprimir.grid(row=0, column=0, padx=10)
+
+                btn_cerrar = tk.Button(
+                    frame_botones,
+                    text="Cerrar",
+                    font=("Helvetica", 11),
+                    bg="#e53935",
+                    fg="white",
+                    width=10,
+                    cursor="hand2",
+                    command=ventana_corte.destroy
+                )
+                btn_cerrar.grid(row=0, column=1, padx=10)
+
+            else:
+                messagebox.showinfo("Información", "No se encontró información para el corte seleccionado")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo mostrar el detalle del corte: {str(e)}")
+            print(f"Error al mostrar detalle del corte: {e}")
+
+    def imprimir_corte_seleccionado(self):
+        """Imprime el corte seleccionado en la tabla"""
+        try:
+            # Obtener el item seleccionado
+            seleccion = self.tabla_cortes.selection()
+
+            if not seleccion:
+                messagebox.showinfo("Información", "Seleccione un corte para imprimir")
+                return
+
+            # Obtener el ID del corte seleccionado
+            item = self.tabla_cortes.item(seleccion[0])
+            id_corte = item['values'][0]
+
+            # Imprimir el corte
+            self.imprimir_corte(id_corte)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el corte: {str(e)}")
+            print(f"Error al imprimir corte seleccionado: {e}")
 
     def configurar_tab_operaciones(self):
         """Configura la pestaña de operaciones de caja"""
@@ -1416,3 +1914,133 @@ class GestionCaja:
         except Exception as e:
             messagebox.showerror("Error", f"Error al verificar estado de caja: {str(e)}")
             self.caja_abierta = False
+
+    def ver_ultimo_corte(self):
+        """Muestra información del último corte de caja registrado"""
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Consultar el último corte de caja (una caja cerrada)
+            cursor.execute("""
+                SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
+                       c.total_ingresos, c.total_egresos, c.saldo_final,
+                       u.nombre
+                FROM caja c
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.hora_cierre IS NOT NULL
+                ORDER BY c.fecha DESC, c.hora_cierre DESC
+                LIMIT 1
+            """)
+
+            corte = cursor.fetchone()
+            conexion.close()
+
+            if corte:
+                id_caja, fecha, hora_apertura, hora_cierre, ingresos, egresos, saldo, responsable = corte
+
+                # Formatear fechas y horas para mejor visualización
+                fecha_formateada = utl.formatear_fecha(fecha)
+                hora_ap = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
+                hora_ci = hora_cierre.strftime("%H:%M:%S") if hora_cierre else ""
+
+                # Crear una ventana para mostrar el corte
+                ventana_corte = tk.Toplevel(self.ventana)
+                ventana_corte.title("Último Corte de Caja")
+                ventana_corte.geometry("500x400")
+                ventana_corte.config(bg="#f5f5f5")
+                ventana_corte.resizable(False, False)
+
+                # Centrar la ventana
+                utl.centrar_ventana(ventana_corte, 500, 400)
+
+                # Hacer la ventana modal
+                ventana_corte.transient(self.ventana)
+                ventana_corte.grab_set()
+
+                # Contenido
+                frame_corte = tk.Frame(ventana_corte, bg="#f5f5f5", padx=20, pady=20)
+                frame_corte.pack(fill=tk.BOTH, expand=True)
+
+                # Título
+                tk.Label(
+                    frame_corte,
+                    text="ÚLTIMO CORTE DE CAJA",
+                    font=("Helvetica", 14, "bold"),
+                    bg="#f5f5f5",
+                    fg="#3a7ff6"
+                ).pack(pady=(0, 20))
+
+                # Información del corte en formato de tabla
+                info_frame = tk.Frame(frame_corte, bg="#f0f7ff", padx=15, pady=15, relief=tk.GROOVE, bd=1)
+                info_frame.pack(fill=tk.BOTH, expand=True)
+
+                # Datos en dos columnas
+                datos = [
+                    ("ID de Caja:", f"{id_caja}"),
+                    ("Fecha:", fecha_formateada),
+                    ("Hora de Apertura:", hora_ap),
+                    ("Hora de Cierre:", hora_ci),
+                    ("Responsable:", responsable),
+                    ("Total Ingresos:", f"${ingresos:.2f}"),
+                    ("Total Egresos:", f"${egresos:.2f}"),
+                    ("Saldo Final:", f"${saldo:.2f}")
+                ]
+
+                for i, (etiqueta, valor) in enumerate(datos):
+                    tk.Label(
+                        info_frame,
+                        text=etiqueta,
+                        font=("Helvetica", 11, "bold"),
+                        bg="#f0f7ff",
+                        anchor=tk.W
+                    ).grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+
+                    tk.Label(
+                        info_frame,
+                        text=valor,
+                        font=("Helvetica", 11),
+                        bg="#f0f7ff",
+                        anchor=tk.W
+                    ).grid(row=i, column=1, sticky=tk.W, padx=5, pady=5)
+
+                # Botones
+                frame_botones = tk.Frame(frame_corte, bg="#f5f5f5")
+                frame_botones.pack(pady=15)
+
+                btn_imprimir = tk.Button(
+                    frame_botones,
+                    text="Imprimir Corte",
+                    font=("Helvetica", 11),
+                    bg="#3f51b5",
+                    fg="white",
+                    width=15,
+                    cursor="hand2",
+                    command=lambda: self.imprimir_corte(id_caja)
+                )
+                btn_imprimir.grid(row=0, column=0, padx=10)
+
+                btn_cerrar = tk.Button(
+                    frame_botones,
+                    text="Cerrar",
+                    font=("Helvetica", 11),
+                    bg="#e53935",
+                    fg="white",
+                    width=10,
+                    cursor="hand2",
+                    command=ventana_corte.destroy
+                )
+                btn_cerrar.grid(row=0, column=1, padx=10)
+
+            else:
+                messagebox.showinfo("Información", "No se encontraron cortes de caja anteriores")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo consultar el último corte: {str(e)}")
+            print(f"Error al consultar último corte: {e}")
+
+# Agrega esta función al final de tu archivo caja.py
+
+def abrir_caja(ventana_padre=None, id_usuario=None):
+    """Función para abrir el módulo de caja desde otros módulos"""
+    return GestionCaja(ventana_padre, id_usuario)
