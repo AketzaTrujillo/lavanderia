@@ -175,7 +175,7 @@ class MasterPanel:
                 text=f"{boton['icono']} {boton['texto']}",
                 font=("Helvetica", 14),
                 bg=color_bg,
-                fg="white",
+                fg="black",
                 width=16,
                 height=2,
                 cursor="hand2",

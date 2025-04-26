@@ -13,14 +13,21 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
 
 # Intentar importar el login
+# Asegurar que podamos importar módulos en cualquier directorio
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
+
+# Intentar importar el login
 try:
+    print("Intentando importar loginP...")  
     from loginP import App
-except ImportError:
+except ImportError as e:
     messagebox.showerror(
         "Error de importación", 
         "No se pudo cargar el módulo de inicio de sesión.\n"
         "Por favor, asegúrate de que todos los archivos del sistema estén completos."
     )
+    print(f"Error real: {e}")  # 👈 También útil para ver el detalle en la terminal
     sys.exit(1)
 
 # Función principal que inicia la aplicación

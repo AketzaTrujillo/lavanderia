@@ -1,55 +1,57 @@
-columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita')
-self.tabla_reporte['columns'] = columnas
+import tkinter as tk   
+elif tipo_seleccionado == "Clientes Frecuentes":
+    columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita')
+    self.tabla_reporte['columns'] = columnas
 
-# Configurar encabezados
-self.tabla_reporte.heading('id_cliente', text='ID')
-self.tabla_reporte.heading('nombre', text='Cliente')
-self.tabla_reporte.heading('visitas', text='Visitas')
-self.tabla_reporte.heading('gasto_total', text='Gasto Total')
-self.tabla_reporte.heading('puntos', text='Puntos')
-self.tabla_reporte.heading('ultima_visita', text='Última Visita')
+    # Configurar encabezados
+    self.tabla_reporte.heading('id_cliente', text='ID')
+    self.tabla_reporte.heading('nombre', text='Cliente')
+    self.tabla_reporte.heading('visitas', text='Visitas')
+    self.tabla_reporte.heading('gasto_total', text='Gasto Total')
+    self.tabla_reporte.heading('puntos', text='Puntos')
+    self.tabla_reporte.heading('ultima_visita', text='Última Visita')
 
-# Configurar anchos
-self.tabla_reporte.column('id_cliente', width=50, anchor=tk.CENTER)
-self.tabla_reporte.column('nombre', width=200)
-self.tabla_reporte.column('visitas', width=80, anchor=tk.CENTER)
-self.tabla_reporte.column('gasto_total', width=100, anchor=tk.E)
-self.tabla_reporte.column('puntos', width=80, anchor=tk.CENTER)
-self.tabla_reporte.column('ultima_visita', width=120, anchor=tk.CENTER)
+    # Configurar anchos
+    self.tabla_reporte.column('id_cliente', width=50, anchor=tk.CENTER)
+    self.tabla_reporte.column('nombre', width=200)
+    self.tabla_reporte.column('visitas', width=80, anchor=tk.CENTER)
+    self.tabla_reporte.column('gasto_total', width=100, anchor=tk.E)
+    self.tabla_reporte.column('puntos', width=80, anchor=tk.CENTER)
+    self.tabla_reporte.column('ultima_visita', width=120, anchor=tk.CENTER)
 
 elif tipo_seleccionado == "Ingresos Mensuales":
-columnas = ('mes', 'ventas', 'total_ventas', 'servicios', 'total_servicios', 'total_general')
-self.tabla_reporte['columns'] = columnas
+    columnas = ('mes', 'ventas', 'total_ventas', 'servicios', 'total_servicios', 'total_general')
+    self.tabla_reporte['columns'] = columnas
 
-# Configurar encabezados
-self.tabla_reporte.heading('mes', text='Mes')
-self.tabla_reporte.heading('ventas', text='Cant. Ventas')
-self.tabla_reporte.heading('total_ventas', text='Total Ventas')
-self.tabla_reporte.heading('servicios', text='Cant. Servicios')
-self.tabla_reporte.heading('total_servicios', text='Total Servicios')
-self.tabla_reporte.heading('total_general', text='Total General')
+    # Configurar encabezados
+    self.tabla_reporte.heading('mes', text='Mes')
+    self.tabla_reporte.heading('ventas', text='Cant. Ventas')
+    self.tabla_reporte.heading('total_ventas', text='Total Ventas')
+    self.tabla_reporte.heading('servicios', text='Cant. Servicios')
+    self.tabla_reporte.heading('total_servicios', text='Total Servicios')
+    self.tabla_reporte.heading('total_general', text='Total General')
 
-# Configurar anchos
-self.tabla_reporte.column('mes', width=100, anchor=tk.W)
-self.tabla_reporte.column('ventas', width=100, anchor=tk.CENTER)
-self.tabla_reporte.column('total_ventas', width=120, anchor=tk.E)
-self.tabla_reporte.column('servicios', width=120, anchor=tk.CENTER)
-self.tabla_reporte.column('total_servicios', width=120, anchor=tk.E)
-self.tabla_reporte.column('total_general', width=120, anchor=tk.E)
+    # Configurar anchos
+    self.tabla_reporte.column('mes', width=100, anchor=tk.W)
+    self.tabla_reporte.column('ventas', width=100, anchor=tk.CENTER)
+    self.tabla_reporte.column('total_ventas', width=120, anchor=tk.E)
+    self.tabla_reporte.column('servicios', width=120, anchor=tk.CENTER)
+    self.tabla_reporte.column('total_servicios', width=120, anchor=tk.E)
+    self.tabla_reporte.column('total_general', width=120, anchor=tk.E)
 
 elif tipo_seleccionado == "Pedidos por Estado":
-columnas = ('estado', 'cantidad', 'porcentaje')
-self.tabla_reporte['columns'] = columnas
+    columnas = ('estado', 'cantidad', 'porcentaje')
+    self.tabla_reporte['columns'] = columnas
 
-# Configurar encabezados
-self.tabla_reporte.heading('estado', text='Estado')
-self.tabla_reporte.heading('cantidad', text='Cantidad')
-self.tabla_reporte.heading('porcentaje', text='Porcentaje')
+    # Configurar encabezados
+    self.tabla_reporte.heading('estado', text='Estado')
+    self.tabla_reporte.heading('cantidad', text='Cantidad')
+    self.tabla_reporte.heading('porcentaje', text='Porcentaje')
 
-# Configurar anchos
-self.tabla_reporte.column('estado', width=150, anchor=tk.W)
-self.tabla_reporte.column('cantidad', width=100, anchor=tk.CENTER)
-self.tabla_reporte.column('porcentaje', width=100, anchor=tk.CENTER)
+    # Configurar anchos
+    self.tabla_reporte.column('estado', width=150, anchor=tk.W)
+    self.tabla_reporte.column('cantidad', width=100, anchor=tk.CENTER)
+    self.tabla_reporte.column('porcentaje', width=100, anchor=tk.CENTER)
 
 # Aplicar el periodo actual
 self.cambiar_periodo()
@@ -184,17 +186,36 @@ def generar_reporte(self):
 
 def generar_reporte_ventas(self, cursor, fecha_inicio, fecha_fin):
     """Genera reporte de ventas en el periodo seleccionado"""
-    # Consulta SQL para obtener ventas en el rango de fechas
-    consulta = """
-            SELECT DATE(v.fecha) as fecha, v.id_venta, c.nombre, v.total, v.metodo_pago, u.nombre as vendedor
-            FROM ventas v
-            LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
-            LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
-            WHERE DATE(v.fecha) BETWEEN %s AND %s
-            ORDER BY v.fecha DESC
-        """
+    condiciones = ["v.fecha >= %s", "v.fecha <= %s"]
+    parametros = [fecha_inicio, fecha_fin]
 
-    cursor.execute(consulta, (fecha_inicio, fecha_fin))
+    # Filtro método de pago
+    if self.filtro_pago.get() != "Todos":
+        condiciones.append("v.metodo_pago = %s")
+        parametros.append(self.filtro_pago.get())
+
+    # Filtro cliente
+    if self.filtro_cliente.get().strip() != "":
+        condiciones.append("c.nombre LIKE %s")
+        parametros.append(f"%{self.filtro_cliente.get().strip()}%")
+
+    # Filtro vendedor
+    if self.filtro_vendedor.get().strip() != "":
+        condiciones.append("u.nombre LIKE %s")
+        parametros.append(f"%{self.filtro_vendedor.get().strip()}%")
+
+    # Unir condiciones y generar consulta final
+    where_clause = " AND ".join(condiciones)
+
+    consulta = f"""
+        SELECT DATE(v.fecha) as fecha, v.id_venta, c.nombre, v.total, v.metodo_pago, u.nombre as vendedor
+        FROM ventas v
+        LEFT JOIN clientes c ON v.id_cliente = c.id_cliente
+        LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+        WHERE {where_clause}
+        ORDER BY v.fecha DESC
+    """
+    cursor.execute(consulta, parametros) 
     ventas = cursor.fetchall()
 
     # Variables para el resumen
@@ -266,8 +287,8 @@ def generar_reporte_productos(self, cursor, fecha_inicio, fecha_fin):
     # Consulta SQL para obtener productos más vendidos
     consulta = """
             SELECT p.id_producto, p.nombre, 
-                   SUM(dv.cantidad) as cantidad_total,
-                   SUM(dv.subtotal) as ingresos_total
+                SUM(dv.cantidad) as cantidad_total,
+                SUM(dv.subtotal) as ingresos_total
             FROM detalle_venta dv
             JOIN productos p ON dv.id_item = p.id_producto
             JOIN ventas v ON dv.id_venta = v.id_venta
@@ -340,8 +361,8 @@ def generar_reporte_servicios(self, cursor, fecha_inicio, fecha_fin):
     # Consulta SQL para obtener servicios más solicitados
     consulta = """
             SELECT s.id_servicio, s.nombre, 
-                   SUM(dv.cantidad) as cantidad_total,
-                   SUM(dv.subtotal) as ingresos_total
+                SUM(dv.cantidad) as cantidad_total,
+                SUM(dv.subtotal) as ingresos_total
             FROM detalle_venta dv
             JOIN servicios s ON dv.id_item = s.id_servicio
             JOIN ventas v ON dv.id_venta = v.id_venta
@@ -414,10 +435,10 @@ def generar_reporte_clientes(self, cursor, fecha_inicio, fecha_fin):
     # Consulta SQL para obtener clientes frecuentes
     consulta = """
             SELECT c.id_cliente, c.nombre, 
-                   COUNT(DISTINCT v.id_venta) as visitas,
-                   SUM(v.total) as gasto_total,
-                   c.puntos,
-                   MAX(v.fecha) as ultima_visita
+                COUNT(DISTINCT v.id_venta) as visitas,
+                SUM(v.total) as gasto_total,
+                c.puntos,
+                MAX(v.fecha) as ultima_visita
             FROM clientes c
             JOIN ventas v ON c.id_cliente = v.id_cliente
             WHERE DATE(v.fecha) BETWEEN %s AND %s
@@ -499,8 +520,8 @@ def generar_reporte_ingresos_mensuales(self, cursor, fecha_inicio, fecha_fin):
     # Consulta SQL para obtener ingresos por mes
     consulta_ventas = """
             SELECT YEAR(v.fecha) as año, MONTH(v.fecha) as mes,
-                   COUNT(v.id_venta) as cant_ventas,
-                   SUM(v.total) as total_ventas
+                COUNT(v.id_venta) as cant_ventas,
+                SUM(v.total) as total_ventas
             FROM ventas v
             WHERE DATE(v.fecha) BETWEEN %s AND %s
             GROUP BY YEAR(v.fecha), MONTH(v.fecha)
@@ -1210,6 +1231,29 @@ def personalizar_colores(self):
 
         # Actualizar el gráfico con el nuevo color
         self.actualizar_grafico()
+        
+def guardar_plantilla(self):
+    """Guarda la configuración actual del reporte como una plantilla .json"""
+    import json
+    tipo = self.tipo_reporte.get().replace(" ", "_").lower()
+    periodo = self.periodo.get().replace(" ", "_").lower()
+    nombre_archivo = f"{tipo}_{periodo}.json"
+
+    datos = {
+        "tipo_reporte": self.tipo_reporte.get(),
+        "periodo": self.periodo.get(),
+        "fecha_inicio": self.fecha_inicio.get(),
+        "fecha_fin": self.fecha_fin.get()
+    }
+
+    try:
+        ruta = os.path.join(self.directorio_reportes, nombre_archivo)
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(datos, f, ensure_ascii=False, indent=4)
+
+        messagebox.showinfo("Plantilla guardada", f"Se guardó como:\n{nombre_archivo}")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo guardar la plantilla:\n{e}")
 
 
 def exportar_reporte(self):
@@ -1550,6 +1594,19 @@ class Reportes:
             command=self.exportar_reporte
         )
         btn_exportar.pack(side=tk.RIGHT, padx=5)
+        
+        # Botón para guardar configuración como plantilla
+        btn_guardar_plantilla = tk.Button(
+            frame_controles,
+            text="Guardar como Plantilla",
+            font=("Helvetica", 11),
+            bg="#ff9800",
+            fg="white",
+            padx=10,
+            cursor="hand2",
+            command=self.guardar_plantilla
+        )
+        btn_guardar_plantilla.pack(side=tk.RIGHT, padx=5)
 
         # Crear notebook (pestañas)
         self.notebook = ttk.Notebook(self.frame_principal)
@@ -1658,70 +1715,109 @@ class Reportes:
         self.canvas = FigureCanvasTkAgg(self.fig, self.frame_grafico)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-    def cambiar_tipo_reporte(self, event=None):
-        """Actualiza la interfaz según el tipo de reporte seleccionado"""
-        tipo_seleccionado = self.tipo_reporte.get()
+def cambiar_tipo_reporte(self, event=None):
+    tipo_seleccionado = self.tipo_reporte.get()
 
-        # Limpiar tabla existente
-        for item in self.tabla_reporte.get_children():
-            self.tabla_reporte.delete(item)
+    # Limpiar tabla existente
+    for item in self.tabla_reporte.get_children():
+        self.tabla_reporte.delete(item)
 
-        # Configurar columnas según el tipo de reporte
-        if tipo_seleccionado == "Ventas por Periodo":
-            columnas = ('fecha', 'id_venta', 'cliente', 'total', 'metodo_pago', 'usuario')
-            self.tabla_reporte['columns'] = columnas
+    # Configurar columnas según el tipo de reporte
+    if tipo_seleccionado == "Ventas por Periodo":
+        columnas = ('fecha', 'id_venta', 'cliente', 'total', 'metodo_pago', 'usuario')
+        self.tabla_reporte['columns'] = columnas
 
-            # Configurar encabezados
-            self.tabla_reporte.heading('fecha', text='Fecha')
-            self.tabla_reporte.heading('id_venta', text='ID Venta')
-            self.tabla_reporte.heading('cliente', text='Cliente')
-            self.tabla_reporte.heading('total', text='Total')
-            self.tabla_reporte.heading('metodo_pago', text='Método de Pago')
-            self.tabla_reporte.heading('usuario', text='Vendedor')
+        # Configurar encabezados
+        self.tabla_reporte.heading('fecha', text='Fecha')
+        self.tabla_reporte.heading('id_venta', text='ID Venta')
+        self.tabla_reporte.heading('cliente', text='Cliente')
+        self.tabla_reporte.heading('total', text='Total')
+        self.tabla_reporte.heading('metodo_pago', text='Método de Pago')
+        self.tabla_reporte.heading('usuario', text='Vendedor')
 
-            # Configurar anchos
-            self.tabla_reporte.column('fecha', width=100, anchor=tk.CENTER)
-            self.tabla_reporte.column('id_venta', width=70, anchor=tk.CENTER)
-            self.tabla_reporte.column('cliente', width=200)
-            self.tabla_reporte.column('total', width=100, anchor=tk.E)
-            self.tabla_reporte.column('metodo_pago', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('usuario', width=150)
+        # Configurar anchos
+        self.tabla_reporte.column('fecha', width=100, anchor=tk.CENTER)
+        self.tabla_reporte.column('id_venta', width=70, anchor=tk.CENTER)
+        self.tabla_reporte.column('cliente', width=200)
+        self.tabla_reporte.column('total', width=100, anchor=tk.E)
+        self.tabla_reporte.column('metodo_pago', width=120, anchor=tk.CENTER)
+        self.tabla_reporte.column('usuario', width=150)
 
-        elif tipo_seleccionado == "Productos Más Vendidos":
-            columnas = ('id_producto', 'nombre', 'cantidad_total', 'ingresos_total')
-            self.tabla_reporte['columns'] = columnas
+    elif tipo_seleccionado == "Productos Más Vendidos":
+        columnas = ('id_producto', 'nombre', 'cantidad_total', 'ingresos_total')
+        self.tabla_reporte['columns'] = columnas
 
-            # Configurar encabezados
-            self.tabla_reporte.heading('id_producto', text='ID')
-            self.tabla_reporte.heading('nombre', text='Producto')
-            self.tabla_reporte.heading('cantidad_total', text='Cantidad Vendida')
-            self.tabla_reporte.heading('ingresos_total', text='Ingresos Generados')
+        self.tabla_reporte.heading('id_producto', text='ID')
+        self.tabla_reporte.heading('nombre', text='Producto')
+        self.tabla_reporte.heading('cantidad_total', text='Cantidad Vendida')
+        self.tabla_reporte.heading('ingresos_total', text='Ingresos Generados')
 
-            # Configurar anchos
-            self.tabla_reporte.column('id_producto', width=50, anchor=tk.CENTER)
-            self.tabla_reporte.column('nombre', width=300)
-            self.tabla_reporte.column('cantidad_total', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('ingresos_total', width=150, anchor=tk.E)
+        self.tabla_reporte.column('id_producto', width=50, anchor=tk.CENTER)
+        self.tabla_reporte.column('nombre', width=300)
+        self.tabla_reporte.column('cantidad_total', width=120, anchor=tk.CENTER)
+        self.tabla_reporte.column('ingresos_total', width=150, anchor=tk.E)
 
-        elif tipo_seleccionado == "Servicios Más Solicitados":
-            columnas = ('id_servicio', 'nombre', 'cantidad_total', 'ingresos_total')
-            self.tabla_reporte['columns'] = columnas
+    elif tipo_seleccionado == "Servicios Más Solicitados":
+        columnas = ('id_servicio', 'nombre', 'cantidad_total', 'ingresos_total')
+        self.tabla_reporte['columns'] = columnas
 
-            # Configurar encabezados
-            self.tabla_reporte.heading('id_servicio', text='ID')
-            self.tabla_reporte.heading('nombre', text='Servicio')
-            self.tabla_reporte.heading('cantidad_total', text='Cantidad Solicitada')
-            self.tabla_reporte.heading('ingresos_total', text='Ingresos Generados')
+        self.tabla_reporte.heading('id_servicio', text='ID')
+        self.tabla_reporte.heading('nombre', text='Servicio')
+        self.tabla_reporte.heading('cantidad_total', text='Cantidad Solicitada')
+        self.tabla_reporte.heading('ingresos_total', text='Ingresos Generados')
 
-            # Configurar anchos
-            self.tabla_reporte.column('id_servicio', width=50, anchor=tk.CENTER)
-            self.tabla_reporte.column('nombre', width=300)
-            self.tabla_reporte.column('cantidad_total', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('ingresos_total', width=150, anchor=tk.E)
+        self.tabla_reporte.column('id_servicio', width=50, anchor=tk.CENTER)
+        self.tabla_reporte.column('nombre', width=300)
+        self.tabla_reporte.column('cantidad_total', width=120, anchor=tk.CENTER)
+        self.tabla_reporte.column('ingresos_total', width=150, anchor=tk.E)
 
-        elif tipo_seleccionado == "Clientes Frecuentes":
-            columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita')
-            self.tabla_reporte['columns'] = columnas
+    elif tipo_seleccionado == "Clientes Frecuentes":
+        columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita')
+        self.tabla_reporte['columns'] = columnas
 
-            # Configurar encabezados
-            self.tabla_reporte.heading('id_cliente',
+        self.tabla_reporte.heading('id_cliente', text='ID')
+        self.tabla_reporte.heading('nombre', text='Cliente')
+        self.tabla_reporte.heading('visitas', text='Visitas')
+        self.tabla_reporte.heading('gasto_total', text='Gasto Total')
+        self.tabla_reporte.heading('puntos', text='Puntos')
+        self.tabla_reporte.heading('ultima_visita', text='Última Visita')
+
+        self.tabla_reporte.column('id_cliente', width=50, anchor=tk.CENTER)
+        self.tabla_reporte.column('nombre', width=200)
+        self.tabla_reporte.column('visitas', width=80, anchor=tk.CENTER)
+        self.tabla_reporte.column('gasto_total', width=100, anchor=tk.E)
+        self.tabla_reporte.column('puntos', width=80, anchor=tk.CENTER)
+        self.tabla_reporte.column('ultima_visita', width=120, anchor=tk.CENTER)
+
+    elif tipo_seleccionado == "Ingresos Mensuales":
+        columnas = ('mes', 'ventas', 'total_ventas', 'servicios', 'total_servicios', 'total_general')
+        self.tabla_reporte['columns'] = columnas
+
+        self.tabla_reporte.heading('mes', text='Mes')
+        self.tabla_reporte.heading('ventas', text='Cant. Ventas')
+        self.tabla_reporte.heading('total_ventas', text='Total Ventas')
+        self.tabla_reporte.heading('servicios', text='Cant. Servicios')
+        self.tabla_reporte.heading('total_servicios', text='Total Servicios')
+        self.tabla_reporte.heading('total_general', text='Total General')
+
+        self.tabla_reporte.column('mes', width=100, anchor=tk.W)
+        self.tabla_reporte.column('ventas', width=100, anchor=tk.CENTER)
+        self.tabla_reporte.column('total_ventas', width=120, anchor=tk.E)
+        self.tabla_reporte.column('servicios', width=120, anchor=tk.CENTER)
+        self.tabla_reporte.column('total_servicios', width=120, anchor=tk.E)
+        self.tabla_reporte.column('total_general', width=120, anchor=tk.E)
+
+    elif tipo_seleccionado == "Pedidos por Estado":
+        columnas = ('estado', 'cantidad', 'porcentaje')
+        self.tabla_reporte['columns'] = columnas
+
+        self.tabla_reporte.heading('estado', text='Estado')
+        self.tabla_reporte.heading('cantidad', text='Cantidad')
+        self.tabla_reporte.heading('porcentaje', text='Porcentaje')
+
+        self.tabla_reporte.column('estado', width=150, anchor=tk.W)
+        self.tabla_reporte.column('cantidad', width=100, anchor=tk.CENTER)
+        self.tabla_reporte.column('porcentaje', width=100, anchor=tk.CENTER)
+
+    # Aplicar el periodo actual (por si el cambio de tipo también requiere actualizar fechas)
+    self.cambiar_periodo()
