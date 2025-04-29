@@ -1,6 +1,6 @@
 # 🧼 Sistema Lavandería - Aplicación de Escritorio
 
-Este proyecto es parte del sistema de punto de venta para una lavandería, desarrollado en Python con Tkinter y MySQL.
+Este proyecto es parte del sistema de punto de venta para una lavandería.
 
 ## 🔐 Módulo actual: Inicio de sesión (Login)
 
@@ -19,5 +19,6 @@ Este proyecto es parte del sistema de punto de venta para una lavandería, desar
 
 Instalación del conector:
 
-```bash
 pip install mysql-connector-python
+
+Se cambia contraseña del archivo config.json
