@@ -29,7 +29,7 @@ class Pedidos:
         self.ventana.title("Módulo de Pedidos - Lavandería")
         self.ventana.geometry("1000x700")
         self.ventana.config(bg="#f5f5f5")
-        self.ventana.resizable(False, False)
+        self.ventana.resizable(True, True)
 
         if ventana_padre:
             # Centrar la ventana si existe una ventana padre

@@ -55,8 +55,8 @@ def enviar_correo_html(destinatario, asunto, contenido_html):
         bool: True si se envió correctamente, False en caso contrario
     """
     # ==== CONFIGURA ESTOS VALORES CON TUS DATOS ====
-    remitente = "kevalenciahd09@gmail.com"  # CAMBIA ESTO con tu correo de Gmail
-    password = "imwg qdss lkrd nfoo"  # CAMBIA ESTO con tu contraseña de aplicación
+    remitente = "reyes.martinez.ulisesjosue@gmail.com"  # CAMBIA ESTO con tu correo de Gmail
+    password = "njdv qeuw mnqu zzcy"  # CAMBIA ESTO con tu contraseña de aplicación
     # ============================================
 
     try:

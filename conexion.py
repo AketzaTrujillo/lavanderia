@@ -23,7 +23,7 @@ def cargar_configuracion():
     config_default = {
         "host": "localhost",
         "user": "root",
-        "password": "Chelsea1302*",
+        "password": "adminPass.29",
         "database": "lavanderiadb"
     }
 
@@ -40,6 +40,8 @@ def cargar_configuracion():
     except Exception as e:
         print(f"Error al cargar configuración: {e}")
         return config_default
+    
+
 
 
 def conectar_bd():

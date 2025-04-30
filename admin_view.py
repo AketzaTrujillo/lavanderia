@@ -314,6 +314,8 @@ class MasterPanel:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos: {str(e)}")
 
+# Ventas
+
     def registrar_ventas(self):
         """Abre la ventana de registro de ventas"""
         try:
@@ -322,6 +324,8 @@ class MasterPanel:
             Ventas(self.ventana)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+
+# Actualizacion 
 
     def generar_reportes(self):
         """Abre la ventana de generación de reportes"""
@@ -342,7 +346,7 @@ class MasterPanel:
         """Abre la ventana de seguimiento de pedidos"""
         try:
             # Importar el módulo de seguimiento
-            from seguimiento import abrir_seguimiento
+            from seguimiento_pedidos import abrir_seguimiento
             abrir_seguimiento(self.ventana)
         except ImportError:
             messagebox.showerror("Error de importación",
@@ -350,6 +354,8 @@ class MasterPanel:
                                  "Verifique que el archivo 'seguimiento.py' existe.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
+
+
 
     def salir(self):
         """Cierra la sesión y la ventana"""
