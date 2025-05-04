@@ -112,5 +112,6 @@ WHERE TABLE_NAME = 'pedidos'
   AND TABLE_SCHEMA = DATABASE()
   AND COLUMN_NAME IN ('prioridad', 'fecha_entrega_estimada');
 
+
 -- Mostrar mensaje de finalización
 SELECT 'Base de datos actualizada correctamente para el módulo de seguimiento de pedidos' as mensaje;

@@ -1,6 +1,6 @@
 """
 Panel de Cajero para el Sistema de Gestión de Lavandería
-Versión actualizada con acceso a módulo de caja
+Versión actualizada con acceso a módulo de caja y seguimiento de pedidos
 """
 
 import tkinter as tk
@@ -9,7 +9,7 @@ import os
 import sys
 import utileria as utl
 
-# Asegurar que podamos importar los módulos
+# Asegurar que podemos importar los módulos
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
 
@@ -111,9 +111,18 @@ class CajeroPanel:
                 "columna": 1
             },
             {
+                "texto": "Seguimiento Pedidos",
+                "comando": self.seguimiento_pedidos,
+                "icono": "📊",
+                "fila": 2,
+                "columna": 0
+            },
+            {
+                "texto": "Cerrar Sesión",
+                "comando": self.salir,
                 "icono": "🚪",
                 "fila": 2,
-                "columna": 0,
+                "columna": 1,
                 "es_salir": True
             }
         ]
@@ -254,7 +263,7 @@ class CajeroPanel:
         except ImportError:
             messagebox.showerror("Error de importación",
                                 "No se pudo importar el módulo de ventas.\n"
-                                "Verifique que el archivo 'ventas.py' existe.")
+                                "Verifique que el archivo 'ventas.py' exists.")
         except AttributeError as e:
             messagebox.showerror("Error de atributo",
                                 f"Error en el módulo de ventas: {str(e)}")
@@ -273,6 +282,20 @@ class CajeroPanel:
                                 "Verifique que el archivo 'caja.py' existe.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
+
+    def seguimiento_pedidos(self):
+        """Abre la ventana de seguimiento de pedidos"""
+        try:
+            # Importar el módulo de seguimiento
+            from seguimiento_pedidos import SeguimientoPedidos
+            # Pasar el ID de usuario y el rol (cajero) al módulo de seguimiento
+            SeguimientoPedidos(self.ventana, self.id_usuario, 'cajero')
+        except ImportError:
+            messagebox.showerror("Error de importación",
+                                "No se pudo importar el módulo de seguimiento.\n"
+                                "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
 
     def salir(self):
         """Cierra la sesión y la ventana"""

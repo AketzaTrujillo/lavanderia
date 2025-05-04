@@ -694,6 +694,176 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudieron cargar los cortes: {str(e)}")
             print(f"Error al cargar cortes: {e}")
 
+    # Modificaciones necesarias para caja.py para lograr coherencia
+
+    # Agregar este método a la clase GestionCaja para mostrar un resumen de ventas
+    def ver_resumen_ventas_dia(self):
+        """Muestra un resumen de las ventas registradas en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener resumen de ventas para la caja actual
+            cursor.execute("""
+                SELECT COUNT(*) as total_ventas, 
+                       SUM(v.total) as total_facturado,
+                       u.nombre as vendedor,
+                       COUNT(*) as ventas_por_usuario
+                FROM ventas v
+                JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+                JOIN usuarios u ON v.id_usuario = u.id_usuario
+                WHERE mc.id_caja = %s
+                GROUP BY u.nombre
+            """, (self.id_caja_actual,))
+
+            resumen_vendedores = cursor.fetchall()
+
+            # Obtener resumen general
+            cursor.execute("""
+                SELECT COUNT(*) as total_ventas, 
+                       SUM(v.total) as total_facturado,
+                       MIN(v.fecha) as primera_venta,
+                       MAX(v.fecha) as ultima_venta
+                FROM ventas v
+                JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+                WHERE mc.id_caja = %s
+            """, (self.id_caja_actual,))
+
+            resumen_general = cursor.fetchone()
+
+            # Mostrar ventana con resumen
+            ventana_resumen = tk.Toplevel(self.ventana)
+            ventana_resumen.title("Resumen de Ventas")
+            ventana_resumen.geometry("600x400")
+            ventana_resumen.config(bg="#f5f5f5")
+            ventana_resumen.grab_set()
+
+            utl.centrar_ventana(ventana_resumen, 600, 400)
+
+            frame = tk.Frame(ventana_resumen, bg="#f5f5f5", padx=20, pady=20)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            # Título
+            tk.Label(frame, text="RESUMEN DE VENTAS", font=("Helvetica", 14, "bold"),
+                     bg="#f5f5f5", fg="#3a7ff6").pack(pady=(0, 10))
+
+            # Resumen general
+            if resumen_general:
+                tk.Label(frame, text=f"Total de ventas: {resumen_general[0]}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+                tk.Label(frame, text=f"Total facturado: ${resumen_general[1]:.2f}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+
+                if resumen_general[2]:  # primera venta
+                    tk.Label(frame, text=f"Primera venta: {resumen_general[2].strftime('%H:%M:%S')}",
+                             font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+                if resumen_general[3]:  # última venta
+                    tk.Label(frame, text=f"Última venta: {resumen_general[3].strftime('%H:%M:%S')}",
+                             font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+
+            # Separador
+            ttk.Separator(frame, orient="horizontal").pack(fill=tk.X, pady=10)
+
+            # Resumen por vendedor
+            tk.Label(frame, text="Ventas por Vendedor:", font=("Helvetica", 12, "bold"),
+                     bg="#f5f5f5").pack(anchor=tk.W, pady=(10, 5))
+
+            for vendedor in resumen_vendedores:
+                tk.Label(frame, text=f"{vendedor[2]}: {vendedor[3]} ventas - ${vendedor[1]:.2f}",
+                         font=("Helvetica", 11), bg="#f5f5f5").pack(anchor=tk.W, padx=20, pady=2)
+
+            # Botón cerrar
+            tk.Button(frame, text="Cerrar", bg="#3a7ff6", fg="white", width=10,
+                      command=ventana_resumen.destroy).pack(pady=20)
+
+            conexion.close()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el resumen: {str(e)}")
+
+    # Modificar el método configurar_tab_operaciones para agregar el botón de resumen de ventas
+    def configurar_tab_operaciones(self):
+        """Configura la pestaña de operaciones de caja"""
+        frame_botones = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
+        frame_botones.pack(pady=20)
+
+        # Botones principales de operación de caja
+        if not self.caja_abierta:
+            # Si la caja está cerrada, mostrar botón de apertura
+            btn_abrir = tk.Button(
+                frame_botones,
+                text="Abrir Caja",
+                font=("Helvetica", 12, "bold"),
+                bg="#4caf50",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.abrir_caja
+            )
+            btn_abrir.pack(padx=20, pady=10)
+        else:
+            # Si la caja está abierta, mostrar botones de operación
+            btn_ingreso = tk.Button(
+                frame_botones,
+                text="Registrar Ingreso",
+                font=("Helvetica", 12),
+                bg="#4caf50",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.registrar_ingreso
+            )
+            btn_ingreso.grid(row=0, column=0, padx=10, pady=10)
+
+            btn_egreso = tk.Button(
+                frame_botones,
+                text="Registrar Egreso",
+                font=("Helvetica", 12),
+                bg="#f44336",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.registrar_egreso
+            )
+            btn_egreso.grid(row=0, column=1, padx=10, pady=10)
+
+            # Agregar botón de resumen de ventas
+            btn_resumen_ventas = tk.Button(
+                frame_botones,
+                text="Resumen Ventas",
+                font=("Helvetica", 12),
+                bg="#2196f3",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.ver_resumen_ventas_dia
+            )
+            btn_resumen_ventas.grid(row=0, column=2, padx=10, pady=10)
+
+            btn_cerrar = tk.Button(
+                frame_botones,
+                text="Cerrar Caja",
+                font=("Helvetica", 12, "bold"),
+                bg="#ff5722",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.cerrar_caja
+            )
+            btn_cerrar.grid(row=1, column=0, columnspan=3, padx=10, pady=20)
+
+        # ... resto del código existente ...
+
+    # Modificar el método cargar_movimientos para mostrar información más detallada
     def cargar_movimientos(self):
         """Carga los movimientos de caja según los filtros seleccionados"""
         try:
@@ -718,9 +888,19 @@ class GestionCaja:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Preparar consulta según filtros
+            # Consulta modificada para incluir información de ventas
             consulta = """
-                SELECT m.id_movimiento, m.hora, m.tipo, m.concepto, m.monto, u.nombre
+                SELECT m.id_movimiento, m.hora, m.tipo, 
+                       CASE 
+                           WHEN m.concepto LIKE 'Venta #%' THEN 
+                               CONCAT(m.concepto, ' - ', 
+                                      (SELECT c.nombre FROM ventas v 
+                                       JOIN clientes c ON v.id_cliente = c.id_cliente 
+                                       WHERE v.id_venta = SUBSTRING(m.concepto, 8, INSTR(m.concepto, ' ', 8) - 8)
+                                       LIMIT 1))
+                           ELSE m.concepto
+                       END as concepto, 
+                       m.monto, u.nombre
                 FROM movimientos_caja m
                 JOIN usuarios u ON m.id_usuario = u.id_usuario
                 WHERE DATE(m.hora) = %s
@@ -730,7 +910,7 @@ class GestionCaja:
 
             if tipo != "Todos":
                 consulta += " AND m.tipo = %s"
-                tipo_bd = tipo.lower()  # convertir a minúsculas para coincidir con la BD
+                tipo_bd = tipo.lower()
                 parametros.append(tipo_bd)
 
             consulta += " ORDER BY m.hora"
@@ -751,16 +931,24 @@ class GestionCaja:
                     # Formatear hora
                     hora_str = hora.strftime("%H:%M:%S") if isinstance(hora, datetime) else str(hora)
 
+                    # Resaltar ventas con color
+                    tags = ()
+                    if "Venta #" in concepto:
+                        tags = ('venta',)
+
                     # Agregar a tabla
                     self.tabla_movimientos.insert('', tk.END, values=(
                         id_mov, hora_str, tipo_mov.capitalize(), concepto, f"${monto:.2f}", usuario
-                    ))
+                    ), tags=tags)
 
                     # Acumular totales
                     if tipo_mov == 'ingreso':
                         total_ing += float(monto)
                     else:
                         total_egr += float(monto)
+
+                # Configurar tags para resaltar ventas
+                self.tabla_movimientos.tag_configure('venta', background='#e8f5e9')
 
                 # Actualizar variables de totales si existen
                 if hasattr(self, 'total_ingresos'):
@@ -912,6 +1100,94 @@ class GestionCaja:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo imprimir los movimientos: {str(e)}")
             print(f"Error al imprimir movimientos: {e}")
+
+    def ver_resumen_ventas_dia(self):
+        """Muestra un resumen de las ventas registradas en la caja actual"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener resumen de ventas para la caja actual
+            cursor.execute("""
+                SELECT COUNT(*) as total_ventas, 
+                       SUM(v.total) as total_facturado,
+                       u.nombre as vendedor,
+                       COUNT(*) as ventas_por_usuario
+                FROM ventas v
+                JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+                JOIN usuarios u ON v.id_usuario = u.id_usuario
+                WHERE mc.id_caja = %s
+                GROUP BY u.nombre
+            """, (self.id_caja_actual,))
+
+            resumen_vendedores = cursor.fetchall()
+
+            # Obtener resumen general
+            cursor.execute("""
+                SELECT COUNT(*) as total_ventas, 
+                       SUM(v.total) as total_facturado,
+                       MIN(v.fecha) as primera_venta,
+                       MAX(v.fecha) as ultima_venta
+                FROM ventas v
+                JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+                WHERE mc.id_caja = %s
+            """, (self.id_caja_actual,))
+
+            resumen_general = cursor.fetchone()
+
+            # Mostrar ventana con resumen
+            ventana_resumen = tk.Toplevel(self.ventana)
+            ventana_resumen.title("Resumen de Ventas")
+            ventana_resumen.geometry("600x400")
+            ventana_resumen.config(bg="#f5f5f5")
+            ventana_resumen.grab_set()
+
+            utl.centrar_ventana(ventana_resumen, 600, 400)
+
+            frame = tk.Frame(ventana_resumen, bg="#f5f5f5", padx=20, pady=20)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            # Título
+            tk.Label(frame, text="RESUMEN DE VENTAS", font=("Helvetica", 14, "bold"),
+                     bg="#f5f5f5", fg="#3a7ff6").pack(pady=(0, 10))
+
+            # Resumen general
+            if resumen_general:
+                tk.Label(frame, text=f"Total de ventas: {resumen_general[0]}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+                tk.Label(frame, text=f"Total facturado: ${resumen_general[1]:.2f}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+
+                if resumen_general[2]:  # primera venta
+                    tk.Label(frame, text=f"Primera venta: {resumen_general[2].strftime('%H:%M:%S')}",
+                             font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+                if resumen_general[3]:  # última venta
+                    tk.Label(frame, text=f"Última venta: {resumen_general[3].strftime('%H:%M:%S')}",
+                             font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, pady=2)
+
+            # Separador
+            ttk.Separator(frame, orient="horizontal").pack(fill=tk.X, pady=10)
+
+            # Resumen por vendedor
+            tk.Label(frame, text="Ventas por Vendedor:", font=("Helvetica", 12, "bold"),
+                     bg="#f5f5f5").pack(anchor=tk.W, pady=(10, 5))
+
+            for vendedor in resumen_vendedores:
+                tk.Label(frame, text=f"{vendedor[2]}: {vendedor[3]} ventas - ${vendedor[1]:.2f}",
+                         font=("Helvetica", 11), bg="#f5f5f5").pack(anchor=tk.W, padx=20, pady=2)
+
+            # Botón cerrar
+            tk.Button(frame, text="Cerrar", bg="#3a7ff6", fg="white", width=10,
+                      command=ventana_resumen.destroy).pack(pady=20)
+
+            conexion.close()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el resumen: {str(e)}")
 
     def registrar_ingreso(self):
         """Registra un ingreso en la caja actual"""
@@ -1555,6 +1831,20 @@ class GestionCaja:
             )
             btn_egreso.grid(row=0, column=1, padx=10, pady=10)
 
+            # Agregar botón de resumen de ventas
+            btn_resumen_ventas = tk.Button(
+                frame_botones,
+                text="Resumen Ventas",
+                font=("Helvetica", 12),
+                bg="#2196f3",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.ver_resumen_ventas_dia
+            )
+            btn_resumen_ventas.grid(row=0, column=2, padx=10, pady=10)
+
             btn_cerrar = tk.Button(
                 frame_botones,
                 text="Cerrar Caja",
@@ -1566,7 +1856,7 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.cerrar_caja
             )
-            btn_cerrar.grid(row=1, column=0, columnspan=2, padx=10, pady=20)
+            btn_cerrar.grid(row=1, column=0, columnspan=3, padx=10, pady=20)
 
         # Frame para operaciones especiales
         frame_especial = tk.Frame(self.tab_operaciones, bg="#f5f5f5", padx=20, pady=10)

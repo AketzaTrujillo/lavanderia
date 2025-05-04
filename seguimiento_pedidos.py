@@ -120,6 +120,225 @@ class SeguimientoPedidos:
         self.lbl_listos = tk.Label(self.resumen_frame, text="Listos: 0", bg="#3a7ff6", fg="white", font=("Helvetica", 12))
         self.lbl_listos.pack(side=tk.LEFT, padx=20)
 
+    def cambiar_estado(self):
+        """Cambia el estado del pedido actual y maneja automáticamente la conversión a venta"""
+        if not self.pedido_actual:
+            return
+
+        # Crear ventana para cambiar estado
+        ventana_estado = tk.Toplevel(self.ventana)
+        ventana_estado.title("Cambiar Estado del Pedido")
+        ventana_estado.geometry("400x350")
+        ventana_estado.config(bg="#f5f5f5")
+        ventana_estado.grab_set()
+
+        utl.centrar_ventana(ventana_estado, 400, 350)
+
+        frame_main = tk.Frame(ventana_estado, bg="#f5f5f5", padx=20, pady=20)
+        frame_main.pack(fill=tk.BOTH, expand=True)
+
+        titulo = tk.Label(frame_main, text=f"Pedido #{self.pedido_actual['id']}",
+                          font=("Helvetica", 14, "bold"), bg="#f5f5f5")
+        titulo.pack(pady=(0, 10))
+
+        estado_actual = self.pedido_actual['estado']
+        frame_actual = tk.Frame(frame_main, bg="#f5f5f5")
+        frame_actual.pack(fill=tk.X, pady=10)
+
+        tk.Label(frame_actual, text="Estado actual:", bg="#f5f5f5", font=("Helvetica", 11)).pack(side=tk.LEFT, padx=5)
+        lbl_estado_actual = tk.Label(frame_actual, text=estado_actual, bg="#f5f5f5",
+                                     font=("Helvetica", 11, "bold"),
+                                     fg=self.colores_estado.get(estado_actual, "#000000"))
+        lbl_estado_actual.pack(side=tk.LEFT, padx=5)
+
+        frame_nuevo = tk.Frame(frame_main, bg="#f5f5f5")
+        frame_nuevo.pack(fill=tk.X, pady=10)
+
+        tk.Label(frame_nuevo, text="Nuevo estado:", bg="#f5f5f5", font=("Helvetica", 11)).pack(anchor=tk.W, padx=5)
+
+        estados_disponibles = ["Recibido", "En proceso", "Listo para entrega", "Entregado", "Cancelado"]
+        var_estado = tk.StringVar(value=estado_actual)
+
+        for estado in estados_disponibles:
+            rb = tk.Radiobutton(frame_nuevo, text=estado, value=estado, variable=var_estado,
+                                bg="#f5f5f5", font=("Helvetica", 10))
+            rb.pack(anchor=tk.W, padx=20)
+
+        frame_obs = tk.Frame(frame_main, bg="#f5f5f5")
+        frame_obs.pack(fill=tk.X, pady=10)
+
+        tk.Label(frame_obs, text="Observaciones (opcional):", bg="#f5f5f5", font=("Helvetica", 11)).pack(anchor=tk.W)
+        txt_obs = tk.Text(frame_obs, height=3, font=("Helvetica", 10))
+        txt_obs.pack(fill=tk.X, pady=5)
+
+        frame_botones = tk.Frame(frame_main, bg="#f5f5f5")
+        frame_botones.pack(pady=20)
+
+        def guardar_cambio():
+            nuevo_estado = var_estado.get()
+            observacion = txt_obs.get(1.0, tk.END).strip()
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                cursor.execute("UPDATE pedidos SET estado = %s WHERE id_pedido = %s",
+                               (nuevo_estado, self.pedido_actual['id']))
+
+                try:
+                    cursor.execute("""
+                        INSERT INTO historial_estados_pedido 
+                        (id_pedido, estado_anterior, estado_nuevo, observacion, id_usuario)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (self.pedido_actual['id'], estado_actual, nuevo_estado, observacion, self.id_usuario))
+                except:
+                    pass
+
+                conexion.commit()
+                conexion.close()
+
+                # Si el nuevo estado es "Entregado", ofrecer convertir a venta
+                if nuevo_estado == "Entregado":
+                    self.finalizar_pedido_a_venta()
+
+                messagebox.showinfo("Éxito", "Estado actualizado correctamente")
+                ventana_estado.destroy()
+                self.aplicar_filtros()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al actualizar estado: {str(e)}")
+
+        btn_guardar = tk.Button(frame_botones, text="Guardar", bg="#3a7ff6", fg="white",
+                                width=10, command=guardar_cambio)
+        btn_guardar.pack(side=tk.LEFT, padx=5)
+
+        btn_cancelar = tk.Button(frame_botones, text="Cancelar", bg="#e53935", fg="white",
+                                 width=10, command=ventana_estado.destroy)
+        btn_cancelar.pack(side=tk.LEFT, padx=5)
+
+    def finalizar_pedido_a_venta(self):
+        """Convierte un pedido entregado en una venta automáticamente"""
+        if not self.pedido_actual:
+            return
+
+        confirmacion = messagebox.askyesno(
+            "Registrar Venta",
+            f"¿Desea registrar el pedido #{self.pedido_actual['id']} como una venta?"
+        )
+
+        if not confirmacion:
+            return
+
+        try:
+            metodo_pago = simpledialog.askstring(
+                "Método de pago",
+                "Ingresa el método de pago (Efectivo, Tarjeta, Transferencia, Otro):"
+            )
+
+            if not metodo_pago:
+                return
+
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Verificar que hay una caja abierta
+            fecha_actual = datetime.now().strftime("%Y-%m-%d")
+            cursor.execute("SELECT id_caja FROM caja WHERE fecha = %s AND hora_cierre IS NULL", (fecha_actual,))
+            caja_abierta = cursor.fetchone()
+
+            if not caja_abierta:
+                messagebox.showerror("Error", "No hay una caja abierta para procesar la venta.")
+                conexion.close()
+                return
+
+            id_caja_actual = caja_abierta[0]
+
+            # Iniciar transacción
+            cursor.execute("START TRANSACTION")
+
+            # Crear venta a partir del pedido
+            cursor.execute("""
+                INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago)
+                VALUES (%s, (SELECT id_cliente FROM pedidos WHERE id_pedido = %s), %s, %s)
+            """, (
+                self.id_usuario,
+                self.pedido_actual['id'],
+                self.pedido_actual['total'],
+                metodo_pago
+            ))
+
+            id_venta = cursor.lastrowid
+
+            # Copiar detalles del pedido a la venta
+            cursor.execute("""
+                INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
+                SELECT %s, dp.tipo_item, dp.id_item, dp.cantidad, 
+                       (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
+                WHERE dp.id_pedido = %s
+            """, (id_venta, self.pedido_actual['id']))
+
+            # Registrar pago
+            cursor.execute("""
+                INSERT INTO pagos (id_venta, monto, metodo_pago)
+                VALUES (%s, %s, %s)
+            """, (
+                id_venta,
+                self.pedido_actual['total'],
+                metodo_pago
+            ))
+
+            # Actualizar puntos del cliente (1 punto por cada 10 pesos)
+            puntos_ganados = int(float(self.pedido_actual['total']) / 10)
+            cursor.execute("""
+                UPDATE clientes 
+                SET puntos = puntos + %s 
+                WHERE id_cliente = (SELECT id_cliente FROM pedidos WHERE id_pedido = %s)
+            """, (puntos_ganados, self.pedido_actual['id']))
+
+            # Registrar la venta como ingreso en caja
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                VALUES (%s, 'ingreso', %s, %s, %s, %s)
+            """, (
+                id_caja_actual,
+                f'Venta #{id_venta} (Pedido #{self.pedido_actual["id"]})',
+                self.pedido_actual['total'],
+                datetime.now(),
+                self.id_usuario
+            ))
+
+            # Actualizar totales de caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_ingresos = total_ingresos + %s,
+                    saldo_final = saldo_final + %s
+                WHERE id_caja = %s
+            """, (self.pedido_actual['total'], self.pedido_actual['total'], id_caja_actual))
+
+            # Commit de la transacción
+            cursor.execute("COMMIT")
+            conexion.close()
+
+            # Generar ticket
+            try:
+                from ticket import imprimir_ticket_venta
+                imprimir_ticket_venta(id_venta, vista_previa=True, imprimir=True)
+            except Exception as e:
+                messagebox.showwarning("Advertencia", f"Venta registrada pero error al imprimir: {str(e)}")
+
+            messagebox.showinfo(
+                "Venta registrada",
+                f"El pedido ha sido convertido a venta (ID: {id_venta})\n" +
+                f"Puntos ganados: {puntos_ganados}\n" +
+                f"La venta ha sido registrada en caja automáticamente."
+            )
+
+        except Exception as e:
+            if 'conexion' in locals():
+                conexion.rollback()
+            messagebox.showerror("Error", f"No se pudo convertir el pedido a venta: {str(e)}")
+
     def configurar_panel_izquierdo(self):
         """Configura el panel izquierdo con filtros y lista de pedidos"""
         # Título del panel
@@ -315,6 +534,17 @@ class SeguimientoPedidos:
         # Primera fila de botones
         fila1_btn = tk.Frame(self.frame_acciones, bg="#f5f5f5")
         fila1_btn.pack(fill=tk.X, pady=2)
+
+        self.btn_finalizar_venta = tk.Button(
+            fila2_btn,
+            text="Finalizar a Venta",
+            bg="#2196f3",
+            fg="white",
+            width=15,
+            command=self.finalizar_pedido_a_venta,
+            state=tk.DISABLED
+        )
+        self.btn_finalizar_venta.pack(side=tk.LEFT, padx=5)
 
         self.btn_cambiar_estado = tk.Button(
             fila1_btn,
@@ -735,6 +965,11 @@ class SeguimientoPedidos:
                 self.btn_eliminar.config(state=tk.NORMAL)
             else:
                 self.btn_eliminar.config(state=tk.DISABLED)
+
+            if self.pedido_actual['estado'] == 'Entregado':
+                self.btn_finalizar_venta.config(state=tk.NORMAL)
+            else:
+                self.btn_finalizar_venta.config(state=tk.DISABLED)
 
     def cambiar_estado(self):
         """Cambia el estado del pedido actual"""
