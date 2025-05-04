@@ -346,15 +346,14 @@ class MasterPanel:
         """Abre la ventana de seguimiento de pedidos"""
         try:
             # Importar el módulo de seguimiento
-            from seguimiento_pedidos import abrir_seguimiento
-            abrir_seguimiento(self.ventana)
+            from seguimiento_pedidos import SeguimientoPedidos
+            SeguimientoPedidos(self.ventana)
         except ImportError:
             messagebox.showerror("Error de importación",
                                  "No se pudo importar el módulo de seguimiento.\n"
-                                 "Verifique que el archivo 'seguimiento.py' existe.")
+                                 "Verifique que el archivo 'seguimiento_pedidos.py' existe.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
-
 
 
     def salir(self):
