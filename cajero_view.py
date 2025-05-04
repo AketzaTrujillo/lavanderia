@@ -111,8 +111,6 @@ class CajeroPanel:
                 "columna": 1
             },
             {
-                "texto": "Cerrar Sesión",
-                "comando": self.salir,
                 "icono": "🚪",
                 "fila": 2,
                 "columna": 0,
