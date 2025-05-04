@@ -26,7 +26,8 @@ class Ventas:
             self.ventana = tk.Tk()
 
         self.ventana.title("Módulo de Ventas - Lavandería")
-        self.ventana.geometry("1100x900")
+        self.ventana.geometry("1200x900")  # Hacer la ventana más alta
+        self.ventana.minsize(1200, 900)  # Establecer tamaño mínimo
         self.ventana.config(bg="#e0f7fa")
         self.ventana.resizable(True, True)
 
@@ -145,11 +146,23 @@ class Ventas:
         # Tabla de productos
         columnas = ('id', 'nombre', 'precio', 'stock')
         self.tabla_productos = ttk.Treeview(tab, columns=columnas, show='headings', height=7)
-        for col in columnas:
-            self.tabla_productos.heading(col, text=col.capitalize())
-            self.tabla_productos.column(col, width=100, anchor=tk.CENTER)
-        self.tabla_productos.pack(fill=tk.BOTH, expand=True, pady=10)
 
+        # Configurar encabezados más claros y con anchos adecuados
+        self.tabla_productos.heading('id', text='ID')
+        self.tabla_productos.heading('nombre', text='PRODUCTO')
+        self.tabla_productos.heading('precio', text='PRECIO')
+        self.tabla_productos.heading('stock', text='STOCK')
+
+        # Configurar anchos adecuados
+        self.tabla_productos.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_productos.column('nombre', width=250, anchor=tk.W)
+        self.tabla_productos.column('precio', width=100, anchor=tk.CENTER)
+        self.tabla_productos.column('stock', width=80, anchor=tk.CENTER)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(self.tabla_productos)
+
+        self.tabla_productos.pack(fill=tk.BOTH, expand=True, pady=10)
         scrollbar = ttk.Scrollbar(tab, orient=tk.VERTICAL, command=self.tabla_productos.yview)
         self.tabla_productos.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -223,7 +236,7 @@ class Ventas:
 
         #Cargar servicios al iniciar 
         self.cargar_servicios()
-        
+
     def cargar_productos(self):
         for item in self.tabla_productos.get_children():
             self.tabla_productos.delete(item)
@@ -231,12 +244,21 @@ class Ventas:
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-            cursor.execute("SELECT id_producto, nombre, precio, stock FROM productos WHERE stock > 0 ORDER BY nombre")
+            # Mostrar TODOS los productos, no solo los que tienen stock
+            cursor.execute("SELECT id_producto, nombre, precio, stock FROM productos ORDER BY nombre")
 
             for producto in cursor.fetchall():
                 precio_formateado = f"${float(producto[2]):.2f}"
                 valores = (producto[0], producto[1], precio_formateado, producto[3])
-                self.tabla_productos.insert('', tk.END, values=valores)
+
+                # Insertar productos sin stock con una etiqueta especial
+                if producto[3] <= 0:
+                    item_id = self.tabla_productos.insert('', tk.END, values=valores, tags=('sin_stock',))
+                else:
+                    item_id = self.tabla_productos.insert('', tk.END, values=valores)
+
+            # Configurar color para productos sin stock
+            self.tabla_productos.tag_configure('sin_stock', background='#ffcccb', foreground='#8b0000')
 
             conexion.close()
         except Exception as e:
@@ -254,10 +276,11 @@ class Ventas:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
+            # Búsqueda en todos los productos, no solo los que tienen stock
             consulta = """
             SELECT id_producto, nombre, precio, stock 
             FROM productos 
-            WHERE stock > 0 AND (nombre LIKE %s OR id_producto = %s)
+            WHERE nombre LIKE %s OR id_producto = %s
             ORDER BY nombre
             """
 
@@ -271,16 +294,20 @@ class Ventas:
             for producto in cursor.fetchall():
                 precio_formateado = f"${float(producto[2]):.2f}"
                 valores = (producto[0], producto[1], precio_formateado, producto[3])
-                self.tabla_productos.insert('', tk.END, values=valores)
+
+                # Marcar productos sin stock
+                if producto[3] <= 0:
+                    item_id = self.tabla_productos.insert('', tk.END, values=valores, tags=('sin_stock',))
+                else:
+                    item_id = self.tabla_productos.insert('', tk.END, values=valores)
+
+            # Configurar color para productos sin stock
+            self.tabla_productos.tag_configure('sin_stock', background='#ffcccb', foreground='#8b0000')
 
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"Error al buscar productos: {str(e)}")
 
-
-    
-
-    
     def agregar_producto_seleccionado(self):
         seleccion = self.tabla_productos.selection()
 
@@ -294,12 +321,20 @@ class Ventas:
         precio_producto = float(valores[2].replace('$', '').replace(',', ''))
         stock_disponible = int(valores[3])
 
+        # Advertir si el producto no tiene stock
+        if stock_disponible <= 0:
+            if not messagebox.askyesno("Sin Stock",
+                                       f"El producto '{nombre_producto}' no tiene stock disponible.\n¿Deseas agregarlo de todas formas?"):
+                return
+
         try:
             cantidad = int(self.entry_cantidad_producto.get().strip())
             if cantidad <= 0:
                 messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
                 return
-            if cantidad > stock_disponible:
+
+            # Solo verificar stock si hay stock disponible
+            if stock_disponible > 0 and cantidad > stock_disponible:
                 messagebox.showwarning("Stock insuficiente", f"Solo hay {stock_disponible} unidades disponibles")
                 return
         except ValueError:
@@ -321,8 +356,9 @@ class Ventas:
         for i, it in enumerate(self.items_venta):
             if it['tipo'] == 'producto' and it['id'] == id_producto:
                 nueva_cantidad = it['cantidad'] + cantidad
-                if nueva_cantidad > stock_disponible:
-                    messagebox.showwarning("Stock insuficiente", f"No se puede agregar {cantidad} más. Stock disponible: {stock_disponible}")
+                if stock_disponible > 0 and nueva_cantidad > stock_disponible:
+                    messagebox.showwarning("Stock insuficiente",
+                                           f"No se puede agregar {cantidad} más. Stock disponible: {stock_disponible}")
                     return
                 self.items_venta[i]['cantidad'] = nueva_cantidad
                 self.items_venta[i]['subtotal'] = precio_producto * nueva_cantidad
@@ -456,13 +492,16 @@ class Ventas:
         # Agregar los nuevos
         for item in self.items_venta:
             valores = (
-                item['tipo'],
+                item['tipo'].capitalize(),
                 item['nombre'],
                 item['cantidad'],
                 f"${item['precio_unitario']:.2f}",
                 f"${item['subtotal']:.2f}"
             )
             self.tabla_items.insert('', tk.END, values=valores)
+
+        # Aplicar estilo
+        utl.aplicar_estilo_tabla(self.tabla_items)
     
     def calcular_total(self):
         total = sum(item['subtotal'] for item in self.items_venta)
@@ -499,20 +538,216 @@ class Ventas:
             messagebox.showwarning("Cliente requerido", "Selecciona un cliente para esta venta.")
             return
 
-        metodo_pago = simpledialog.askstring("Método de pago", "Ingresa el método de pago (Efectivo, Tarjeta, Transferencia, Otro):")
-        if not metodo_pago:
-            messagebox.showwarning("Método de pago", "Debes indicar un método de pago.")
-            return
-        
-        self.calcular_total()
-        print("TOTAL ACTUAL:", self.total_venta)
+        # Crear ventana para procesar pago
+        ventana_pago = tk.Toplevel(self.ventana)
+        ventana_pago.title("Procesar Pago")
+        ventana_pago.geometry("400x450")  # Aumentado para asegurar que los botones se vean
+        ventana_pago.config(bg="#f5f5f5")
+        ventana_pago.resizable(False, False)
+        ventana_pago.grab_set()
 
+        utl.centrar_ventana(ventana_pago, 400, 450)
 
+        # Frame principal con scroll por si acaso
+        canvas = tk.Canvas(ventana_pago, bg="#f5f5f5")
+        scrollbar = ttk.Scrollbar(ventana_pago, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#f5f5f5")
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Para permitir scroll con la rueda del mouse
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Frame para contenido
+        frame_principal = tk.Frame(scrollable_frame, bg="#f5f5f5", padx=20, pady=20)
+        frame_principal.pack(fill=tk.BOTH, expand=True)
+
+        # Total a pagar
+        tk.Label(
+            frame_principal,
+            text="TOTAL A PAGAR:",
+            font=("Helvetica", 14, "bold"),
+            bg="#f5f5f5"
+        ).pack(pady=(0, 5))
+
+        tk.Label(
+            frame_principal,
+            text=f"${self.total_venta:.2f}",
+            font=("Helvetica", 18, "bold"),
+            bg="#f5f5f5",
+            fg="#00796b"
+        ).pack(pady=(0, 20))
+
+        # Métodos de pago
+        tk.Label(
+            frame_principal,
+            text="Método de pago:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5"
+        ).pack(anchor=tk.W)
+
+        metodo_pago_var = tk.StringVar(value="Efectivo")
+
+        # Frame para radio buttons
+        frame_metodos = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_metodos.pack(fill=tk.X, pady=10)
+
+        # Opciones sin "Combinado"
+        metodos = ["Efectivo", "Tarjeta", "Transferencia"]
+        for i, metodo in enumerate(metodos):
+            rb = tk.Radiobutton(
+                frame_metodos,
+                text=metodo,
+                variable=metodo_pago_var,
+                value=metodo,
+                bg="#f5f5f5",
+                font=("Helvetica", 11),
+                command=lambda m=metodo: self.actualizar_pago_efectivo(m, frame_efectivo, entry_recibido, lbl_cambio)
+            )
+            rb.grid(row=i // 2, column=i % 2, sticky=tk.W, padx=5, pady=5)
+
+        # Frame para pago en efectivo
+        frame_efectivo = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_efectivo.pack(fill=tk.X, pady=10)
+
+        tk.Label(
+            frame_efectivo,
+            text="Efectivo recibido:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).grid(row=0, column=0, sticky=tk.W, pady=5)
+
+        entry_recibido = tk.Entry(frame_efectivo, font=("Helvetica", 11), width=15)
+        entry_recibido.grid(row=0, column=1, sticky=tk.W, padx=5)
+        entry_recibido.bind("<KeyRelease>", lambda event: self.calcular_cambio(entry_recibido, lbl_cambio))
+
+        tk.Label(
+            frame_efectivo,
+            text="Cambio:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).grid(row=1, column=0, sticky=tk.W, pady=5)
+
+        lbl_cambio = tk.Label(
+            frame_efectivo,
+            text="$0.00",
+            font=("Helvetica", 11, "bold"),
+            bg="#f5f5f5",
+            fg="#d32f2f"
+        )
+        lbl_cambio.grid(row=1, column=1, sticky=tk.W, padx=5)
+
+        # Espacio antes de botones
+        tk.Frame(frame_principal, height=20, bg="#f5f5f5").pack(fill=tk.X)
+
+        # Frame para botones (FIJO en la parte de abajo)
+        frame_botones = tk.Frame(ventana_pago, bg="#f5f5f5")
+        frame_botones.pack(side=tk.BOTTOM, pady=20)
+
+        btn_procesar = tk.Button(
+            frame_botones,
+            text="Procesar Pago",
+            font=("Helvetica", 12, "bold"),
+            bg="#00796b",
+            fg="white",
+            width=15,
+            cursor="hand2",
+            command=lambda: self.finalizar_pago(ventana_pago, metodo_pago_var, entry_recibido)
+        )
+        btn_procesar.pack(side=tk.LEFT, padx=10)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            font=("Helvetica", 12),
+            bg="#e53935",
+            fg="white",
+            width=15,
+            cursor="hand2",
+            command=ventana_pago.destroy
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        # Empaquetar canvas y scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def actualizar_pago_efectivo(self, metodo, frame_efectivo, entry_recibido, lbl_cambio):
+        """Muestra/oculta campos según el método de pago"""
+        if metodo == "Efectivo":
+            frame_efectivo.pack(fill=tk.X, pady=10)
+        else:
+            frame_efectivo.pack_forget()
+
+    def calcular_cambio(self, entry_recibido, lbl_cambio):
+        """Calcula el cambio en tiempo real"""
+        try:
+            recibido = float(entry_recibido.get())
+            cambio = recibido - self.total_venta
+            if cambio >= 0:
+                lbl_cambio.config(text=f"${cambio:.2f}", fg="#388e3c")
+            else:
+                lbl_cambio.config(text=f"${cambio:.2f}", fg="#d32f2f")
+        except ValueError:
+            lbl_cambio.config(text="$0.00", fg="#666666")
+
+    def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_recibido):
+        """Procesa el pago final"""
+        metodo_pago = metodo_pago_var.get()
+        cambio = 0.0
+        monto_efectivo = 0.0
+
+        try:
+            if metodo_pago == "Efectivo":
+                try:
+                    recibido = float(entry_recibido.get())
+                    if recibido < self.total_venta:
+                        messagebox.showwarning("Efectivo insuficiente", "El monto recibido es menor al total a pagar.")
+                        return
+                    cambio = recibido - self.total_venta
+                    monto_efectivo = self.total_venta
+                except ValueError:
+                    messagebox.showwarning("Error", "El monto en efectivo debe ser un número válido.")
+                    return
+
+            # Procesar el pago
+            self.guardar_venta(metodo_pago, cambio, monto_efectivo)
+            ventana_pago.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al procesar el pago: {str(e)}")
+
+    def guardar_venta(self, metodo_pago, cambio, monto_efectivo):
+        """Guarda la venta y registra todos los movimientos de caja"""
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Insertar en tabla ventas
+            # Verificar que hay una caja abierta
+            fecha_actual = datetime.now().strftime("%Y-%m-%d")
+            cursor.execute("SELECT id_caja FROM caja WHERE fecha = %s AND hora_cierre IS NULL", (fecha_actual,))
+            caja_abierta = cursor.fetchone()
+
+            if not caja_abierta:
+                messagebox.showerror("Error", "No hay una caja abierta para procesar la venta.")
+                conexion.close()
+                return
+
+            id_caja_actual = caja_abierta[0]
+
+            # Iniciar transacción
+            cursor.execute("START TRANSACTION")
+
+            # Insertar venta
             cursor.execute("""
                 INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago)
                 VALUES (%s, %s, %s, %s)
@@ -523,9 +758,9 @@ class Ventas:
                 metodo_pago
             ))
 
-            id_venta = cursor.lastrowid  # Obtener ID de venta recién creada
+            id_venta = cursor.lastrowid
 
-            # Insertar en detalle_venta
+            # Insertar detalles de venta
             for item in self.items_venta:
                 cursor.execute("""
                     INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
@@ -544,7 +779,7 @@ class Ventas:
                         item['cantidad'], item['id']
                     ))
 
-            # Insertar pago en tabla pagos
+            # Registrar pago
             cursor.execute("""
                 INSERT INTO pagos (id_venta, monto, metodo_pago)
                 VALUES (%s, %s, %s)
@@ -553,23 +788,103 @@ class Ventas:
                 self.total_venta,
                 metodo_pago
             ))
-            
+
+            # Registrar movimientos en caja
+            if metodo_pago == "Efectivo":
+                # Registrar ingreso por el monto en efectivo
+                if monto_efectivo > 0:
+                    cursor.execute("""
+                        INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'ingreso', %s, %s, %s, %s)
+                    """, (
+                        id_caja_actual,
+                        f'Venta #{id_venta} - Efectivo',
+                        monto_efectivo,
+                        datetime.now(),
+                        self.id_usuario_actual
+                    ))
+
+                    # Actualizar saldo
+                    cursor.execute("""
+                        UPDATE caja 
+                        SET total_ingresos = total_ingresos + %s,
+                            saldo_final = saldo_final + %s
+                        WHERE id_caja = %s
+                    """, (monto_efectivo, monto_efectivo, id_caja_actual))
+
+                # Registrar egreso por el cambio
+                if cambio > 0:
+                    cursor.execute("""
+                        INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'egreso', %s, %s, %s, %s)
+                    """, (
+                        id_caja_actual,
+                        f'Venta #{id_venta} - Cambio',
+                        cambio,
+                        datetime.now(),
+                        self.id_usuario_actual
+                    ))
+
+                    # Actualizar saldo
+                    cursor.execute("""
+                        UPDATE caja 
+                        SET total_egresos = total_egresos + %s,
+                            saldo_final = saldo_final - %s
+                        WHERE id_caja = %s
+                    """, (cambio, cambio, id_caja_actual))
+
+            else:  # Para pagos con tarjeta o transferencia
+                cursor.execute("""
+                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                    VALUES (%s, 'ingreso', %s, %s, %s, %s)
+                """, (
+                    id_caja_actual,
+                    f'Venta #{id_venta} - {metodo_pago}',
+                    self.total_venta,
+                    datetime.now(),
+                    self.id_usuario_actual
+                ))
+
+                # No actualizar el saldo de caja para pagos electrónicos
+                # Solo agregar a total_ingresos para registro contable
+                cursor.execute("""
+                    UPDATE caja 
+                    SET total_ingresos = total_ingresos + %s
+                    WHERE id_caja = %s
+                """, (self.total_venta, id_caja_actual))
+
+            # Actualizar puntos del cliente (1 punto por cada 10 pesos)
+            puntos_ganados = int(float(self.total_venta) / 10)
+            cursor.execute("""
+                UPDATE clientes 
+                SET puntos = puntos + %s 
+                WHERE id_cliente = %s
+            """, (puntos_ganados, self.cliente_actual['id']))
+
+            # Commit de la transacción
+            cursor.execute("COMMIT")
+
+            # Generar ticket
             ruta_ticket = self.generar_ticket_html(id_venta)
 
-            conexion.commit()
             conexion.close()
 
-            messagebox.showinfo("Venta registrada", f"La venta (ID: {id_venta}) fue registrada exitosamente.")
-            self.limpiar_venta()
+            mensajes = [
+                f"La venta (ID: {id_venta}) fue registrada exitosamente.",
+                f"Puntos ganados: {puntos_ganados}"
+            ]
 
-            
+            if cambio > 0:
+                mensajes.append(f"Cambio a entregar: ${cambio:.2f}")
+
+            messagebox.showinfo("Venta registrada", "\n".join(mensajes))
+
+            self.limpiar_venta()
             webbrowser.open(ruta_ticket)
 
-            
-
         except Exception as e:
-            if conexion:
-                conexion.rollback()
+            if 'conexion' in locals():
+                cursor.execute("ROLLBACK")
             messagebox.showerror("Error", f"No se pudo registrar la venta:\n{e}")
 
 
@@ -662,20 +977,18 @@ class Ventas:
 
         return ruta
 
-
-
-
     def seleccionar_cliente(self):
         """Abre ventana para seleccionar un cliente"""
         # Crear ventana para seleccionar cliente
         ventana_clientes = tk.Toplevel(self.ventana)
         ventana_clientes.title("Seleccionar Cliente")
-        ventana_clientes.geometry("700x500")
+        ventana_clientes.geometry("700x550")  # Aumentar altura
         ventana_clientes.config(bg="#f5f5f5")
+        ventana_clientes.minsize(700, 550)  # Establecer tamaño mínimo
+        ventana_clientes.resizable(True, True)  # Permitir redimensionar
 
         # Centrar ventana
-        utl.centrar_ventana(ventana_clientes, 700, 500)
-
+        utl.centrar_ventana(ventana_clientes, 700, 550)
         # Frame principal
         frame_principal = tk.Frame(ventana_clientes, bg="#f5f5f5")
         frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)

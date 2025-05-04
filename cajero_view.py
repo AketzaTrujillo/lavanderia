@@ -270,16 +270,14 @@ class CajeroPanel:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
+    # En cajero_view.py o admin_view.py
     def gestionar_caja(self):
         """Abre la ventana de gestión de caja"""
         try:
-            # Importación del módulo de caja
-            from caja import abrir_caja
-            abrir_caja(self.ventana, self.id_usuario)
-        except ImportError:
-            messagebox.showerror("Error de importación",
-                                "No se pudo importar el módulo de caja.\n"
-                                "Verifique que el archivo 'caja.py' existe.")
+            # Importar la clase en lugar de la función
+            from caja import GestionCaja
+            # Crear una instancia de la clase
+            GestionCaja(self.ventana, self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
 

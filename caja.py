@@ -53,13 +53,6 @@ class GestionCaja:
             self.ventana.transient(ventana_padre)
             self.ventana.grab_set()
 
-        # Establecer ícono si existe
-        try:
-            if os.path.exists("Img/lavadora.ico"):
-                self.ventana.iconbitmap("Img/lavadora.ico")
-        except Exception:
-            pass  # Si no se puede cargar el ícono, continuar sin él
-
         # Verificar estado de la caja al iniciar
         self.verificar_estado_caja()
 
@@ -68,6 +61,7 @@ class GestionCaja:
 
         if not ventana_padre:
             self.ventana.mainloop()
+
 
     def construir_interfaz(self):
         """Construye la interfaz gráfica del módulo de caja"""
@@ -136,6 +130,9 @@ class GestionCaja:
         for widget in self.frame_estado.winfo_children():
             widget.destroy()
 
+        # Verificar estado antes de mostrar
+        self.verificar_estado_caja()
+
         if self.caja_abierta:
             # Obtener información detallada de la caja actual
             try:
@@ -143,7 +140,13 @@ class GestionCaja:
                 cursor = conexion.cursor()
 
                 cursor.execute("""
-                    SELECT c.fecha, c.hora_apertura, u.nombre, c.total_ingresos, c.total_egresos, c.saldo_final
+                    SELECT c.fecha, c.hora_apertura, u.nombre, 
+                           COALESCE(c.total_ingresos, 0), 
+                           COALESCE(c.total_egresos, 0), 
+                           COALESCE(c.saldo_final, 0),
+                           (SELECT m.concepto FROM movimientos_caja m 
+                            WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso' 
+                            ORDER BY m.hora ASC LIMIT 1) as primer_movimiento
                     FROM caja c
                     JOIN usuarios u ON c.responsable = u.id_usuario
                     WHERE c.id_caja = %s
@@ -153,7 +156,7 @@ class GestionCaja:
                 conexion.close()
 
                 if caja:
-                    fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
+                    fecha, hora_apertura, responsable, ingresos, egresos, saldo, primer_movimiento = caja
                     fecha_formateada = utl.formatear_fecha(fecha)
                     hora_formateada = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
 
@@ -214,46 +217,21 @@ class GestionCaja:
                         bg="#f5f5f5"
                     ).grid(row=0, column=4, rowspan=2, sticky=tk.W, padx=15, pady=2)
 
+                    # Mostrar el origen del saldo inicial
+                    if primer_movimiento:
+                        origen_texto = "(Saldo del cierre anterior)" if "cierre anterior" in primer_movimiento else "(Saldo inicial)"
+                        tk.Label(
+                            self.frame_estado,
+                            text=origen_texto,
+                            font=("Helvetica", 10),
+                            bg="#f5f5f5",
+                            fg="#666666"
+                        ).grid(row=1, column=4, sticky=tk.W, padx=15, pady=2)
+
             except Exception as e:
                 # Si hay error, mostrar un estado simplificado
-                lbl_estado = tk.Label(
-                    self.frame_estado,
-                    text="CAJA ABIERTA",
-                    font=("Helvetica", 14, "bold"),
-                    bg="#b2ff59",
-                    fg="#33691e",
-                    padx=15,
-                    pady=5
-                )
-                lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
-
-                tk.Label(
-                    self.frame_estado,
-                    text=f"ID Caja: {self.id_caja_actual}",
-                    font=("Helvetica", 12),
-                    bg="#f5f5f5"
-                ).pack(side=tk.LEFT, padx=15, pady=10)
-
                 print(f"Error al obtener detalles de caja: {e}")
-        else:
-            # Mostrar que la caja está cerrada
-            lbl_estado = tk.Label(
-                self.frame_estado,
-                text="CAJA CERRADA",
-                font=("Helvetica", 14, "bold"),
-                bg="#ffcdd2",
-                fg="#c62828",
-                padx=15,
-                pady=5
-            )
-            lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
-
-            tk.Label(
-                self.frame_estado,
-                text="Debe abrir la caja para operar",
-                font=("Helvetica", 12),
-                bg="#f5f5f5"
-            ).pack(side=tk.LEFT, padx=15, pady=10)
+                # ... código de estado simplificado ...
 
     def imprimir_estado_caja(self):
         """Imprime el estado actual de la caja"""
@@ -488,6 +466,7 @@ class GestionCaja:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
 
+                # Corregir la consulta - asegurarse de que las columnas existen
                 cursor.execute("""
                     SELECT total_ingresos, total_egresos, saldo_final
                     FROM caja
@@ -499,15 +478,16 @@ class GestionCaja:
                 if caja:
                     ingresos, egresos, saldo_final = caja
 
+                    # Calcular fechas y horas correctas
+                    fecha_actual = datetime.now()
+                    hora_actual = fecha_actual.strftime("%H:%M:%S")
+
                     # Actualizar la caja con la hora de cierre
                     cursor.execute("""
                         UPDATE caja 
                         SET hora_cierre = %s
                         WHERE id_caja = %s
-                    """, (
-                        datetime.now().strftime("%H:%M:%S"),
-                        self.id_caja_actual
-                    ))
+                    """, (hora_actual, self.id_caja_actual))
 
                     conexion.commit()
 
@@ -655,27 +635,29 @@ class GestionCaja:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Consultar cortes
+            # Consultar cortes - corregir la consulta
             cursor.execute("""
                 SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
-                       c.total_ingresos, c.total_egresos, c.saldo_final, u.nombre
+                       COALESCE(c.total_ingresos, 0) as total_ingresos, 
+                       COALESCE(c.total_egresos, 0) as total_egresos, 
+                       COALESCE(c.saldo_final, 0) as saldo_final, 
+                       u.nombre
                 FROM caja c
-                JOIN usuarios u ON c.responsable = u.id_usuario
+                LEFT JOIN usuarios u ON c.responsable = u.id_usuario
                 WHERE DATE(c.fecha) = %s
-                ORDER BY c.hora_apertura
+                ORDER BY c.hora_apertura DESC
             """, (fecha,))
 
             cortes = cursor.fetchall()
             conexion.close()
 
             # Insertar datos en la tabla
-            if hasattr(self, 'tabla_cortes'):
+            if hasattr(self, 'tabla_cortes') and cortes:
                 for corte in cortes:
-                    id_caja, fecha, hora_ap, hora_ci, ingresos, egresos, saldo, responsable = corte
+                    id_caja, fecha_c, hora_ap, hora_ci, ingresos, egresos, saldo, responsable = corte
 
                     # Formatear fechas y horas
-                    fecha_str = utl.formatear_fecha(fecha) if callable(getattr(utl, 'formatear_fecha', None)) else str(
-                        fecha)
+                    fecha_str = utl.formatear_fecha(fecha_c) if fecha_c else ""
                     hora_ap_str = hora_ap.strftime("%H:%M:%S") if hora_ap else ""
                     hora_ci_str = hora_ci.strftime("%H:%M:%S") if hora_ci else "Abierta"
 
@@ -683,11 +665,11 @@ class GestionCaja:
                     self.tabla_cortes.insert('', tk.END, values=(
                         id_caja, fecha_str, hora_ap_str, hora_ci_str,
                         f"${ingresos:.2f}", f"${egresos:.2f}", f"${saldo:.2f}",
-                        responsable
+                        responsable or "N/A"
                     ))
 
             # Mensaje si no hay datos
-            if not cortes and hasattr(self, 'tabla_cortes'):
+            if not cortes:
                 messagebox.showinfo("Información", "No se encontraron cortes para la fecha seleccionada")
 
         except Exception as e:
@@ -787,15 +769,17 @@ class GestionCaja:
 
     # Modificar el método configurar_tab_operaciones para agregar el botón de resumen de ventas
     def configurar_tab_operaciones(self):
-        """Configura la pestaña de operaciones de caja"""
-        frame_botones = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
-        frame_botones.pack(pady=20)
+        """Configura la pestaña de operaciones de caja como punto de venta"""
+        frame_principal = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
+        frame_principal.pack(fill=tk.BOTH, expand=True, pady=20)
 
-        # Botones principales de operación de caja
         if not self.caja_abierta:
-            # Si la caja está cerrada, mostrar botón de apertura
+            # Si la caja está cerrada, mostrar solo botón de apertura
+            frame_apertura = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_apertura.pack(expand=True)
+
             btn_abrir = tk.Button(
-                frame_botones,
+                frame_apertura,
                 text="Abrir Caja",
                 font=("Helvetica", 12, "bold"),
                 bg="#4caf50",
@@ -806,11 +790,104 @@ class GestionCaja:
                 command=self.abrir_caja
             )
             btn_abrir.pack(padx=20, pady=10)
+
+            lbl_info = tk.Label(
+                frame_apertura,
+                text="Debe abrir la caja para comenzar a operar",
+                font=("Helvetica", 11),
+                bg="#f5f5f5",
+                fg="#666"
+            )
+            lbl_info.pack(pady=5)
         else:
-            # Si la caja está abierta, mostrar botones de operación
+            # Si la caja está abierta, mostrar punto de venta completo
+            # Panel de operaciones principales (lado izquierdo)
+            frame_izquierdo = tk.Frame(frame_principal, bg="#f0f7ff", relief=tk.GROOVE, bd=1)
+            frame_izquierdo.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+            tk.Label(
+                frame_izquierdo,
+                text="VENTAS RÁPIDAS",
+                font=("Helvetica", 12, "bold"),
+                bg="#f0f7ff",
+                fg="#303f9f"
+            ).pack(pady=5)
+
+            # Botones de operaciones rápidas
+            frame_botones_rapidos = tk.Frame(frame_izquierdo, bg="#f0f7ff")
+            frame_botones_rapidos.pack(fill=tk.X, pady=10, padx=10)
+
+            btn_nueva_venta = tk.Button(
+                frame_botones_rapidos,
+                text="💰 Nueva Venta",
+                font=("Helvetica", 12),
+                bg="#4caf50",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.nueva_venta
+            )
+            btn_nueva_venta.grid(row=0, column=0, padx=5, pady=5)
+
+            btn_nuevo_pedido = tk.Button(
+                frame_botones_rapidos,
+                text="📋 Nuevo Pedido",
+                font=("Helvetica", 12),
+                bg="#2196f3",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.nuevo_pedido
+            )
+            btn_nuevo_pedido.grid(row=0, column=1, padx=5, pady=5)
+
+            btn_seguimiento = tk.Button(
+                frame_botones_rapidos,
+                text="📊 Seguimiento",
+                font=("Helvetica", 12),
+                bg="#ff9800",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.seguimiento_pedidos
+            )
+            btn_seguimiento.grid(row=1, column=0, padx=5, pady=5)
+
+            btn_clientes = tk.Button(
+                frame_botones_rapidos,
+                text="👥 Clientes",
+                font=("Helvetica", 12),
+                bg="#9c27b0",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.gestionar_clientes
+            )
+            btn_clientes.grid(row=1, column=1, padx=5, pady=5)
+
+            # Panel de control de caja (lado derecho)
+            frame_derecho = tk.Frame(frame_principal, bg="#f5f5f5", relief=tk.GROOVE, bd=1)
+            frame_derecho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+            tk.Label(
+                frame_derecho,
+                text="CONTROL DE CAJA",
+                font=("Helvetica", 12, "bold"),
+                bg="#f5f5f5",
+                fg="#e53935"
+            ).pack(pady=5)
+
+            # Botones de control de caja
+            frame_control_caja = tk.Frame(frame_derecho, bg="#f5f5f5")
+            frame_control_caja.pack(fill=tk.X, pady=10, padx=10)
+
             btn_ingreso = tk.Button(
-                frame_botones,
-                text="Registrar Ingreso",
+                frame_control_caja,
+                text="➕ Registrar Ingreso",
                 font=("Helvetica", 12),
                 bg="#4caf50",
                 fg="white",
@@ -819,11 +896,11 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.registrar_ingreso
             )
-            btn_ingreso.grid(row=0, column=0, padx=10, pady=10)
+            btn_ingreso.grid(row=0, column=0, padx=5, pady=5)
 
             btn_egreso = tk.Button(
-                frame_botones,
-                text="Registrar Egreso",
+                frame_control_caja,
+                text="➖ Registrar Egreso",
                 font=("Helvetica", 12),
                 bg="#f44336",
                 fg="white",
@@ -832,36 +909,171 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.registrar_egreso
             )
-            btn_egreso.grid(row=0, column=1, padx=10, pady=10)
+            btn_egreso.grid(row=1, column=0, padx=5, pady=5)
 
-            # Agregar botón de resumen de ventas
-            btn_resumen_ventas = tk.Button(
-                frame_botones,
-                text="Resumen Ventas",
+            btn_resumen = tk.Button(
+                frame_control_caja,
+                text="📈 Resumen del Día",
                 font=("Helvetica", 12),
-                bg="#2196f3",
+                bg="#607d8b",
                 fg="white",
                 width=15,
                 height=2,
                 cursor="hand2",
-                command=self.ver_resumen_ventas_dia
+                command=self.resumen_dia
             )
-            btn_resumen_ventas.grid(row=0, column=2, padx=10, pady=10)
+            btn_resumen.grid(row=2, column=0, padx=5, pady=5)
 
             btn_cerrar = tk.Button(
-                frame_botones,
-                text="Cerrar Caja",
+                frame_control_caja,
+                text="🔒 Cerrar Caja",
                 font=("Helvetica", 12, "bold"),
-                bg="#ff5722",
+                bg="#795548",
                 fg="white",
                 width=15,
                 height=2,
                 cursor="hand2",
                 command=self.cerrar_caja
             )
-            btn_cerrar.grid(row=1, column=0, columnspan=3, padx=10, pady=20)
+            btn_cerrar.grid(row=3, column=0, padx=5, pady=10)
 
-        # ... resto del código existente ...
+            # Estado actual rápido
+            frame_estado_rapido = tk.Frame(frame_derecho, bg="#f0f7ff", padx=10, pady=5)
+            frame_estado_rapido.pack(fill=tk.X, pady=10)
+
+            self.lbl_ventas_hoy = tk.Label(
+                frame_estado_rapido,
+                text="Ventas hoy: $0.00",
+                font=("Helvetica", 11),
+                bg="#f0f7ff"
+            )
+            self.lbl_ventas_hoy.pack()
+
+            self.lbl_pedidos_pendientes = tk.Label(
+                frame_estado_rapido,
+                text="Pedidos pendientes: 0",
+                font=("Helvetica", 11),
+                bg="#f0f7ff"
+            )
+            self.lbl_pedidos_pendientes.pack()
+
+    # Agregar estos métodos a la clase
+    def nueva_venta(self):
+        """Abre el módulo de ventas embebido en esta ventana"""
+        try:
+            from ventas import Ventas
+            # Crear una instancia de ventas dentro de la ventana actual
+            Ventas(self.ventana)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir ventas: {str(e)}")
+
+    def nuevo_pedido(self):
+        """Abre el módulo de pedidos"""
+        try:
+            from pedidos import Pedidos
+            Pedidos(self.ventana)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir pedidos: {str(e)}")
+
+    def seguimiento_pedidos(self):
+        """Abre el seguimiento de pedidos"""
+        try:
+            from seguimiento_pedidos import SeguimientoPedidos
+            SeguimientoPedidos(self.ventana, self.id_usuario)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir seguimiento: {str(e)}")
+
+    def gestionar_clientes(self):
+        """Abre la gestión de clientes"""
+        try:
+            from clientes import GestionClientes
+            GestionClientes(self.ventana)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir clientes: {str(e)}")
+
+    def resumen_dia(self):
+        """Muestra un resumen completo del día"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Obtener resumen completo
+            cursor.execute("""
+                SELECT 
+                    (SELECT COUNT(*) FROM ventas v 
+                     JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%') 
+                     WHERE mc.id_caja = %s) as total_ventas,
+                    (SELECT SUM(v.total) FROM ventas v 
+                     JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%') 
+                     WHERE mc.id_caja = %s) as total_vendido,
+                    (SELECT COUNT(*) FROM pedidos p WHERE DATE(p.fecha_pedido) = CURDATE()) as total_pedidos,
+                    (SELECT COUNT(*) FROM pedidos p WHERE DATE(p.fecha_pedido) = CURDATE() AND p.estado != 'Entregado') as pedidos_pendientes
+            """, (self.id_caja_actual, self.id_caja_actual))
+
+            resumen = cursor.fetchone()
+
+            # Obtener ingresos y egresos de la caja
+            cursor.execute("""
+                SELECT total_ingresos, total_egresos, saldo_final
+                FROM caja WHERE id_caja = %s
+            """, (self.id_caja_actual,))
+
+            caja_info = cursor.fetchone()
+            conexion.close()
+
+            # Crear ventana de resumen
+            ventana_resumen = tk.Toplevel(self.ventana)
+            ventana_resumen.title("Resumen del Día")
+            ventana_resumen.geometry("600x500")
+            ventana_resumen.config(bg="#f5f5f5")
+            ventana_resumen.grab_set()
+
+            utl.centrar_ventana(ventana_resumen, 600, 500)
+
+            frame = tk.Frame(ventana_resumen, bg="#f5f5f5", padx=20, pady=20)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            # Título
+            tk.Label(frame, text="RESUMEN DEL DÍA", font=("Helvetica", 16, "bold"),
+                     bg="#f5f5f5", fg="#303f9f").pack(pady=(0, 20))
+
+            # Ventas
+            tk.Label(frame, text="VENTAS", font=("Helvetica", 14, "bold"),
+                     bg="#f5f5f5").pack(anchor=tk.W, pady=(10, 5))
+            tk.Label(frame, text=f"Total de ventas: {resumen[0]}",
+                     font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+            tk.Label(frame, text=f"Total vendido: ${resumen[1]:.2f}",
+                     font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+
+            # Pedidos
+            tk.Label(frame, text="PEDIDOS", font=("Helvetica", 14, "bold"),
+                     bg="#f5f5f5").pack(anchor=tk.W, pady=(20, 5))
+            tk.Label(frame, text=f"Total de pedidos: {resumen[2]}",
+                     font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+            tk.Label(frame, text=f"Pedidos pendientes: {resumen[3]}",
+                     font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+
+            # Caja
+            if caja_info:
+                tk.Label(frame, text="CAJA", font=("Helvetica", 14, "bold"),
+                         bg="#f5f5f5").pack(anchor=tk.W, pady=(20, 5))
+                tk.Label(frame, text=f"Total ingresos: ${caja_info[0]:.2f}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+                tk.Label(frame, text=f"Total egresos: ${caja_info[1]:.2f}",
+                         font=("Helvetica", 12), bg="#f5f5f5").pack(anchor=tk.W, padx=20)
+                tk.Label(frame, text=f"Saldo actual: ${caja_info[2]:.2f}",
+                         font=("Helvetica", 12, "bold"), bg="#f5f5f5", fg="#4caf50").pack(anchor=tk.W, padx=20)
+
+            # Botón cerrar
+            tk.Button(frame, text="Cerrar", bg="#e53935", fg="white", width=10,
+                      command=ventana_resumen.destroy).pack(pady=30)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el resumen: {str(e)}")
 
     # Modificar el método cargar_movimientos para mostrar información más detallada
     def cargar_movimientos(self):
@@ -888,19 +1100,24 @@ class GestionCaja:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Consulta modificada para incluir información de ventas
+            # Consulta más simple
             consulta = """
-                SELECT m.id_movimiento, m.hora, m.tipo, 
-                       CASE 
-                           WHEN m.concepto LIKE 'Venta #%' THEN 
-                               CONCAT(m.concepto, ' - ', 
-                                      (SELECT c.nombre FROM ventas v 
-                                       JOIN clientes c ON v.id_cliente = c.id_cliente 
-                                       WHERE v.id_venta = SUBSTRING(m.concepto, 8, INSTR(m.concepto, ' ', 8) - 8)
-                                       LIMIT 1))
-                           ELSE m.concepto
-                       END as concepto, 
-                       m.monto, u.nombre
+                SELECT 
+                    m.id_movimiento, 
+                    m.hora, 
+                    m.tipo, 
+                    m.concepto,
+                    m.monto, 
+                    u.nombre,
+                    CASE 
+                        WHEN m.concepto LIKE 'Venta #%' THEN
+                            (SELECT c.nombre 
+                             FROM ventas v 
+                             JOIN clientes c ON v.id_cliente = c.id_cliente 
+                             WHERE m.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+                             LIMIT 1)
+                        ELSE NULL
+                    END as cliente_nombre
                 FROM movimientos_caja m
                 JOIN usuarios u ON m.id_usuario = u.id_usuario
                 WHERE DATE(m.hora) = %s
@@ -926,10 +1143,16 @@ class GestionCaja:
             # Insertar datos en la tabla si existe
             if hasattr(self, 'tabla_movimientos'):
                 for mov in movimientos:
-                    id_mov, hora, tipo_mov, concepto, monto, usuario = mov
+                    id_mov, hora, tipo_mov, concepto, monto, usuario, cliente_nombre = mov
 
                     # Formatear hora
                     hora_str = hora.strftime("%H:%M:%S") if isinstance(hora, datetime) else str(hora)
+
+                    # Agregar información del cliente si existe
+                    if cliente_nombre:
+                        concepto_completo = f"{concepto} - {cliente_nombre}"
+                    else:
+                        concepto_completo = concepto
 
                     # Resaltar ventas con color
                     tags = ()
@@ -938,11 +1161,11 @@ class GestionCaja:
 
                     # Agregar a tabla
                     self.tabla_movimientos.insert('', tk.END, values=(
-                        id_mov, hora_str, tipo_mov.capitalize(), concepto, f"${monto:.2f}", usuario
+                        id_mov, hora_str, tipo_mov.capitalize(), concepto_completo, f"${monto:.2f}", usuario
                     ), tags=tags)
 
                     # Acumular totales
-                    if tipo_mov == 'ingreso':
+                    if tipo_mov.lower() == 'ingreso':
                         total_ing += float(monto)
                     else:
                         total_egr += float(monto)
@@ -959,10 +1182,6 @@ class GestionCaja:
                     self.saldo_del_dia.set(f"${(total_ing - total_egr):.2f}")
 
             conexion.close()
-
-            # Mensaje si no hay datos y si tenemos la tabla
-            if not movimientos and hasattr(self, 'tabla_movimientos'):
-                messagebox.showinfo("Información", "No se encontraron movimientos con los filtros seleccionados")
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los movimientos: {str(e)}")
@@ -1190,146 +1409,524 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudo generar el resumen: {str(e)}")
 
     def registrar_ingreso(self):
-        """Registra un ingreso en la caja actual"""
+        """Abre el módulo de ventas para registrar un ingreso en la caja actual"""
         try:
             if not self.caja_abierta:
                 messagebox.showinfo("Información", "Debe abrir la caja primero")
                 return
 
-            # Solicitar información del ingreso
-            concepto = simpledialog.askstring(
-                "Ingreso",
-                "Ingrese el concepto del ingreso:"
-            )
+            # Importar y abrir el módulo de ventas
+            from ventas import Ventas
+            Ventas(self.ventana)
 
-            if not concepto:
-                return
+            # En lugar de un simple diálogo, se abre el módulo completo de ventas
+            # Cuando se complete una venta, esta se registrará automáticamente en la caja
 
-            monto = simpledialog.askfloat(
-                "Ingreso",
-                "Ingrese el monto del ingreso:",
-                minvalue=0.01
-            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir módulo de ventas: {str(e)}")
+            print(f"Error al abrir ventas: {e}")
 
-            if monto is None:
-                return
+    # Agrega este método a la clase GestionCaja en caja.py
 
-            # Registrar en la base de datos
+    def verificar_estado_caja(self):
+        """Verifica si hay una caja abierta para la fecha actual"""
+        try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Insertar en la tabla de movimientos
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                self.id_caja_actual,
-                date.today().strftime("%Y-%m-%d"),
-                datetime.now(),
-                'ingreso',  # Debe ser 'ingreso' (minúsculas)
-                concepto,
-                monto,
-                self.id_usuario
-            ))
-
-            # Actualizar el total de ingresos en la caja
-            cursor.execute("""
-                UPDATE caja 
-                SET total_ingresos = total_ingresos + %s,
-                    saldo_final = saldo_final + %s
-                WHERE id_caja = %s
-            """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-
-            # Recargar movimientos si estamos en esa pestaña
-            if hasattr(self, 'cargar_movimientos'):
-                self.cargar_movimientos()
-
-            messagebox.showinfo(
-                "Registro Exitoso",
-                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
+            # Consultar si hay una caja abierta para hoy (hora_cierre es NULL)
+            fecha_actual = date.today().strftime("%Y-%m-%d")
+            cursor.execute(
+                "SELECT id_caja, responsable FROM caja WHERE fecha = %s AND hora_cierre IS NULL",
+                (fecha_actual,)
             )
 
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
-            print(f"Error al registrar ingreso: {e}")
+            resultado = cursor.fetchone()
 
-    # Agrega este método a la clase GestionCaja en caja.py
+            if resultado:
+                self.id_caja_actual = resultado[0]
+                self.caja_abierta = True
+                print(f"Caja abierta encontrada: ID {self.id_caja_actual}")  # Debug
+            else:
+                self.id_caja_actual = None
+                self.caja_abierta = False
+                print("No hay caja abierta")  # Debug
+
+            conexion.close()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al verificar estado de caja: {str(e)}")
+            self.caja_abierta = False
+
+    def actualizar_estado_caja(self):
+        """Actualiza la visualización del estado actual de la caja"""
+        # Limpiar frame de estado
+        for widget in self.frame_estado.winfo_children():
+            widget.destroy()
+
+        # Verificar estado antes de mostrar
+        self.verificar_estado_caja()
+
+        if self.caja_abierta:
+            # Obtener información detallada de la caja actual
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Verificar qué columnas existen en la tabla
+                cursor.execute("DESCRIBE caja")
+                columnas = {col[0] for col in cursor.fetchall()}
+
+                # Construir consulta basada en columnas disponibles
+                if 'total_ingresos' in columnas and 'total_egresos' in columnas and 'saldo_final' in columnas:
+                    consulta = """
+                        SELECT c.fecha, c.hora_apertura, u.nombre, 
+                               c.total_ingresos, c.total_egresos, c.saldo_final
+                        FROM caja c
+                        JOIN usuarios u ON c.responsable = u.id_usuario
+                        WHERE c.id_caja = %s
+                    """
+                else:
+                    # Consulta con cálculo manual
+                    consulta = """
+                        SELECT c.fecha, c.hora_apertura, u.nombre, 
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) as total_ingresos,
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as total_egresos,
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) -
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as saldo_final
+                        FROM caja c
+                        JOIN usuarios u ON c.responsable = u.id_usuario
+                        WHERE c.id_caja = %s
+                    """
+
+                cursor.execute(consulta, (self.id_caja_actual,))
+                caja = cursor.fetchone()
+                conexion.close()
+
+                if caja:
+                    fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
+                    fecha_formateada = utl.formatear_fecha(fecha)
+                    hora_formateada = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
+
+                    # Mostrar información de caja abierta
+                    lbl_estado = tk.Label(
+                        self.frame_estado,
+                        text="CAJA ABIERTA",
+                        font=("Helvetica", 14, "bold"),
+                        bg="#b2ff59",
+                        fg="#33691e",
+                        padx=15,
+                        pady=5
+                    )
+                    lbl_estado.grid(row=0, column=0, rowspan=2, padx=10, pady=10)
+
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Fecha: {fecha_formateada}",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5"
+                    ).grid(row=0, column=1, sticky=tk.W, padx=5, pady=2)
+
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Hora apertura: {hora_formateada}",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5"
+                    ).grid(row=0, column=2, sticky=tk.W, padx=5, pady=2)
+
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Responsable: {responsable}",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5"
+                    ).grid(row=1, column=1, sticky=tk.W, padx=5, pady=2)
+
+                    # Mostrar ingresos, egresos y saldo actual
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Ingresos: ${ingresos:.2f}",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5",
+                        fg="#388e3c"
+                    ).grid(row=0, column=3, sticky=tk.W, padx=5, pady=2)
+
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Egresos: ${egresos:.2f}",
+                        font=("Helvetica", 12),
+                        bg="#f5f5f5",
+                        fg="#d32f2f"
+                    ).grid(row=1, column=3, sticky=tk.W, padx=5, pady=2)
+
+                    tk.Label(
+                        self.frame_estado,
+                        text=f"Saldo: ${saldo:.2f}",
+                        font=("Helvetica", 12, "bold"),
+                        bg="#f5f5f5"
+                    ).grid(row=0, column=4, rowspan=2, sticky=tk.W, padx=15, pady=2)
+
+            except Exception as e:
+                # Si hay error, mostrar un estado simplificado
+                lbl_estado = tk.Label(
+                    self.frame_estado,
+                    text="CAJA ABIERTA",
+                    font=("Helvetica", 14, "bold"),
+                    bg="#b2ff59",
+                    fg="#33691e",
+                    padx=15,
+                    pady=5
+                )
+                lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
+
+                tk.Label(
+                    self.frame_estado,
+                    text=f"ID Caja: {self.id_caja_actual}",
+                    font=("Helvetica", 12),
+                    bg="#f5f5f5"
+                ).pack(side=tk.LEFT, padx=15, pady=10)
+
+                print(f"Error al obtener detalles de caja: {e}")
+        else:
+            # Mostrar que la caja está cerrada
+            lbl_estado = tk.Label(
+                self.frame_estado,
+                text="CAJA CERRADA",
+                font=("Helvetica", 14, "bold"),
+                bg="#ffcdd2",
+                fg="#c62828",
+                padx=15,
+                pady=5
+            )
+            lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
+
+            tk.Label(
+                self.frame_estado,
+                text="Debe abrir la caja para operar",
+                font=("Helvetica", 12),
+                bg="#f5f5f5"
+            ).pack(side=tk.LEFT, padx=15, pady=10)
+
+    def construir_interfaz(self):
+        """Construye la interfaz gráfica del módulo de caja"""
+        # Frame principal con padding
+        self.frame_principal = tk.Frame(self.ventana, bg="#f5f5f5", padx=20, pady=20)
+        self.frame_principal.pack(fill=tk.BOTH, expand=True)
+
+        # Título con estilo
+        titulo_frame = tk.Frame(self.frame_principal, bg="#f5f5f5")
+        titulo_frame.pack(fill=tk.X, pady=(0, 20))
+
+        titulo = tk.Label(
+            titulo_frame,
+            text="GESTIÓN DE CAJA",
+            font=("Helvetica", 18, "bold"),
+            bg="#f5f5f5",
+            fg="#3a7ff6"
+        )
+        titulo.pack()
+
+        # Separador
+        separador = ttk.Separator(self.frame_principal, orient="horizontal")
+        separador.pack(fill=tk.X, pady=(0, 20))
+
+        # Frame para mostrar estado actual de la caja
+        self.frame_estado = tk.Frame(self.frame_principal, bg="#f5f5f5", relief=tk.GROOVE, bd=1)
+        self.frame_estado.pack(fill=tk.X, pady=10, padx=5)
+
+        # Mostrar estado de caja actual
+        self.actualizar_estado_caja()
+
+        # Crear notebook (pestañas)
+        self.notebook = ttk.Notebook(self.frame_principal)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Pestañas
+        self.tab_operaciones = tk.Frame(self.notebook, bg="#f5f5f5")
+        self.tab_movimientos = tk.Frame(self.notebook, bg="#f5f5f5")
+        self.tab_cortes = tk.Frame(self.notebook, bg="#f5f5f5")
+
+        self.notebook.add(self.tab_operaciones, text="Operaciones de Caja")
+        self.notebook.add(self.tab_movimientos, text="Movimientos")
+        self.notebook.add(self.tab_cortes, text="Cortes de Caja")
+
+        # Configurar las pestañas
+        self.configurar_tab_operaciones()
+        self.configurar_tab_movimientos()
+        self.configurar_tab_cortes()
+
+        # Botón para volver
+        btn_volver = tk.Button(
+            self.frame_principal,
+            text="Volver",
+            font=("Helvetica", 11),
+            bg="#e53935",
+            fg="white",
+            width=10,
+            cursor="hand2",
+            command=self.ventana.destroy
+        )
+        btn_volver.pack(pady=10, anchor=tk.SE)
 
     def abrir_caja(self):
         """Método para abrir la caja"""
         try:
             if not self.caja_abierta:
-                # Preguntar por el monto inicial
-                monto_inicial = simpledialog.askfloat(
+                # Preguntar si desea usar el saldo del último corte
+                usar_saldo_anterior = messagebox.askyesno(
                     "Apertura de Caja",
-                    "Ingrese el monto inicial en caja:",
-                    minvalue=0.0
+                    "¿Desea iniciar con el saldo del último cierre de caja?"
                 )
 
-                if monto_inicial is not None:
-                    conexion = conectar_bd()
-                    cursor = conexion.cursor()
+                monto_inicial = 0.0
+                if usar_saldo_anterior:
+                    # Obtener el último corte
+                    try:
+                        conexion = conectar_bd()
+                        cursor = conexion.cursor()
 
-                    # Registrar apertura en la tabla de caja - sin usar la columna monto_inicial
-                    cursor.execute("""
-                        INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        date.today().strftime("%Y-%m-%d"),
-                        datetime.now().strftime("%H:%M:%S"),
-                        self.id_usuario,
-                        0.0,  # Total ingresos inicia en 0
-                        0.0,  # Total egresos inicia en 0
-                        monto_inicial  # Saldo inicial igual al monto inicial
-                    ))
+                        cursor.execute("""
+                            SELECT c.saldo_final 
+                            FROM caja c
+                            WHERE c.hora_cierre IS NOT NULL
+                            ORDER BY c.fecha DESC, c.hora_cierre DESC
+                            LIMIT 1
+                        """)
 
-                    # Obtener el ID de la caja recién abierta
-                    self.id_caja_actual = cursor.lastrowid
-                    self.caja_abierta = True
+                        ultimo_corte = cursor.fetchone()
+                        conexion.close()
 
-                    # Si quieres registrar el monto inicial como un ingreso inicial
+                        if ultimo_corte and ultimo_corte[0] is not None:
+                            monto_inicial = float(ultimo_corte[0])
+                            # Preguntar si desea modificar el monto
+                            modificar = messagebox.askyesno(
+                                "Confirmar Saldo",
+                                f"Saldo del último cierre: ${monto_inicial:.2f}\n¿Desea modificar este monto?"
+                            )
+
+                            if modificar:
+                                monto_inicial = simpledialog.askfloat(
+                                    "Modificar Saldo",
+                                    "Ingrese el monto inicial en caja:",
+                                    initialvalue=monto_inicial,
+                                    minvalue=0.0
+                                )
+
+                                if monto_inicial is None:
+                                    messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
+                                    return
+                        else:
+                            messagebox.showinfo("Información", "No se encontró un corte anterior. Iniciando con $0.00")
+                            monto_inicial = 0.0
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Error al obtener último corte: {str(e)}")
+                        monto_inicial = 0.0
+                else:
+                    # Pedir monto inicial manualmente
+                    monto_inicial = simpledialog.askfloat(
+                        "Apertura de Caja",
+                        "Ingrese el monto inicial en caja:",
+                        minvalue=0.0
+                    )
+
+                    if monto_inicial is None:
+                        messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
+                        return
+
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Registrar apertura en la tabla de caja
+                cursor.execute("""
+                    INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    date.today().strftime("%Y-%m-%d"),
+                    datetime.now().strftime("%H:%M:%S"),
+                    self.id_usuario,
+                    0.0,  # Total ingresos inicia en 0
+                    0.0,  # Total egresos inicia en 0
+                    monto_inicial  # Saldo inicial
+                ))
+
+                # Obtener el ID de la caja recién abierta
+                self.id_caja_actual = cursor.lastrowid
+                self.caja_abierta = True
+
+                # Si hay monto inicial, registrarlo como ingreso
+                if monto_inicial > 0:
                     cursor.execute("""
                         INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
                         VALUES (%s, %s, %s, %s, %s, %s)
                     """, (
                         self.id_caja_actual,
-                        'ingreso',  # Tipo debe ser 'ingreso' o 'egreso' (minúsculas)
-                        'Saldo inicial',
+                        'ingreso',
+                        'Saldo inicial' if not usar_saldo_anterior else 'Saldo del cierre anterior',
                         monto_inicial,
                         datetime.now(),
                         self.id_usuario
                     ))
 
-                    # Actualizar el total de ingresos y saldo final
+                    # Actualizar el total de ingresos
                     cursor.execute("""
                         UPDATE caja 
-                        SET total_ingresos = %s, saldo_final = %s
+                        SET total_ingresos = %s
                         WHERE id_caja = %s
-                    """, (monto_inicial, monto_inicial, self.id_caja_actual))
+                    """, (monto_inicial, self.id_caja_actual))
 
-                    conexion.commit()
-                    conexion.close()
+                conexion.commit()
+                conexion.close()
 
-                    messagebox.showinfo(
-                        "Apertura Exitosa",
-                        f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
-                    )
+                mensaje = f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
+                if usar_saldo_anterior:
+                    mensaje += "\n(Saldo del cierre anterior)"
 
-                    # Actualizar la interfaz
-                    self.actualizar_estado_caja()
-                    self.configurar_tab_operaciones()
+                messagebox.showinfo("Apertura Exitosa", mensaje)
+
+                # Actualizar la interfaz
+                self.actualizar_estado_caja()
+                self.configurar_tab_operaciones()
             else:
                 messagebox.showinfo("Información", "La caja ya se encuentra abierta")
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
             print(f"Error al abrir caja: {e}")
+
+    def configurar_tab_operaciones(self):
+        """Configura la pestaña de operaciones de caja"""
+        # Limpiar la pestaña
+        for widget in self.tab_operaciones.winfo_children():
+            widget.destroy()
+
+        # Frame para botones principales
+        frame_botones_principales = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
+        frame_botones_principales.pack(pady=20)
+
+        if not self.caja_abierta:
+            # Si la caja está cerrada, mostrar solo botón de apertura
+            # En configurar_tab_operaciones()
+            btn_abrir = tk.Button(
+                frame_botones_principales,
+                text="Abrir Caja",
+                font=("Helvetica", 12, "bold"),
+                bg="#4caf50",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.abrir_caja  # NO debe tener paréntesis ni argumentos
+            )
+            btn_abrir.pack(padx=20, pady=10)
+        else:
+            # Si la caja está abierta, mostrar todos los botones
+            btn_nueva_venta = tk.Button(
+                frame_botones_principales,
+                text="💰 Nueva Venta",
+                font=("Helvetica", 12),
+                bg="#4caf50",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.registrar_ingreso
+            )
+            btn_nueva_venta.grid(row=0, column=0, padx=10, pady=10)
+
+            btn_otro_ingreso = tk.Button(
+                frame_botones_principales,
+                text="➕ Otro Ingreso",
+                font=("Helvetica", 12),
+                bg="#2196f3",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.otro_ingreso
+            )
+            btn_otro_ingreso.grid(row=0, column=1, padx=10, pady=10)
+
+            btn_egreso = tk.Button(
+                frame_botones_principales,
+                text="➖ Registrar Egreso",
+                font=("Helvetica", 12),
+                bg="#f44336",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.registrar_egreso
+            )
+            btn_egreso.grid(row=0, column=2, padx=10, pady=10)
+
+            btn_resumen_ventas = tk.Button(
+                frame_botones_principales,
+                text="📊 Resumen Ventas",
+                font=("Helvetica", 12),
+                bg="#9c27b0",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.ver_resumen_ventas_dia
+            )
+            btn_resumen_ventas.grid(row=1, column=0, padx=10, pady=10)
+
+            btn_cerrar = tk.Button(
+                frame_botones_principales,
+                text="🔒 Cerrar Caja",
+                font=("Helvetica", 12, "bold"),
+                bg="#795548",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.cerrar_caja
+            )
+            btn_cerrar.grid(row=1, column=1, columnspan=2, padx=10, pady=20)
+
+            # Frame para operaciones especiales (siempre visible)
+            frame_especial = tk.Frame(self.tab_operaciones, bg="#f5f5f5", padx=20, pady=10)
+            frame_especial.pack(fill=tk.X, pady=10)
+
+            ttk.Separator(self.tab_operaciones, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
+
+            lbl_operaciones = tk.Label(
+                frame_especial,
+                text="Operaciones Especiales",
+                font=("Helvetica", 12, "bold"),
+                bg="#f5f5f5"
+            )
+            lbl_operaciones.pack(anchor=tk.W, pady=5)
+
+            frame_botones_especiales = tk.Frame(frame_especial, bg="#f5f5f5")
+            frame_botones_especiales.pack(fill=tk.X)
+
+            btn_ultimo_corte = tk.Button(
+                frame_botones_especiales,
+                text="Ver Último Corte",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.ver_ultimo_corte
+            )
+            btn_ultimo_corte.grid(row=0, column=0, padx=5, pady=5)
+
+            btn_imprimir = tk.Button(
+                frame_botones_especiales,
+                text="Imprimir Estado",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.imprimir_estado_caja
+            )
+            btn_imprimir.grid(row=0, column=1, padx=5, pady=5)
 
     def registrar_egreso(self):
         """Registra un egreso en la caja actual"""
@@ -1783,151 +2380,75 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudo imprimir el corte: {str(e)}")
             print(f"Error al imprimir corte seleccionado: {e}")
 
-    def configurar_tab_operaciones(self):
-        """Configura la pestaña de operaciones de caja"""
-        frame_botones = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
-        frame_botones.pack(pady=20)
 
-        # Botones principales de operación de caja
-        if not self.caja_abierta:
-            # Si la caja está cerrada, mostrar botón de apertura
-            btn_abrir = tk.Button(
-                frame_botones,
-                text="Abrir Caja",
-                font=("Helvetica", 12, "bold"),
-                bg="#4caf50",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.abrir_caja
+    # Agregar este nuevo método para otros ingresos simples
+    def otro_ingreso(self):
+        """Registra un ingreso simple en la caja"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Solicitar información del ingreso
+            concepto = simpledialog.askstring(
+                "Otro Ingreso",
+                "Ingrese el concepto del ingreso:"
             )
-            btn_abrir.pack(padx=20, pady=10)
-        else:
-            # Si la caja está abierta, mostrar botones de operación
-            btn_ingreso = tk.Button(
-                frame_botones,
-                text="Registrar Ingreso",
-                font=("Helvetica", 12),
-                bg="#4caf50",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.registrar_ingreso
+
+            if not concepto:
+                return
+
+            monto = simpledialog.askfloat(
+                "Otro Ingreso",
+                "Ingrese el monto del ingreso:",
+                minvalue=0.01
             )
-            btn_ingreso.grid(row=0, column=0, padx=10, pady=10)
 
-            btn_egreso = tk.Button(
-                frame_botones,
-                text="Registrar Egreso",
-                font=("Helvetica", 12),
-                bg="#f44336",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.registrar_egreso
+            if monto is None:
+                return
+
+            # Registrar en la base de datos
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Insertar en la tabla de movimientos
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                VALUES (%s, 'ingreso', %s, %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                concepto,
+                monto,
+                datetime.now(),
+                self.id_usuario
+            ))
+
+            # Actualizar el total de ingresos en la caja
+            cursor.execute("""
+                UPDATE caja 
+                SET total_ingresos = total_ingresos + %s,
+                    saldo_final = saldo_final + %s
+                WHERE id_caja = %s
+            """, (monto, monto, self.id_caja_actual))
+
+            conexion.commit()
+            conexion.close()
+
+            # Actualizar interfaz
+            self.actualizar_estado_caja()
+
+            # Recargar movimientos si estamos en esa pestaña
+            if hasattr(self, 'cargar_movimientos'):
+                self.cargar_movimientos()
+
+            messagebox.showinfo(
+                "Registro Exitoso",
+                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
             )
-            btn_egreso.grid(row=0, column=1, padx=10, pady=10)
 
-            # Agregar botón de resumen de ventas
-            btn_resumen_ventas = tk.Button(
-                frame_botones,
-                text="Resumen Ventas",
-                font=("Helvetica", 12),
-                bg="#2196f3",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.ver_resumen_ventas_dia
-            )
-            btn_resumen_ventas.grid(row=0, column=2, padx=10, pady=10)
-
-            btn_cerrar = tk.Button(
-                frame_botones,
-                text="Cerrar Caja",
-                font=("Helvetica", 12, "bold"),
-                bg="#ff5722",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.cerrar_caja
-            )
-            btn_cerrar.grid(row=1, column=0, columnspan=3, padx=10, pady=20)
-
-        # Frame para operaciones especiales
-        frame_especial = tk.Frame(self.tab_operaciones, bg="#f5f5f5", padx=20, pady=10)
-        frame_especial.pack(fill=tk.X, pady=10)
-
-        ttk.Separator(self.tab_operaciones, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
-
-        lbl_operaciones = tk.Label(
-            frame_especial,
-            text="Operaciones Especiales",
-            font=("Helvetica", 12, "bold"),
-            bg="#f5f5f5"
-        )
-        lbl_operaciones.pack(anchor=tk.W, pady=5)
-
-        frame_botones_especiales = tk.Frame(frame_especial, bg="#f5f5f5")
-        frame_botones_especiales.pack(fill=tk.X)
-
-        btn_ultimo_corte = tk.Button(
-            frame_botones_especiales,
-            text="Ver Último Corte",
-            font=("Helvetica", 11),
-            bg="#3f51b5",
-            fg="white",
-            width=15,
-            cursor="hand2",
-            command=self.ver_ultimo_corte
-        )
-        btn_ultimo_corte.grid(row=0, column=0, padx=5, pady=5)
-
-        btn_imprimir = tk.Button(
-            frame_botones_especiales,
-            text="Imprimir Estado",
-            font=("Helvetica", 11),
-            bg="#3f51b5",
-            fg="white",
-            width=15,
-            cursor="hand2",
-            command=self.imprimir_estado_caja
-        )
-        btn_imprimir.grid(row=0, column=1, padx=5, pady=5)
-
-        # Frame informativo
-        frame_info = tk.Frame(self.tab_operaciones, bg="#f0f7ff", padx=20, pady=10, relief=tk.GROOVE, bd=1)
-        frame_info.pack(fill=tk.BOTH, expand=True, pady=20, padx=20)
-
-        lbl_info_titulo = tk.Label(
-            frame_info,
-            text="Información de Uso",
-            font=("Helvetica", 12, "bold"),
-            bg="#f0f7ff"
-        )
-        lbl_info_titulo.pack(anchor=tk.W, pady=5)
-
-        info_text = """
-• La Apertura de Caja debe realizarse al inicio del día.
-• El Cierre de Caja debe realizarse al final del día.
-• Los ingresos corresponden a entradas de dinero (ventas, pagos, etc.).
-• Los egresos corresponden a salidas de dinero (compras, gastos, etc.).
-• Al realizar el cierre se genera automáticamente un corte de caja.
-• Es responsabilidad del usuario mantener cuadrada la caja física.
-        """
-
-        lbl_info = tk.Label(
-            frame_info,
-            text=info_text,
-            font=("Helvetica", 11),
-            bg="#f0f7ff",
-            justify=tk.LEFT
-        )
-        lbl_info.pack(anchor=tk.W, pady=5)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
+            print(f"Error al registrar ingreso: {e}")
 
     def configurar_tab_movimientos(self):
         """Configura la pestaña de movimientos de caja"""
@@ -2174,8 +2695,6 @@ class GestionCaja:
         self.tabla_cortes.heading('saldo', text='Saldo Final')
         self.tabla_cortes.heading('responsable', text='Responsable')
 
-
-
     def verificar_estado_caja(self):
         """Verifica si hay una caja abierta para la fecha actual"""
         try:
@@ -2193,12 +2712,12 @@ class GestionCaja:
 
             if resultado:
                 self.id_caja_actual = resultado[0]
-                self.responsable_caja = resultado[1]
                 self.caja_abierta = True
+                print(f"Caja abierta encontrada: ID {self.id_caja_actual}")  # Debug
             else:
                 self.id_caja_actual = None
-                self.responsable_caja = None
                 self.caja_abierta = False
+                print("No hay caja abierta")  # Debug
 
             conexion.close()
         except Exception as e:
@@ -2331,6 +2850,74 @@ class GestionCaja:
 
 # Agrega esta función al final de tu archivo caja.py
 
-def abrir_caja(ventana_padre=None, id_usuario=None):
-    """Función para abrir el módulo de caja desde otros módulos"""
-    return GestionCaja(ventana_padre, id_usuario)
+def abrir_caja(self):
+    """Método para abrir la caja"""
+    try:
+        if not self.caja_abierta:
+            # Solicitar monto inicial
+            monto_inicial = simpledialog.askfloat(
+                "Apertura de Caja",
+                "Ingrese el monto inicial en caja:",
+                minvalue=0.0
+            )
+
+            if monto_inicial is not None:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                # Registrar apertura en la tabla de caja - sin usar monto_inicial en caja
+                cursor.execute("""
+                    INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    date.today().strftime("%Y-%m-%d"),
+                    datetime.now().strftime("%H:%M:%S"),
+                    self.id_usuario,
+                    0.0,  # Total ingresos inicia en 0
+                    0.0,  # Total egresos inicia en 0
+                    monto_inicial  # Saldo inicial igual al monto inicial
+                ))
+
+                # Obtener el ID de la caja recién abierta
+                self.id_caja_actual = cursor.lastrowid
+                self.caja_abierta = True  # Establecer el estado ANTES de cualquier otra operación
+
+                # Registrar el monto inicial como un ingreso inicial
+                cursor.execute("""
+                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    self.id_caja_actual,
+                    'ingreso',  # Tipo debe ser 'ingreso' o 'egreso' (minúsculas)
+                    'Saldo inicial',
+                    monto_inicial,
+                    datetime.now(),
+                    self.id_usuario
+                ))
+
+                # Actualizar el total de ingresos y saldo final
+                cursor.execute("""
+                    UPDATE caja 
+                    SET total_ingresos = %s, saldo_final = %s
+                    WHERE id_caja = %s
+                """, (monto_inicial, monto_inicial, self.id_caja_actual))
+
+                conexion.commit()
+                conexion.close()
+
+                messagebox.showinfo(
+                    "Apertura Exitosa",
+                    f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
+                )
+
+                # Actualizar la interfaz
+                self.actualizar_estado_caja()
+                self.configurar_tab_operaciones()
+            else:
+                messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
+        else:
+            messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
+        print(f"Error detallado al abrir caja: {e}")
