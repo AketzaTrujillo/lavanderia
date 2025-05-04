@@ -6,6 +6,7 @@ Proporciona funciones comunes utilizadas en diferentes partes de la aplicación
 import os
 import sys
 import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog
 from PIL import ImageTk, Image
 from datetime import datetime
 
@@ -116,15 +117,18 @@ def aplicar_estilo_tabla(tabla):
     Args:
         tabla (ttk.Treeview): Tabla a la que aplicar estilo
     """
-    style = tk.ttk.Style()
+    style = ttk.Style()
 
-    # Configurar alternancia de colores en las filas
+    # Asegurar que el tema sea compatible
+    style.theme_use('default')
+
+    # Configurar estilo general de la tabla
     style.configure(
         "Treeview",
-        background="#f0f0f0",
-        foreground="black",
+        background="#ffffff",
+        foreground="#333333",
         rowheight=25,
-        fieldbackground="#f0f0f0"
+        fieldbackground="#ffffff"
     )
 
     # Configurar colores al seleccionar
@@ -134,12 +138,20 @@ def aplicar_estilo_tabla(tabla):
         foreground=[('selected', 'white')]
     )
 
-    # Configura encabezados
+    # Configurar encabezados con colores contrastantes
     style.configure(
         "Treeview.Heading",
-        background="#3a7ff6",
-        foreground="white",
-        font=('Helvetica', 10, 'bold')
+        background="#3a7ff6",    # Fondo azul
+        foreground="white",       # Texto blanco
+        font=('Helvetica', 11, 'bold'),
+        relief="flat"
+    )
+
+    # Asegurar que los encabezados cambien color al pasar el mouse
+    style.map(
+        'Treeview.Heading',
+        background=[('active', '#2979d3')],  # Azul más oscuro al pasar el mouse
+        foreground=[('active', 'white')]
     )
 
 
