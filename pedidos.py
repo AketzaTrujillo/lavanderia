@@ -320,7 +320,7 @@ class Pedidos:
             font=("Helvetica", 12, "bold"),
             bg="#303f9f",
             fg="white",
-            command=self.guardar_pedido
+            command=self.procesar_pago
         )
         btn_guardar.pack(side=tk.RIGHT, padx=10)
 
@@ -957,72 +957,303 @@ class Pedidos:
             self.items_pedido = []
             self.actualizar_tabla_detalles()
             self.calcular_total()
+
+    def procesar_pago(self):
+        """Proceso para cobrar los servicios del pedido"""
+        # 1) Validaciones
+        if not self.items_pedido:
+            messagebox.showwarning("Pedido vacío", "Agrega servicios antes de procesar el pago.")
+            return
+        if not self.cliente_actual:
+            messagebox.showwarning("Cliente requerido", "Selecciona un cliente para este pedido.")
+            return
+
+        # 2) Crear ventana modal
+        ventana_pago = tk.Toplevel(self.ventana)
+        ventana_pago.title("Procesar Pago")
+        ventana_pago.geometry("400x450")
+        ventana_pago.config(bg="#f5f5f5")
+        ventana_pago.resizable(False, False)
+        ventana_pago.transient(self.ventana)
+        ventana_pago.grab_set()
+        utl.centrar_ventana(ventana_pago, 400, 450)
+
+        # 3) Variable de método de pago
+        metodo_var = tk.StringVar(value="Efectivo")
+
+        # 4) Botones fijos abajo
+        frame_btn = tk.Frame(ventana_pago, bg="#f5f5f5")
+        frame_btn.pack(side="bottom", fill="x", pady=10, padx=20)
+        tk.Button(
+            frame_btn,
+            text="Procesar Pago",
+            font=("Helvetica", 12, "bold"),
+            bg="#00796b", fg="white",
+            width=15, cursor="hand2",
+            command=lambda: self.finalizar_pago(ventana_pago, metodo_var, entry_rec)
+        ).pack(side="left", padx=5)
+        tk.Button(
+            frame_btn,
+            text="Cancelar",
+            font=("Helvetica", 12),
+            bg="#e53935", fg="white",
+            width=15, cursor="hand2",
+            command=ventana_pago.destroy
+        ).pack(side="left", padx=5)
+
+        # 5) Canvas + Scrollbar
+        canvas = tk.Canvas(ventana_pago, bg="#f5f5f5", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(ventana_pago, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg="#f5f5f5")
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # 6) Contenedor principal dentro del scroll
+        frame = tk.Frame(scrollable, bg="#f5f5f5", padx=20, pady=20)
+        frame.pack(fill="both", expand=True)
+
+        # 7) Mostrar total
+        tk.Label(
+            frame,
+            text="TOTAL A PAGAR:",
+            font=("Helvetica", 14, "bold"),
+            bg="#f5f5f5"
+        ).pack(pady=(0, 5))
+        tk.Label(
+            frame,
+            text=f"${self.total_pedido:.2f}",
+            font=("Helvetica", 18, "bold"),
+            bg="#f5f5f5",
+            fg="#00796b"
+        ).pack(pady=(0, 20))
+
+        # 8) Método de pago
+        tk.Label(
+            frame,
+            text="Método de pago:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5"
+        ).pack(anchor="w", pady=(0, 5))
+        frame_rb = tk.Frame(frame, bg="#f5f5f5")
+        frame_rb.pack(fill="x", pady=5)
+
+        # 9) Precrear frame_efec y lbl_cambio
+        frame_efec = tk.Frame(frame, bg="#f5f5f5")
+        frame_efec.pack(fill="x", pady=10)
+        tk.Label(
+            frame_efec,
+            text="Efectivo recibido:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).grid(row=0, column=0, sticky="w", pady=5)
+        entry_rec = tk.Entry(frame_efec, font=("Helvetica", 11), width=15)
+        entry_rec.grid(row=0, column=1, padx=5)
+        tk.Label(
+            frame_efec,
+            text="Cambio:",
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        ).grid(row=1, column=0, sticky="w", pady=5)
+        lbl_cambio = tk.Label(
+            frame_efec,
+            text="$0.00",
+            font=("Helvetica", 11, "bold"),
+            bg="#f5f5f5",
+            fg="#d32f2f"
+        )
+        lbl_cambio.grid(row=1, column=1, sticky="w", padx=5)
+
+        # 10) Radiobuttons con callback
+        for m in ["Efectivo", "Tarjeta", "Transferencia"]:
+            tk.Radiobutton(
+                frame_rb,
+                text=m,
+                variable=metodo_var,
+                value=m,
+                bg="#f5f5f5",
+                font=("Helvetica", 11),
+                command=lambda mm=m: self.actualizar_pago_efectivo(mm, frame_efec, entry_rec, lbl_cambio)
+            ).pack(side="left", padx=5, pady=2)
+
+        # 11) Bind para recalcular cambio
+        entry_rec.bind("<KeyRelease>", lambda e: self.calcular_cambio(entry_rec, lbl_cambio))
+
+        # 12) Ajustar visibilidad inicial
+        self.actualizar_pago_efectivo(metodo_var.get(), frame_efec, entry_rec, lbl_cambio)
+
+
+            
+    def actualizar_pago_efectivo(self, metodo, frame_efectivo, entry_recibido, lbl_cambio):
+            """Muestra/oculta campos según el método de pago"""
+            if metodo == "Efectivo":
+                frame_efectivo.pack(fill=tk.X, pady=10)
+            else:
+                frame_efectivo.pack_forget()
+
+    def calcular_cambio(self, entry_recibido, lbl_cambio):
+        """Calcula el cambio en tiempo real"""
+        try:
+            recibido = float(entry_recibido.get())
+            cambio = recibido - self.total_pedido
+            if cambio >= 0:
+                lbl_cambio.config(text=f"${cambio:.2f}", fg="#388e3c")
+            else:
+                lbl_cambio.config(text=f"${cambio:.2f}", fg="#d32f2f")
+        except ValueError:
+            lbl_cambio.config(text="$0.00", fg="#666666")
+
+
             
 
     def guardar_pedido(self):
-        """Guarda el pedido en la base de datos"""
-        # Verificar si hay un cliente seleccionado
+        """
+        Guarda el pedido en pedidos y detalle_pedido.
+        Devuelve el id_pedido generado o None si hay un error.
+        """
         if not self.cliente_actual:
-            messagebox.showwarning("Cliente requerido", "Por favor, selecciona un cliente para el pedido")
-            return
-
-        # Verificar si hay items en el pedido
+            messagebox.showwarning("Cliente requerido", "Selecciona un cliente para el pedido")
+            return None
         if not self.items_pedido:
-            messagebox.showwarning("Pedido vacío", "El pedido no tiene servicios agregados")
-            return
+            messagebox.showwarning("Pedido vacío", "Agrega servicios al pedido")
+            return None
 
-        # Obtener observaciones
         observaciones = self.txt_observaciones.get("1.0", tk.END).strip()
-
         try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
+            conn = conectar_bd()
+            cur = conn.cursor()
 
-            # Insertar encabezado del pedido
-            consulta_pedido = """
-            INSERT INTO pedidos (id_cliente, fecha_pedido, estado, observaciones)
-            VALUES (%s, NOW(), 'Recibido', %s)
-            """
+            # 1) Insertar encabezado
+            cur.execute(
+                "INSERT INTO pedidos (id_cliente, fecha_pedido, estado, observaciones) "
+                "VALUES (%s, NOW(), 'Recibido', %s)",
+                (self.cliente_actual['id'], observaciones)
+            )
+            # 2) Obtener id_pedido
+            cur.execute("SELECT LAST_INSERT_ID()")
+            id_pedido = cur.fetchone()[0]
 
-            cursor.execute(consulta_pedido, (self.cliente_actual['id'], observaciones))
-
-            # Obtener el ID del pedido recién insertado
-            cursor.execute("SELECT LAST_INSERT_ID()")
-            id_pedido = cursor.fetchone()[0]
-
-            # Insertar detalle del pedido
-            consulta_detalle = """
-            INSERT INTO detalle_pedido (id_pedido, tipo_item, id_item, cantidad, precio_unitario)
-            VALUES (%s, 'servicio', %s, %s, %s)
-            """
-
+            # 3) Insertar cada servicio en detalle_pedido
             for item in self.items_pedido:
-                cursor.execute(
-                    consulta_detalle,
+                cur.execute(
+                    "INSERT INTO detalle_pedido "
+                    "(id_pedido, tipo_item, id_item, cantidad, precio_unitario) "
+                    "VALUES (%s, 'servicio', %s, %s, %s)",
                     (id_pedido, item['id'], item['cantidad'], item['precio_unitario'])
                 )
 
-            conexion.commit()
-            conexion.close()
+            conn.commit()
+            conn.close()
+            return id_pedido
 
-            messagebox.showinfo("Éxito", f"Pedido #{id_pedido} registrado correctamente")
+        except Exception as e:
+            messagebox.showerror("Error al guardar pedido", str(e))
+            return None
 
-            # Limpiar formulario para un nuevo pedido
-            self.cliente_actual = None
-            self.lbl_cliente_seleccionado.config(text="No seleccionado", fg="#777777")
-            self.items_pedido = []
+
+    def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_rec):
+        """
+        Flujo completo:
+        1) calcular cambio/monto
+        2) guardar pedido → id_pedido
+        3) insertar en ventas → id_venta
+        4) insertar en detalle_venta
+        5) insertar en pagos (usando id_venta)
+        6) marcar pedido entregado
+        7) limpiar UI + generar ticket
+        """
+        metodo = metodo_pago_var.get()
+        try:
+            # 1) Calcular monto y cambio
+            if metodo == "Efectivo":
+                recibido = float(entry_rec.get())
+                if recibido < self.total_pedido:
+                    return messagebox.showwarning(
+                        "Efectivo insuficiente",
+                        "El monto recibido es menor al total a pagar."
+                    )
+                cambio = recibido - self.total_pedido
+                monto = self.total_pedido
+            else:
+                cambio = 0.0
+                monto = self.total_pedido
+
+            # 2) Guardar pedido
+            id_pedido = self.guardar_pedido()
+            if id_pedido is None:
+                return  # abortar si algo falló
+
+            conn = conectar_bd()
+            cur = conn.cursor()
+
+            # 3) Insertar en ventas
+            cur.execute(
+                "INSERT INTO ventas (id_cliente, total, fecha, metodo_pago) "
+                "VALUES (%s, %s, NOW(), %s)",
+                (self.cliente_actual['id'], self.total_pedido, metodo)
+            )
+            cur.execute("SELECT LAST_INSERT_ID()")
+            id_venta = cur.fetchone()[0]
+
+            # 4) Insertar detalle_venta
+            for item in self.items_pedido:
+                cur.execute(
+                    "INSERT INTO detalle_venta "
+                    "(id_venta, tipo_item, id_item, cantidad, subtotal) "
+                    "VALUES (%s, 'servicio', %s, %s, %s)",
+                    (id_venta,
+                    item['id'],
+                    item['cantidad'],
+                    item.get('subtotal', item['cantidad'] * item['precio_unitario']))
+                )
+
+            # 5) Insertar en pagos (referenciando id_venta)
+            cur.execute(
+                "INSERT INTO pagos (id_venta, monto, metodo_pago, fecha_hora) "
+                "VALUES (%s, %s, %s, NOW())",
+                (id_venta, monto, metodo)
+            )
+
+            # 6) Marcar pedido como recibido
+            cur.execute(
+                "UPDATE pedidos SET estado = 'Recibido' WHERE id_pedido = %s",
+                (id_pedido,)
+            )
+
+            conn.commit()
+            conn.close()
+
+            # 7) Cerrar diálogo y notificar
+            ventana_pago.destroy()
+            messagebox.showinfo("Pago registrado",
+                                f"Pedido #{id_pedido} pagado correctamente.")
+
+            # Limpiar para nuevo pedido
+            self.items_pedido.clear()
             self.actualizar_tabla_detalles()
             self.calcular_total()
             self.txt_observaciones.delete("1.0", tk.END)
-
-            # Cambiar a la pestaña de listado de pedidos
+            self.lbl_cliente_seleccionado.config(text="No seleccionado", fg="#777777")
+            self.cliente_actual = None
             self.notebook.select(self.tab_lista)
-
-            # Actualizar la lista de pedidos
             self.cargar_pedidos()
 
+            # Generar ticket final
+            self.generar_ticket(id_venta, metodo, cambio, monto)
+
+        except ValueError:
+            messagebox.showwarning("Error", "El monto ingresado no es un número válido.")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar el pedido: {str(e)}")
+            messagebox.showerror("Error al procesar el pago", str(e))
+
+
+
+
 
     def cargar_pedidos(self):
         """Carga los pedidos en la tabla según los filtros aplicados"""
