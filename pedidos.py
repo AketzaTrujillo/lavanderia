@@ -163,7 +163,7 @@ class Pedidos:
 
         columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo')
 
-        self.tabla_servicios = ttk.Treeview(frame_tabla_servicios, columns=columnas, show='headings', height=6)
+        self.tabla_servicios = ttk.Treeview(frame_tabla_servicios, columns=columnas, show='headings', height=4)
 
         # Configurar encabezados
         self.tabla_servicios.heading('id', text='ID')
@@ -232,7 +232,7 @@ class Pedidos:
 
         columnas_detalle = ('servicio', 'cantidad', 'precio_unitario', 'subtotal')
 
-        self.tabla_detalles = ttk.Treeview(frame_tabla_detalles, columns=columnas_detalle, show='headings', height=5)
+        self.tabla_detalles = ttk.Treeview(frame_tabla_detalles, columns=columnas_detalle, show='headings', height=4)
 
         # Configurar encabezados
         self.tabla_detalles.heading('servicio', text='Servicio')
@@ -404,7 +404,7 @@ class Pedidos:
 
         columnas = ('id', 'cliente', 'fecha', 'total', 'estado', 'observaciones')
 
-        self.tabla_pedidos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+        self.tabla_pedidos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=10)
 
         # Aplicar estilo a la tabla
         utl.aplicar_estilo_tabla(self.tabla_pedidos)
@@ -532,7 +532,7 @@ class Pedidos:
         # Tabla de clientes
         columnas = ('id', 'nombre', 'telefono', 'puntos')
 
-        tabla_clientes = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+        tabla_clientes = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=10)
 
         # Aplicar estilo a la tabla
         utl.aplicar_estilo_tabla(tabla_clientes)
@@ -856,69 +856,60 @@ class Pedidos:
 
     def agregar_servicio(self):
         """Agrega un servicio al pedido actual"""
-        # Verificar si hay un cliente seleccionado
+
         if not self.cliente_actual:
             messagebox.showwarning("Cliente requerido", "Por favor, selecciona un cliente primero")
             return
 
-        # Obtener el servicio seleccionado
         seleccion = self.tabla_servicios.selection()
-
         if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un servicio para agregar")
+            messagebox.showwarning("Selección requerida", "Selecciona un servicio para agregar")
             return
 
-        # Obtener datos del servicio seleccionado
         valores = self.tabla_servicios.item(seleccion[0], 'values')
-        id_servicio = valores[0]
+        id_servicio = int(valores[0])
         nombre_servicio = valores[1]
-        precio_str = valores[3].replace(',', '')  # Quitar la coma del precio
+        precio_str = valores[3].replace('$', '').replace(',', '').strip()
+
 
         try:
             precio_unitario = float(precio_str)
 
-            # Obtener cantidad deseada
             try:
                 cantidad = int(self.entry_cantidad.get().strip())
                 if cantidad <= 0:
-                    messagebox.showwarning("Valor inválido", "La cantidad debe ser un número positivo")
-                    return
+                    raise ValueError
             except ValueError:
-                messagebox.showwarning("Valor inválido", "La cantidad debe ser un número entero")
+                messagebox.showwarning("Cantidad inválida", "La cantidad debe ser un número entero positivo")
                 return
 
-            # Calcular subtotal
             subtotal = precio_unitario * cantidad
-
-            # Verificar si ya existe este servicio en la lista
             existe = False
+
             for i, item in enumerate(self.items_pedido):
-                if item['id_servicio'] == id_servicio:
-                    # Actualizar cantidad y subtotal
+                if item['id'] == id_servicio and item['tipo'] == 'servicio':
                     nueva_cantidad = item['cantidad'] + cantidad
                     self.items_pedido[i]['cantidad'] = nueva_cantidad
                     self.items_pedido[i]['subtotal'] = precio_unitario * nueva_cantidad
                     existe = True
                     break
 
-            # Si no existe, agregarlo a la lista
             if not existe:
                 self.items_pedido.append({
-                    'id_servicio': id_servicio,
+                    'id': id_servicio,
+                    'tipo': 'servicio',
                     'nombre': nombre_servicio,
                     'cantidad': cantidad,
                     'precio_unitario': precio_unitario,
                     'subtotal': subtotal
                 })
 
-            # Actualizar la tabla de detalles
             self.actualizar_tabla_detalles()
-
-            # Calcular y mostrar el total
             self.calcular_total()
 
-        except ValueError:
-            messagebox.showerror("Error", "No se pudo procesar el precio del servicio")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo agregar el servicio:\n{e}")
+
 
     def actualizar_tabla_detalles(self):
         """Actualiza la tabla de detalles del pedido"""
@@ -966,6 +957,7 @@ class Pedidos:
             self.items_pedido = []
             self.actualizar_tabla_detalles()
             self.calcular_total()
+            
 
     def guardar_pedido(self):
         """Guarda el pedido en la base de datos"""
@@ -1007,7 +999,7 @@ class Pedidos:
             for item in self.items_pedido:
                 cursor.execute(
                     consulta_detalle,
-                    (id_pedido, item['id_servicio'], item['cantidad'], item['precio_unitario'])
+                    (id_pedido, item['id'], item['cantidad'], item['precio_unitario'])
                 )
 
             conexion.commit()

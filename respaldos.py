@@ -1,3 +1,4 @@
+
 lbl_instrucciones = tk.Label(
     frame_instrucciones,
     text="Seleccione un respaldo de la lista o utilice un archivo SQL externo para restaurar la base de datos.",

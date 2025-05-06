@@ -45,7 +45,7 @@ class HistorialCliente:
         # Establecer ícono si existe
         try:
             if os.path.exists("/Img/lavadora.ico"):
-                self.ventana.iconbitmap("Img/lavadora.ico")
+                self.ventana.iconbitmap("/Img/lavadora.ico")
         except Exception:
             pass
 

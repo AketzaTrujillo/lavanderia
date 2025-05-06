@@ -1,4 +1,5 @@
 import tkinter as tk   
+
 elif tipo_seleccionado == "Clientes Frecuentes":
     columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita')
     self.tabla_reporte['columns'] = columnas
