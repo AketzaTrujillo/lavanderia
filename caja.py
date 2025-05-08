@@ -9,7 +9,7 @@ from tkinter import ttk, messagebox, simpledialog
 import os
 import sys
 import utileria as utl
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 import decimal
 
 
@@ -624,127 +624,173 @@ class GestionCaja:
     # Agregar prints de debug extensivo
 
     def cargar_cortes(self):
-        """Carga los cortes de caja para la fecha especificada (versión debug)"""
+        """Carga los cortes de caja para la fecha especificada"""
         try:
-            # Debug 1: Verificar estado inicial
-            print(f"=== INICIO cargar_cortes() ===")
-            print(f"1. Items en tabla antes de limpiar: {len(self.tabla_cortes.get_children())}")
-
-            # Limpiar tabla existente
+            # Limpiar tabla
             for item in self.tabla_cortes.get_children():
                 self.tabla_cortes.delete(item)
 
-            print(f"2. Items en tabla después de limpiar: {len(self.tabla_cortes.get_children())}")
-
             fecha = self.fecha_cortes.get()
-            print(f"3. Fecha para buscar: '{fecha}'")
-
-            # Debug 2: Verificar tabla existe
-            if not hasattr(self, 'tabla_cortes'):
-                print("ERROR: tabla_cortes no existe!")
-                return
-            else:
-                print("4. tabla_cortes existe ✓")
+            print(f"Cargando cortes para fecha: {fecha}")
 
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Debug 3: Verificar query
-            query = """
-            SELECT id_caja, fecha, hora_apertura, hora_cierre, 
-                   total_ingresos, total_egresos, saldo_final, responsable
-            FROM caja 
-            WHERE DATE(fecha) = DATE(%s)
-            ORDER BY hora_apertura DESC
+            # Consulta simplificada
+            consulta = """
+            SELECT c.id_caja, c.fecha, c.hora_apertura, c.hora_cierre, 
+                   c.total_ingresos, c.total_egresos, c.saldo_final, 
+                   u.nombre
+            FROM caja c
+            JOIN usuarios u ON c.responsable = u.id_usuario
+            WHERE DATE(c.fecha) = %s
+            ORDER BY c.hora_apertura DESC
             """
-            print(f"5. Query: {query}")
 
-            cursor.execute(query, (fecha,))
+            cursor.execute(consulta, (fecha,))
             resultados = cursor.fetchall()
+            print(f"Encontrados {len(resultados)} cortes")
 
-            print(f"6. Resultados de la query: {len(resultados)}")
-            for i, resultado in enumerate(resultados):
-                print(f"   Resultado {i}: {resultado}")
-
-            # Debug 4: Verificar inserción
-            for i, fila in enumerate(resultados):
+            for fila in resultados:
                 id_caja, fecha_obj, hora_apertura, hora_cierre, ingresos, egresos, saldo, responsable = fila
 
                 # Formatear valores
-                fecha_str = fecha_obj.strftime("%d/%m/%Y") if fecha_obj else "N/A"
+                fecha_str = fecha_obj.strftime("%d/%m/%Y") if hasattr(fecha_obj, 'strftime') else str(fecha_obj)
 
                 # Manejar hora_apertura
                 hora_apertura_str = "N/A"
                 if hora_apertura:
-                    if hasattr(hora_apertura, 'total_seconds'):  # Es timedelta
+                    if hasattr(hora_apertura, 'strftime'):  # datetime o time
+                        hora_apertura_str = hora_apertura.strftime("%H:%M:%S")
+                    elif isinstance(hora_apertura, datetime.timedelta):  # timedelta
                         segundos = hora_apertura.total_seconds()
                         horas = int(segundos // 3600)
                         minutos = int((segundos % 3600) // 60)
                         segundos = int(segundos % 60)
                         hora_apertura_str = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
-                    elif hasattr(hora_apertura, 'strftime'):  # Es datetime o time
-                        hora_apertura_str = hora_apertura.strftime("%H:%M:%S")
                     else:
                         hora_apertura_str = str(hora_apertura)
 
                 # Manejar hora_cierre
                 hora_cierre_str = "Abierta"
                 if hora_cierre:
-                    if hasattr(hora_cierre, 'total_seconds'):  # Es timedelta
+                    if hasattr(hora_cierre, 'strftime'):  # datetime o time
+                        hora_cierre_str = hora_cierre.strftime("%H:%M:%S")
+                    elif isinstance(hora_cierre, datetime.timedelta):  # timedelta
                         segundos = hora_cierre.total_seconds()
                         horas = int(segundos // 3600)
                         minutos = int((segundos % 3600) // 60)
                         segundos = int(segundos % 60)
                         hora_cierre_str = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
-                    elif hasattr(hora_cierre, 'strftime'):  # Es datetime o time
-                        hora_cierre_str = hora_cierre.strftime("%H:%M:%S")
                     else:
                         hora_cierre_str = str(hora_cierre)
 
                 # Formatear montos
-                ingresos_str = f"${float(ingresos):.2f}" if ingresos else "$0.00"
-                egresos_str = f"${float(egresos):.2f}" if egresos else "$0.00"
-                saldo_str = f"${float(saldo):.2f}" if saldo else "$0.00"
+                ingresos_str = f"${float(ingresos):.2f}" if ingresos is not None else "$0.00"
+                egresos_str = f"${float(egresos):.2f}" if egresos is not None else "$0.00"
+                saldo_str = f"${float(saldo):.2f}" if saldo is not None else "$0.00"
 
-                # Responsable
-                responsable_str = f"ID {responsable}" if responsable else "Sistema"
-
-                # Debug: Valores a insertar
-                valores = (id_caja, fecha_str, hora_apertura_str, hora_cierre_str,
-                           ingresos_str, egresos_str, saldo_str, responsable_str)
-                print(f"7. Valores para insertar {i}: {valores}")
-
+                print(f"Insertando fila: {id_caja} - {fecha_str}")
                 # Insertar en tabla
-                self.tabla_cortes.insert('', tk.END, values=valores)
-                print(f"8. Insertado item {i} en tabla")
+                self.tabla_cortes.insert('', tk.END, values=(
+                    id_caja, fecha_str, hora_apertura_str, hora_cierre_str,
+                    ingresos_str, egresos_str, saldo_str, responsable
+                ))
 
+            print(f"Filas en tabla: {len(self.tabla_cortes.get_children())}")
             conexion.close()
 
-            # Debug 5: Verificar resultado final
-            items_finales = len(self.tabla_cortes.get_children())
-            print(f"9. Items finales en tabla: {items_finales}")
-
-            # Debug 6: Verificar los items
-            for i, item_id in enumerate(self.tabla_cortes.get_children()):
-                item_valores = self.tabla_cortes.item(item_id)['values']
-                print(f"10. Item {i} en tabla: {item_valores}")
-
-            # Actualizar vista - FORZAR ACTUALIZACIÓN
-            print("11. Actualizando vista...")
-            self.tabla_cortes.update_idletasks()
-            self.ventana.update()
-
-            # Debug 7: Verificar dimensiones de la tabla
-            print(f"12. Tabla visible: {self.tabla_cortes.winfo_viewable()}")
-            print(f"13. Tamaño tabla: {self.tabla_cortes.winfo_width()}x{self.tabla_cortes.winfo_height()}")
-
-            print("=== FIN cargar_cortes() ===")
+            # Actualizar UI después de inserción
+            self.ventana.update_idletasks()
 
         except Exception as e:
-            print(f"ERROR COMPLETO: {e}")
+            messagebox.showerror("Error", f"No se pudieron cargar los cortes: {str(e)}")
+            print(f"Error detallado al cargar cortes: {e}")
             import traceback
             traceback.print_exc()
-            messagebox.showerror("Error", f"Error al cargar cortes: {str(e)}")
+
+    def diagnosticar_problemas(self):
+        """Función para depurar problemas con las pestañas"""
+        try:
+            # Mostrar información general
+            print("\n=== DIAGNÓSTICO ===")
+            print(f"ID de caja actual: {self.id_caja_actual}")
+            print(f"Caja abierta: {self.caja_abierta}")
+
+            # Verificar pestañas
+            print("\n=== PESTAÑAS EXISTENTES ===")
+            if hasattr(self, 'notebook'):
+                print(f"Notebook existe: Sí")
+                print(f"Tabs: {self.notebook.tabs()}")
+                print(f"Tab actual: {self.notebook.select()}")
+            else:
+                print("Notebook no existe")
+
+            # Verificar tabla de cortes
+            print("\n=== TABLA CORTES ===")
+            if hasattr(self, 'tabla_cortes'):
+                print(f"Tabla cortes existe: Sí")
+                print(f"Tabla cortes visible: {self.tabla_cortes.winfo_viewable()}")
+                print(f"Filas en tabla: {len(self.tabla_cortes.get_children())}")
+
+                # Listar todas las filas
+                if len(self.tabla_cortes.get_children()) > 0:
+                    print("Contenido de la tabla:")
+                    for item in self.tabla_cortes.get_children():
+                        print(f"  {self.tabla_cortes.item(item, 'values')}")
+            else:
+                print("Tabla cortes no existe")
+
+            # Verificar tabla de movimientos
+            print("\n=== TABLA MOVIMIENTOS ===")
+            if hasattr(self, 'tabla_movimientos'):
+                print(f"Tabla movimientos existe: Sí")
+                print(f"Tabla movimientos visible: {self.tabla_movimientos.winfo_viewable()}")
+                print(f"Filas en tabla: {len(self.tabla_movimientos.get_children())}")
+            else:
+                print("Tabla movimientos no existe")
+
+            print("=== FIN DIAGNÓSTICO ===\n")
+
+            # Crear ventana con diagnóstico
+            ventana_diagnostico = tk.Toplevel(self.ventana)
+            ventana_diagnostico.title("Diagnóstico")
+            ventana_diagnostico.geometry("400x300")
+
+            # Mensaje
+            tk.Label(
+                ventana_diagnostico,
+                text="Diagnóstico completado",
+                font=("Helvetica", 14, "bold"),
+                padx=20, pady=20
+            ).pack()
+
+            tk.Label(
+                ventana_diagnostico,
+                text="Se ha impreso información de diagnóstico en la consola.",
+                wraplength=350,
+                padx=20, pady=10
+            ).pack()
+
+            # Botón para forzar reconstrucción
+            tk.Button(
+                ventana_diagnostico,
+                text="Reconstruir Interfaz",
+                command=lambda: [
+                    self.configurar_tab_cortes(),
+                    self.configurar_tab_movimientos(),
+                    ventana_diagnostico.destroy()
+                ]
+            ).pack(pady=20)
+
+            tk.Button(
+                ventana_diagnostico,
+                text="Cerrar",
+                command=ventana_diagnostico.destroy
+            ).pack()
+
+        except Exception as e:
+            print(f"Error en diagnóstico: {e}")
 
     # También agrega este método para hacer un test rápido de la tabla
     def test_tabla_cortes(self):
@@ -1915,28 +1961,19 @@ class GestionCaja:
     def cargar_movimientos(self):
         """Carga los movimientos de caja según los filtros seleccionados"""
         try:
-            # Limpiar tabla si existe
-            if hasattr(self, 'tabla_movimientos'):
-                for item in self.tabla_movimientos.get_children():
-                    self.tabla_movimientos.delete(item)
+            # Limpiar tabla
+            for item in self.tabla_movimientos.get_children():
+                self.tabla_movimientos.delete(item)
 
             # Obtener parámetros de filtro
-            fecha = self.fecha_movimientos.get() if hasattr(self, 'fecha_movimientos') else date.today().strftime(
-                "%Y-%m-%d")
-            tipo = self.tipo_movimiento.get() if hasattr(self, 'tipo_movimiento') else "Todos"
-
-            # Validar fecha
-            try:
-                datetime.strptime(fecha, "%Y-%m-%d")
-            except ValueError:
-                messagebox.showerror("Error", "Formato de fecha incorrecto. Use YYYY-MM-DD")
-                return
+            fecha = self.fecha_movimientos.get()
+            tipo = self.tipo_movimiento.get()
 
             # Conectar a la BD
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Consulta más simple
+            # Consulta base
             consulta = """
                 SELECT 
                     m.id_movimiento, 
@@ -1944,26 +1981,18 @@ class GestionCaja:
                     m.tipo, 
                     m.concepto,
                     m.monto, 
-                    u.nombre,
-                    CASE 
-                        WHEN m.concepto LIKE 'Venta #%' THEN
-                            (SELECT c.nombre 
-                             FROM ventas v 
-                             JOIN clientes c ON v.id_cliente = c.id_cliente 
-                             WHERE m.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
-                             LIMIT 1)
-                        ELSE NULL
-                    END as cliente_nombre
+                    u.nombre
                 FROM movimientos_caja m
                 JOIN usuarios u ON m.id_usuario = u.id_usuario
-                WHERE DATE(m.hora) = %s
+                WHERE DATE(m.fecha) = %s
             """
 
             parametros = [fecha]
 
+            # Agregar condición de tipo si no es "Todos"
             if tipo != "Todos":
                 consulta += " AND m.tipo = %s"
-                tipo_bd = tipo.lower()
+                tipo_bd = tipo.lower()  # Convertir a minúsculas para coincidir con BD
                 parametros.append(tipo_bd)
 
             consulta += " ORDER BY m.hora"
@@ -1976,52 +2005,37 @@ class GestionCaja:
             total_ing = 0
             total_egr = 0
 
-            # Insertar datos en la tabla si existe
-            if hasattr(self, 'tabla_movimientos'):
-                for mov in movimientos:
-                    id_mov, hora, tipo_mov, concepto, monto, usuario, cliente_nombre = mov
+            # Insertar datos en la tabla
+            for mov in movimientos:
+                id_mov, hora, tipo_mov, concepto, monto, usuario = mov
 
-                    # Formatear hora
-                    hora_str = hora.strftime("%H:%M:%S") if isinstance(hora, datetime) else str(hora)
+                # Formatear hora
+                hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
 
-                    # Agregar información del cliente si existe
-                    if cliente_nombre:
-                        concepto_completo = f"{concepto} - {cliente_nombre}"
-                    else:
-                        concepto_completo = concepto
+                # Poner la primera letra en mayúscula
+                tipo_mov = tipo_mov.capitalize()
 
-                    # Resaltar ventas con color
-                    tags = ()
-                    if "Venta #" in concepto:
-                        tags = ('venta',)
+                # Acumular totales
+                if tipo_mov.lower() == 'ingreso':
+                    total_ing += float(monto)
+                else:
+                    total_egr += float(monto)
 
-                    # Agregar a tabla
-                    self.tabla_movimientos.insert('', tk.END, values=(
-                        id_mov, hora_str, tipo_mov.capitalize(), concepto_completo, f"${monto:.2f}", usuario
-                    ), tags=tags)
+                # Insertar en la tabla
+                self.tabla_movimientos.insert('', tk.END, values=(
+                    id_mov, hora_str, tipo_mov, concepto, f"${float(monto):.2f}", usuario
+                ))
 
-                    # Acumular totales
-                    if tipo_mov.lower() == 'ingreso':
-                        total_ing += float(monto)
-                    else:
-                        total_egr += float(monto)
-
-                # Configurar tags para resaltar ventas
-                self.tabla_movimientos.tag_configure('venta', background='#e8f5e9')
-
-                # Actualizar variables de totales si existen
-                if hasattr(self, 'total_ingresos'):
-                    self.total_ingresos.set(f"${total_ing:.2f}")
-                if hasattr(self, 'total_egresos'):
-                    self.total_egresos.set(f"${total_egr:.2f}")
-                if hasattr(self, 'saldo_del_dia'):
-                    self.saldo_del_dia.set(f"${(total_ing - total_egr):.2f}")
+            # Actualizar variables de totales
+            self.total_ingresos.set(f"${total_ing:.2f}")
+            self.total_egresos.set(f"${total_egr:.2f}")
+            self.saldo_del_dia.set(f"${(total_ing - total_egr):.2f}")
 
             conexion.close()
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los movimientos: {str(e)}")
-            print(f"Error al cargar movimientos: {e}")
+            print(f"Error detallado al cargar movimientos: {e}")
 
     def imprimir_movimientos(self):
         """Imprime los movimientos de caja mostrados actualmente"""
@@ -2359,7 +2373,24 @@ class GestionCaja:
                 if caja:
                     fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
                     fecha_formateada = utl.formatear_fecha(fecha)
-                    hora_formateada = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
+
+                    # Formatear hora_apertura correctamente
+                    hora_formateada = "No disponible"
+                    if hora_apertura:
+                        try:
+                            if hasattr(hora_apertura, 'strftime'):  # datetime o time
+                                hora_formateada = hora_apertura.strftime("%H:%M:%S")
+                            elif isinstance(hora_apertura, timedelta):  # timedelta
+                                segundos = hora_apertura.total_seconds()
+                                horas = int(segundos // 3600)
+                                minutos = int((segundos % 3600) // 60)
+                                segundos = int(segundos % 60)
+                                hora_formateada = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+                            else:
+                                hora_formateada = str(hora_apertura)
+                        except Exception as e:
+                            print(f"Error al formatear hora: {e}")
+                            hora_formateada = str(hora_apertura)
 
                     # Mostrar información de caja abierta
                     lbl_estado = tk.Label(
@@ -2733,126 +2764,185 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
             print(f"Error al registrar egreso: {e}")
 
-    # SOLUCIÓN: La tabla está oculta o colapsada. Vamos a corregir configurar_tab_cortes()
+    def mostrar_calendario_para(self, target="cortes"):
+        """Muestra un calendario para seleccionar fecha"""
 
-    # SOLUCIÓN: La tabla está oculta o colapsada. Vamos a corregir configurar_tab_cortes()
+        def set_fecha():
+            try:
+                # Construir fecha seleccionada
+                dia = int(combo_dia.get())
+                mes = meses.index(combo_mes.get()) + 1
+                anio = int(combo_anio.get())
+
+                # Validar fecha
+                fecha_obj = date(anio, mes, dia)
+                fecha_str = fecha_obj.strftime("%Y-%m-%d")
+
+                # Asignar según pestaña
+                if target == "cortes":
+                    self.fecha_cortes.set(fecha_str)
+                    self.cargar_cortes()
+                elif target == "movimientos":
+                    self.fecha_movimientos.set(fecha_str)
+                    self.cargar_movimientos()
+
+                ventana_cal.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Fecha inválida")
+
+        # Crear ventana
+        ventana_cal = tk.Toplevel(self.ventana)
+        ventana_cal.title("Seleccionar Fecha")
+        ventana_cal.geometry("300x200")
+        ventana_cal.config(bg="#f5f5f5")
+        ventana_cal.transient(self.ventana)
+        ventana_cal.grab_set()
+        utl.centrar_ventana(ventana_cal, 300, 200)
+
+        frame = tk.Frame(ventana_cal, bg="#f5f5f5", padx=20, pady=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        # Obtener fecha actual según pestaña
+        if target == "cortes":
+            fecha_actual = self.fecha_cortes.get()
+        else:
+            fecha_actual = self.fecha_movimientos.get()
+
+        try:
+            anio, mes, dia = fecha_actual.split("-")
+            mes = int(mes)
+            dia = int(dia)
+        except:
+            hoy = date.today()
+            anio, mes, dia = str(hoy.year), hoy.month, hoy.day
+
+        # Controles de fecha
+        tk.Label(frame, text="Día:", bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W)
+        combo_dia = ttk.Combobox(frame, values=list(range(1, 32)), width=5, state="readonly")
+        combo_dia.set(str(dia))
+        combo_dia.grid(row=0, column=1, padx=5, pady=5)
+
+        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+        tk.Label(frame, text="Mes:", bg="#f5f5f5").grid(row=1, column=0, sticky=tk.W)
+        combo_mes = ttk.Combobox(frame, values=meses, width=10, state="readonly")
+        combo_mes.set(meses[int(mes) - 1])
+        combo_mes.grid(row=1, column=1, padx=5, pady=5)
+
+        tk.Label(frame, text="Año:", bg="#f5f5f5").grid(row=2, column=0, sticky=tk.W)
+        combo_anio = ttk.Combobox(frame, values=list(range(2020, 2031)), width=6, state="readonly")
+        combo_anio.set(anio)
+        combo_anio.grid(row=2, column=1, padx=5, pady=5)
+
+        # Botones
+        frame_btn = tk.Frame(frame, bg="#f5f5f5")
+        frame_btn.grid(row=3, column=0, columnspan=2, pady=20)
+
+        btn_aceptar = tk.Button(frame_btn, text="Aceptar", bg="#4CAF50", fg="white", command=set_fecha)
+        btn_aceptar.pack(side=tk.LEFT, padx=5)
+
+        btn_hoy = tk.Button(frame_btn, text="Hoy", bg="#2196F3", fg="white",
+                            command=lambda: [
+                                combo_dia.set(str(date.today().day)),
+                                combo_mes.set(meses[date.today().month - 1]),
+                                combo_anio.set(str(date.today().year))
+                            ])
+        btn_hoy.pack(side=tk.LEFT, padx=5)
+
+        btn_cancelar = tk.Button(frame_btn, text="Cancelar", bg="#f44336", fg="white",
+                                 command=ventana_cal.destroy)
+        btn_cancelar.pack(side=tk.LEFT, padx=5)
 
     def configurar_tab_cortes(self):
         """Configura la pestaña de cortes de caja"""
-
-        # Limpiar todo primero
+        # Limpiar pestaña
         for widget in self.tab_cortes.winfo_children():
             widget.destroy()
 
-        # Frame principal
-        frame_main = tk.Frame(self.tab_cortes, bg="#f5f5f5")
-        frame_main.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Frame contenedor principal con fondo de color para verificar que se muestra
+        frame_principal = tk.Frame(self.tab_cortes, bg="#e3f2fd", padx=10, pady=10)
+        frame_principal.pack(fill=tk.BOTH, expand=True)
 
-        # Frame para filtros
-        frame_filtros = tk.Frame(frame_main, bg="#f5f5f5")
-        frame_filtros.pack(fill=tk.X, pady=(0, 10))
-
-        frame_tabla = tk.Frame(frame_main, bg="#f5f5f5", height=400)
-        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
-        # Hacer que el frame mantenga su tamaño y no se contraiga
-        frame_tabla.pack_propagate(False)
-        # Filtro por fecha
+        # Etiqueta de diagnóstico
         tk.Label(
-            frame_filtros,
-            text="Fecha:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).pack(side=tk.LEFT, padx=5, pady=5)
+            frame_principal,
+            text="Cargando interfaz de cortes de caja...",
+            font=("Helvetica", 14, "bold"),
+            bg="#e3f2fd"
+        ).pack(pady=20)
 
+        # Variable para fecha
         self.fecha_cortes = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
 
-        entry_fecha_cortes = tk.Entry(
+        # Frame para filtros
+        frame_filtros = tk.Frame(frame_principal, bg="#e3f2fd", padx=5, pady=5, relief=tk.GROOVE, bd=1)
+        frame_filtros.pack(fill=tk.X, pady=10)
+
+        # Control de fecha
+        tk.Label(frame_filtros, text="Fecha:", bg="#e3f2fd", font=("Helvetica", 11)).pack(side=tk.LEFT, padx=5)
+
+        entry_fecha = tk.Entry(
             frame_filtros,
             textvariable=self.fecha_cortes,
-            font=("Helvetica", 11),
-            width=12
+            width=12,
+            font=("Helvetica", 11)
         )
-        entry_fecha_cortes.pack(side=tk.LEFT, padx=5, pady=5)
+        entry_fecha.pack(side=tk.LEFT, padx=5)
 
-        # Botón para seleccionar fecha
-        btn_fecha_cortes = tk.Button(
+        btn_fecha = tk.Button(
             frame_filtros,
             text="📅",
             font=("Helvetica", 11),
-            bg="#3f51b5",
+            bg="#2196f3",
             fg="white",
-            cursor="hand2",
-            command=self.mostrar_calendario
+            command=lambda: self.mostrar_calendario("cortes")
         )
-        btn_fecha_cortes.pack(side=tk.LEFT, padx=2, pady=5)
+        btn_fecha.pack(side=tk.LEFT)
 
         # Botón de búsqueda
-        btn_buscar_cortes = tk.Button(
+        btn_buscar = tk.Button(
             frame_filtros,
-            text="Buscar",
+            text="🔍 Buscar",
             font=("Helvetica", 11),
             bg="#3f51b5",
             fg="white",
-            width=8,
-            cursor="hand2",
             command=self.cargar_cortes
         )
-        btn_buscar_cortes.pack(side=tk.LEFT, padx=15, pady=5)
+        btn_buscar.pack(side=tk.LEFT, padx=20)
 
-        # Frame para la tabla
-        frame_tabla = tk.Frame(frame_main, bg="#f5f5f5")
+        # Frame para tabla con altura fija
+        frame_tabla = tk.Frame(frame_principal, bg="#e3f2fd", padx=5, pady=5, height=300)
         frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+        frame_tabla.pack_propagate(False)  # Evita que se encoja
 
-        # Columnas de la tabla
+        # Crear tabla con columnas
         columnas = ('id', 'fecha', 'apertura', 'cierre', 'ingresos', 'egresos', 'saldo', 'responsable')
-
-        # Crear tabla con estilo personalizado
-        style = ttk.Style()
-        style.configure("Custom.Treeview", rowheight=28)
-        style.configure("Custom.Treeview.Heading", font=('Helvetica', 11, 'bold'))
 
         self.tabla_cortes = ttk.Treeview(
             frame_tabla,
             columns=columnas,
             show='headings',
-            height=15,
-            style="Custom.Treeview"
+            height=10
         )
 
-        # Configurar encabezados y columnas con mejor formato
-        headers = {
-            'id': 'ID',
-            'fecha': 'Fecha',
-            'apertura': 'Apertura',
-            'cierre': 'Cierre',
-            'ingresos': 'Ingresos',
-            'egresos': 'Egresos',
-            'saldo': 'Saldo Final',
-            'responsable': 'Responsable'
-        }
-
-        widths = {
-            'id': 50,
-            'fecha': 100,
-            'apertura': 100,
-            'cierre': 100,
-            'ingresos': 100,
-            'egresos': 100,
-            'saldo': 100,
-            'responsable': 150
-        }
-
+        # Configuración básica de la tabla
         for col in columnas:
-            self.tabla_cortes.heading(col, text=headers[col])
-            if col in ['ingresos', 'egresos', 'saldo']:
-                self.tabla_cortes.column(col, width=widths[col], anchor=tk.E)
-            else:
-                self.tabla_cortes.column(col, width=widths[col], anchor=tk.CENTER)
+            self.tabla_cortes.heading(col, text=col.replace('_', ' ').capitalize())
 
-        # Aplicar estilo mejorado a la tabla
+        self.tabla_cortes.column('id', width=50, anchor=tk.CENTER)
+        self.tabla_cortes.column('fecha', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('apertura', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('cierre', width=100, anchor=tk.CENTER)
+        self.tabla_cortes.column('ingresos', width=100, anchor=tk.E)
+        self.tabla_cortes.column('egresos', width=100, anchor=tk.E)
+        self.tabla_cortes.column('saldo', width=100, anchor=tk.E)
+        self.tabla_cortes.column('responsable', width=150)
+
+        # Aplicar estilo predefinido
         utl.aplicar_estilo_tabla(self.tabla_cortes)
 
-        # Scrollbar para la tabla
+        # Scrollbar
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_cortes.yview)
         self.tabla_cortes.configure(yscrollcommand=scrollbar.set)
 
@@ -2860,65 +2950,33 @@ class GestionCaja:
         self.tabla_cortes.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Frame para botones con mejor espaciado
-        frame_botones = tk.Frame(frame_main, bg="#f5f5f5")
-        frame_botones.pack(fill=tk.X, pady=(15, 10))
+        # Frame para botones
+        frame_botones = tk.Frame(frame_principal, bg="#e3f2fd")
+        frame_botones.pack(fill=tk.X, pady=10)
 
-        # Separador visual
-        separador = ttk.Separator(frame_main, orient="horizontal")
-        separador.pack(fill=tk.X, pady=(0, 10))
-
-        # Botón para ver detalles
-        btn_ver_detalle = tk.Button(
+        # Botones
+        btn_detalle = tk.Button(
             frame_botones,
             text="📄 Ver Detalle",
             font=("Helvetica", 11),
             bg="#3f51b5",
             fg="white",
-            width=15,
-            cursor="hand2",
             command=self.ver_detalle_corte
         )
-        btn_ver_detalle.pack(side=tk.LEFT, padx=5)
+        btn_detalle.pack(side=tk.LEFT, padx=5)
 
-        # Botón para imprimir corte
-        btn_imprimir_corte = tk.Button(
+        btn_imprimir = tk.Button(
             frame_botones,
             text="🖨️ Imprimir Corte",
             font=("Helvetica", 11),
             bg="#4caf50",
             fg="white",
-            width=15,
-            cursor="hand2",
             command=self.imprimir_corte_seleccionado
         )
-        btn_imprimir_corte.pack(side=tk.LEFT, padx=5)
+        btn_imprimir.pack(side=tk.LEFT, padx=5)
 
-        # Botón para exportar a PDF (nuevo)
-        btn_exportar_pdf = tk.Button(
-            frame_botones,
-            text="📑 Exportar PDF",
-            font=("Helvetica", 11),
-            bg="#ff9800",
-            fg="white",
-            width=15,
-            cursor="hand2",
-            command=self.exportar_cortes_pdf
-        )
-        btn_exportar_pdf.pack(side=tk.LEFT, padx=5)
-
-        # Información adicional
-        info_label = tk.Label(
-            frame_main,
-            text="Selecciona un corte y haz clic en 'Imprimir Corte' o 'Exportar PDF'",
-            font=("Helvetica", 10, "italic"),
-            bg="#f5f5f5",
-            fg="#666666"
-        )
-        info_label.pack(pady=(10, 0))
-
-        # Cargar cortes iniciales
-        self.cargar_cortes()
+        # Cargar datos iniciales con pequeño retraso para asegurar que la GUI esté lista
+        self.ventana.after(500, self.cargar_cortes)
 
     def debug_verificar_fechas(self):
         """Método para depurar fechas en la base de datos"""
@@ -2963,116 +3021,114 @@ class GestionCaja:
         except Exception as e:
             print(f"Error en debug_verificar_fechas: {e}")
 
-    def mostrar_calendario(self):
-        """Muestra una ventana para seleccionar la fecha"""
-        # Crear ventana para el calendario
+    def mostrar_calendario(self, target="cortes"):
+        """Muestra un calendario para seleccionar fecha"""
         ventana_cal = tk.Toplevel(self.ventana)
         ventana_cal.title("Seleccionar Fecha")
         ventana_cal.geometry("300x200")
         ventana_cal.config(bg="#f5f5f5")
-
-        # Centrar la ventana
-        utl.centrar_ventana(ventana_cal, 300, 200)
         ventana_cal.transient(self.ventana)
         ventana_cal.grab_set()
+        utl.centrar_ventana(ventana_cal, 300, 200)
 
-        # Frame principal
         frame = tk.Frame(ventana_cal, bg="#f5f5f5", padx=20, pady=20)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(frame, text="Seleccionar fecha:", font=("Helvetica", 12, "bold"), bg="#f5f5f5").pack(pady=(0, 10))
+        # Obtener fecha actual
+        if target == "cortes":
+            fecha_str = self.fecha_cortes.get()
+        else:  # movimientos
+            fecha_str = self.fecha_movimientos.get()
 
-        # Obtener la fecha actual
-        fecha_actual = self.fecha_cortes.get()
         try:
-            year, month, day = fecha_actual.split("-")
+            anio, mes, dia = fecha_str.split("-")
+            dia = int(dia)
+            mes = int(mes)
+            anio = int(anio)
         except:
             hoy = date.today()
-            year, month, day = str(hoy.year), str(hoy.month), str(hoy.day)
+            dia, mes, anio = hoy.day, hoy.month, hoy.year
 
-        # Frame para los controles de fecha
-        date_frame = tk.Frame(frame, bg="#f5f5f5")
-        date_frame.pack(fill=tk.X, pady=10)
+        # Controles de fecha
+        frame_fecha = tk.Frame(frame, bg="#f5f5f5")
+        frame_fecha.pack(fill=tk.X, pady=10)
 
         # Día
-        tk.Label(date_frame, text="Día:", bg="#f5f5f5", font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(0, 5))
-        combo_dia = ttk.Combobox(date_frame, values=list(range(1, 32)), width=4, state="readonly")
-        combo_dia.set(day)
-        combo_dia.pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_fecha, text="Día:", bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W)
+        combo_dia = ttk.Combobox(frame_fecha, values=list(range(1, 32)), width=5, state="readonly")
+        combo_dia.set(str(dia))
+        combo_dia.grid(row=0, column=1, padx=5, pady=5)
 
         # Mes
-        tk.Label(date_frame, text="Mes:", bg="#f5f5f5", font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(10, 5))
-        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre",
-                 "Noviembre", "Diciembre"]
-        combo_mes = ttk.Combobox(date_frame, values=meses, width=12, state="readonly")
-        combo_mes.set(meses[int(month) - 1])
-        combo_mes.pack(side=tk.LEFT, padx=5)
+        meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+        tk.Label(frame_fecha, text="Mes:", bg="#f5f5f5").grid(row=1, column=0, sticky=tk.W)
+        combo_mes = ttk.Combobox(frame_fecha, values=meses, width=10, state="readonly")
+        combo_mes.set(meses[mes - 1])
+        combo_mes.grid(row=1, column=1, padx=5, pady=5)
 
         # Año
-        tk.Label(date_frame, text="Año:", bg="#f5f5f5", font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(10, 5))
-        anios = list(range(2020, 2031))
-        combo_anio = ttk.Combobox(date_frame, values=anios, width=8, state="readonly")
-        combo_anio.set(year)
-        combo_anio.pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_fecha, text="Año:", bg="#f5f5f5").grid(row=2, column=0, sticky=tk.W)
+        combo_anio = ttk.Combobox(frame_fecha, values=list(range(2020, 2031)), width=6, state="readonly")
+        combo_anio.set(str(anio))
+        combo_anio.grid(row=2, column=1, padx=5, pady=5)
 
-        # Frame para botones
+        # Función para aplicar la fecha
+        def aplicar_fecha():
+            try:
+                d = int(combo_dia.get())
+                m = meses.index(combo_mes.get()) + 1
+                a = int(combo_anio.get())
+
+                fecha_obj = date(a, m, d)
+                fecha_formateada = fecha_obj.strftime("%Y-%m-%d")
+
+                if target == "cortes":
+                    self.fecha_cortes.set(fecha_formateada)
+                    self.cargar_cortes()
+                else:  # movimientos
+                    self.fecha_movimientos.set(fecha_formateada)
+                    self.cargar_movimientos()
+
+                ventana_cal.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Fecha inválida: {e}")
+
+        # Botones
         frame_botones = tk.Frame(frame, bg="#f5f5f5")
         frame_botones.pack(pady=20)
 
-        def aplicar_fecha():
-            try:
-                dia = int(combo_dia.get())
-                mes = meses.index(combo_mes.get()) + 1
-                anio = int(combo_anio.get())
-
-                # Validar la fecha
-                fecha_obj = date(anio, mes, dia)
-                fecha_str = fecha_obj.strftime("%Y-%m-%d")
-                self.fecha_cortes.set(fecha_str)
-                ventana_cal.destroy()
-
-                # Cargar cortes automáticamente después de seleccionar la fecha
-                self.cargar_cortes()
-
-            except ValueError:
-                messagebox.showerror("Error", "Fecha inválida. Por favor, selecciona una fecha válida.")
-
-        btn_aplicar = tk.Button(
+        tk.Button(
             frame_botones,
-            text="Aplicar",
-            bg="#3f51b5",
+            text="Aceptar",
+            bg="#4CAF50",
             fg="white",
-            width=10,
+            width=8,
             command=aplicar_fecha
-        )
-        btn_aplicar.pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=5)
 
-        btn_hoy = tk.Button(
+        tk.Button(
             frame_botones,
             text="Hoy",
-            bg="#4caf50",
+            bg="#2196F3",
             fg="white",
-            width=10,
-            command=lambda: (aplicar_fecha_hoy())
-        )
-        btn_hoy.pack(side=tk.LEFT, padx=5)
+            width=8,
+            command=lambda: [
+                combo_dia.set(str(date.today().day)),
+                combo_mes.set(meses[date.today().month - 1]),
+                combo_anio.set(str(date.today().year))
+            ]
+        ).pack(side=tk.LEFT, padx=5)
 
-        def aplicar_fecha_hoy():
-            hoy = date.today()
-            combo_dia.set(hoy.day)
-            combo_mes.set(meses[hoy.month - 1])
-            combo_anio.set(hoy.year)
-            aplicar_fecha()
-
-        btn_cancelar = tk.Button(
+        tk.Button(
             frame_botones,
             text="Cancelar",
-            bg="#e53935",
+            bg="#F44336",
             fg="white",
-            width=10,
+            width=8,
             command=ventana_cal.destroy
-        )
-        btn_cancelar.pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=5)
 
     def ver_detalle_corte(self):
         """Muestra los detalles de un corte seleccionado"""
@@ -3834,102 +3890,112 @@ class GestionCaja:
 
     def configurar_tab_movimientos(self):
         """Configura la pestaña de movimientos de caja"""
+        # Limpiar pestaña
+        for widget in self.tab_movimientos.winfo_children():
+            widget.destroy()
+
+        # Frame contenedor principal con fondo de color para verificar que se muestra
+        frame_principal = tk.Frame(self.tab_movimientos, bg="#e8f5e9", padx=10, pady=10)
+        frame_principal.pack(fill=tk.BOTH, expand=True)
+
+        # Etiqueta de diagnóstico
+        tk.Label(
+            frame_principal,
+            text="Cargando interfaz de movimientos...",
+            font=("Helvetica", 14, "bold"),
+            bg="#e8f5e9"
+        ).pack(pady=20)
+
+        # Variables para filtros
+        self.fecha_movimientos = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
+        self.tipo_movimiento = tk.StringVar(value="Todos")
+
         # Frame para filtros
-        frame_filtros = tk.Frame(self.tab_movimientos, bg="#f5f5f5")
+        frame_filtros = tk.Frame(frame_principal, bg="#e8f5e9", padx=5, pady=5, relief=tk.GROOVE, bd=1)
         frame_filtros.pack(fill=tk.X, pady=10)
 
-        # Filtro por fecha
-        tk.Label(
-            frame_filtros,
-            text="Fecha:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).grid(row=0, column=0, padx=5, pady=5)
+        # Control de fecha
+        frame_fecha = tk.Frame(frame_filtros, bg="#e8f5e9")
+        frame_fecha.pack(side=tk.LEFT, padx=10)
 
-        self.fecha_movimientos = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
+        tk.Label(frame_fecha, text="Fecha:", bg="#e8f5e9", font=("Helvetica", 11)).pack(side=tk.LEFT)
 
         entry_fecha = tk.Entry(
-            frame_filtros,
+            frame_fecha,
             textvariable=self.fecha_movimientos,
-            font=("Helvetica", 11),
-            width=12
+            width=12,
+            font=("Helvetica", 11)
         )
-        entry_fecha.grid(row=0, column=1, padx=5, pady=5)
+        entry_fecha.pack(side=tk.LEFT, padx=5)
 
-        # Botón para seleccionar fecha con un calendario
         btn_fecha = tk.Button(
-            frame_filtros,
+            frame_fecha,
             text="📅",
             font=("Helvetica", 11),
-            bg="#3f51b5",
+            bg="#2196f3",
             fg="white",
-            cursor="hand2",
-            command=self.mostrar_calendario  # Usar el método directamente
+            command=lambda: self.mostrar_calendario("movimientos")
         )
-        btn_fecha.grid(row=0, column=2, padx=2, pady=5)
+        btn_fecha.pack(side=tk.LEFT)
 
-        # Resto del código...
+        # Control de tipo
+        frame_tipo = tk.Frame(frame_filtros, bg="#e8f5e9")
+        frame_tipo.pack(side=tk.LEFT, padx=10)
 
-        # Filtro por tipo
-        tk.Label(
-            frame_filtros,
-            text="Tipo:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).grid(row=0, column=3, padx=5, pady=5)
+        tk.Label(frame_tipo, text="Tipo:", bg="#e8f5e9", font=("Helvetica", 11)).pack(side=tk.LEFT)
 
-        self.tipo_movimiento = tk.StringVar(value="Todos")
         combo_tipo = ttk.Combobox(
-            frame_filtros,
+            frame_tipo,
             textvariable=self.tipo_movimiento,
             values=["Todos", "Ingreso", "Egreso"],
             width=10,
             state="readonly"
         )
-        combo_tipo.grid(row=0, column=4, padx=5, pady=5)
+        combo_tipo.pack(side=tk.LEFT, padx=5)
 
         # Botón de búsqueda
+        frame_btn = tk.Frame(frame_filtros, bg="#e8f5e9")
+        frame_btn.pack(side=tk.LEFT, padx=20)
+
         btn_buscar = tk.Button(
-            frame_filtros,
-            text="Buscar",
+            frame_btn,
+            text="🔍 Buscar",
             font=("Helvetica", 11),
             bg="#3f51b5",
             fg="white",
-            width=8,
-            cursor="hand2",
             command=self.cargar_movimientos
         )
-        btn_buscar.grid(row=0, column=5, padx=15, pady=5)
+        btn_buscar.pack()
 
-        # Tabla de movimientos
-        frame_tabla = tk.Frame(self.tab_movimientos, bg="#f5f5f5")
-        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10, padx=5)
+        # Frame para tabla
+        frame_tabla = tk.Frame(frame_principal, bg="#e8f5e9", padx=5, pady=5)
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        # Columnas de la tabla
+        # Crear tabla con columnas
         columnas = ('id', 'hora', 'tipo', 'concepto', 'monto', 'usuario')
 
-        self.tabla_movimientos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+        self.tabla_movimientos = ttk.Treeview(
+            frame_tabla,
+            columns=columnas,
+            show='headings',
+            height=10
+        )
 
-        # Aplicar estilo a la tabla
-        utl.aplicar_estilo_tabla(self.tabla_movimientos)
+        # Configuración básica de la tabla
+        for col in columnas:
+            self.tabla_movimientos.heading(col, text=col.capitalize())
 
-        # Configurar encabezados
-        self.tabla_movimientos.heading('id', text='ID')
-        self.tabla_movimientos.heading('hora', text='Hora')
-        self.tabla_movimientos.heading('tipo', text='Tipo')
-        self.tabla_movimientos.heading('concepto', text='Concepto')
-        self.tabla_movimientos.heading('monto', text='Monto')
-        self.tabla_movimientos.heading('usuario', text='Usuario')
-
-        # Configurar anchos
         self.tabla_movimientos.column('id', width=50, anchor=tk.CENTER)
         self.tabla_movimientos.column('hora', width=100, anchor=tk.CENTER)
-        self.tabla_movimientos.column('tipo', width=100, anchor=tk.CENTER)
-        self.tabla_movimientos.column('concepto', width=300)
+        self.tabla_movimientos.column('tipo', width=80, anchor=tk.CENTER)
+        self.tabla_movimientos.column('concepto', width=250)
         self.tabla_movimientos.column('monto', width=100, anchor=tk.E)
         self.tabla_movimientos.column('usuario', width=150)
 
-        # Scrollbar para la tabla
+        # Aplicar estilo predefinido
+        utl.aplicar_estilo_tabla(self.tabla_movimientos)
+
+        # Scrollbar
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_movimientos.yview)
         self.tabla_movimientos.configure(yscrollcommand=scrollbar.set)
 
@@ -3937,74 +4003,53 @@ class GestionCaja:
         self.tabla_movimientos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Frame para resumen
-        frame_resumen = tk.Frame(self.tab_movimientos, bg="#f5f5f5", relief=tk.GROOVE, bd=1)
-        frame_resumen.pack(fill=tk.X, pady=10, padx=5)
+        # Frame para totales
+        frame_totales = tk.Frame(frame_principal, bg="#f0f7fa", relief=tk.GROOVE, bd=1, padx=10, pady=10)
+        frame_totales.pack(fill=tk.X, pady=10)
 
-        # Variables para los totales
+        # Variables de totales
         self.total_ingresos = tk.StringVar(value="$0.00")
         self.total_egresos = tk.StringVar(value="$0.00")
         self.saldo_del_dia = tk.StringVar(value="$0.00")
 
-        # Mostrar resumen
-        tk.Label(
-            frame_resumen,
-            text="Total Ingresos:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
+        # Mostrar totales en 3 columnas
+        frame_ing = tk.Frame(frame_totales, bg="#f0f7fa")
+        frame_ing.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        tk.Label(
-            frame_resumen,
-            textvariable=self.total_ingresos,
-            font=("Helvetica", 11, "bold"),
-            bg="#f5f5f5",
-            fg="#388e3c"
-        ).grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        tk.Label(frame_ing, text="Total Ingresos:", font=("Helvetica", 11, "bold"), bg="#f0f7fa").pack(anchor=tk.W)
+        tk.Label(frame_ing, textvariable=self.total_ingresos, font=("Helvetica", 11), fg="#4caf50", bg="#f0f7fa").pack(
+            anchor=tk.W)
 
-        tk.Label(
-            frame_resumen,
-            text="Total Egresos:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).grid(row=0, column=2, padx=20, pady=5, sticky=tk.W)
+        frame_egr = tk.Frame(frame_totales, bg="#f0f7fa")
+        frame_egr.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        tk.Label(
-            frame_resumen,
-            textvariable=self.total_egresos,
-            font=("Helvetica", 11, "bold"),
-            bg="#f5f5f5",
-            fg="#d32f2f"
-        ).grid(row=0, column=3, padx=5, pady=5, sticky=tk.W)
+        tk.Label(frame_egr, text="Total Egresos:", font=("Helvetica", 11, "bold"), bg="#f0f7fa").pack(anchor=tk.W)
+        tk.Label(frame_egr, textvariable=self.total_egresos, font=("Helvetica", 11), fg="#f44336", bg="#f0f7fa").pack(
+            anchor=tk.W)
 
-        tk.Label(
-            frame_resumen,
-            text="Saldo del Día:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).grid(row=0, column=4, padx=20, pady=5, sticky=tk.W)
+        frame_saldo = tk.Frame(frame_totales, bg="#f0f7fa")
+        frame_saldo.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        tk.Label(
-            frame_resumen,
-            textvariable=self.saldo_del_dia,
-            font=("Helvetica", 11, "bold"),
-            bg="#f5f5f5"
-        ).grid(row=0, column=5, padx=5, pady=5, sticky=tk.W)
+        tk.Label(frame_saldo, text="Saldo del Día:", font=("Helvetica", 11, "bold"), bg="#f0f7fa").pack(anchor=tk.W)
+        tk.Label(frame_saldo, textvariable=self.saldo_del_dia, font=("Helvetica", 11, "bold"), bg="#f0f7fa").pack(
+            anchor=tk.W)
 
-        # Botón para imprimir movimientos
+        # Botón de imprimir
+        frame_btn_imp = tk.Frame(frame_totales, bg="#f0f7fa")
+        frame_btn_imp.pack(side=tk.RIGHT)
+
         btn_imprimir = tk.Button(
-            frame_resumen,
-            text="Imprimir Movimientos",
+            frame_btn_imp,
+            text="🖨️ Imprimir",
             font=("Helvetica", 11),
             bg="#3f51b5",
             fg="white",
-            cursor="hand2",
             command=self.imprimir_movimientos
         )
-        btn_imprimir.grid(row=0, column=6, padx=20, pady=5)
+        btn_imprimir.pack(pady=5)
 
-        # Cargar movimientos iniciales
-        self.cargar_movimientos()
+        # Cargar datos iniciales
+        self.ventana.after(500, self.cargar_movimientos)
 
 
     def verificar_estado_caja(self):
