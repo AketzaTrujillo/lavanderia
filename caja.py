@@ -940,17 +940,19 @@ class GestionCaja:
 
     # Modificar el método configurar_tab_operaciones para agregar el botón de resumen de ventas
     def configurar_tab_operaciones(self):
-        """Configura la pestaña de operaciones de caja como punto de venta"""
-        frame_principal = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
-        frame_principal.pack(fill=tk.BOTH, expand=True, pady=20)
+        """Configura la pestaña de operaciones de caja"""
+        # Limpiar la pestaña
+        for widget in self.tab_operaciones.winfo_children():
+            widget.destroy()
+
+        # Frame para botones principales
+        frame_botones_principales = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
+        frame_botones_principales.pack(pady=20)
 
         if not self.caja_abierta:
             # Si la caja está cerrada, mostrar solo botón de apertura
-            frame_apertura = tk.Frame(frame_principal, bg="#f5f5f5")
-            frame_apertura.pack(expand=True)
-
             btn_abrir = tk.Button(
-                frame_apertura,
+                frame_botones_principales,
                 text="Abrir Caja",
                 font=("Helvetica", 12, "bold"),
                 bg="#4caf50",
@@ -963,7 +965,7 @@ class GestionCaja:
             btn_abrir.pack(padx=20, pady=10)
 
             lbl_info = tk.Label(
-                frame_apertura,
+                frame_botones_principales,
                 text="Debe abrir la caja para comenzar a operar",
                 font=("Helvetica", 11),
                 bg="#f5f5f5",
@@ -971,25 +973,9 @@ class GestionCaja:
             )
             lbl_info.pack(pady=5)
         else:
-            # Si la caja está abierta, mostrar punto de venta completo
-            # Panel de operaciones principales (lado izquierdo)
-            frame_izquierdo = tk.Frame(frame_principal, bg="#f0f7ff", relief=tk.GROOVE, bd=1)
-            frame_izquierdo.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-            tk.Label(
-                frame_izquierdo,
-                text="VENTAS RÁPIDAS",
-                font=("Helvetica", 12, "bold"),
-                bg="#f0f7ff",
-                fg="#303f9f"
-            ).pack(pady=5)
-
-            # Botones de operaciones rápidas
-            frame_botones_rapidos = tk.Frame(frame_izquierdo, bg="#f0f7ff")
-            frame_botones_rapidos.pack(fill=tk.X, pady=10, padx=10)
-
+            # Si la caja está abierta, mostrar todos los botones
             btn_nueva_venta = tk.Button(
-                frame_botones_rapidos,
+                frame_botones_principales,
                 text="💰 Nueva Venta",
                 font=("Helvetica", 12),
                 bg="#4caf50",
@@ -999,106 +985,23 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.nueva_venta
             )
-            btn_nueva_venta.grid(row=0, column=0, padx=5, pady=5)
+            btn_nueva_venta.grid(row=0, column=0, padx=10, pady=10)
 
-            btn_nuevo_pedido = tk.Button(
-                frame_botones_rapidos,
-                text="📋 Nuevo Pedido",
+            btn_otro_ingreso = tk.Button(
+                frame_botones_principales,
+                text="➕ Otro Ingreso",
                 font=("Helvetica", 12),
                 bg="#2196f3",
                 fg="white",
                 width=15,
                 height=2,
                 cursor="hand2",
-                command=self.nuevo_pedido
+                command=self.otro_ingreso
             )
-            btn_nuevo_pedido.grid(row=0, column=1, padx=5, pady=5)
-
-            btn_seguimiento = tk.Button(
-                frame_botones_rapidos,
-                text="📊 Seguimiento",
-                font=("Helvetica", 12),
-                bg="#ff9800",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.seguimiento_pedidos
-            )
-            btn_seguimiento.grid(row=1, column=0, padx=5, pady=5)
-
-            btn_clientes = tk.Button(
-                frame_botones_rapidos,
-                text="👥 Clientes",
-                font=("Helvetica", 12),
-                bg="#9c27b0",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.gestionar_clientes
-            )
-            btn_clientes.grid(row=1, column=1, padx=5, pady=5)
-
-            # Panel de control de caja (lado derecho)
-            frame_derecho = tk.Frame(frame_principal, bg="#f5f5f5", relief=tk.GROOVE, bd=1)
-            frame_derecho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-            tk.Label(
-                frame_derecho,
-                text="CONTROL DE CAJA",
-                font=("Helvetica", 12, "bold"),
-                bg="#f5f5f5",
-                fg="#e53935"
-            ).pack(pady=5)
-
-            # Botones de control de caja
-            frame_control_caja = tk.Frame(frame_derecho, bg="#f5f5f5")
-            frame_control_caja.pack(fill=tk.X, pady=10, padx=10)
-
-            btn_ingreso = tk.Button(
-                frame_control_caja,
-                text="➕ Registrar Ingreso",
-                font=("Helvetica", 12),
-                bg="#4caf50",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.registrar_ingreso
-            )
-            btn_ingreso.grid(row=0, column=0, padx=5, pady=5)
-            btn_arqueo = tk.Button(
-                frame_control_caja,
-                text="🧮 Arqueo de Caja",
-                font=("Helvetica", 12),
-                bg="#607d8b",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.realizar_arqueo_caja
-            )
-            btn_arqueo.grid(row=0, column=1, padx=5, pady=5)
-
-            # NUEVO BOTÓN DE VER ARQUEOS
-            btn_ver_arqueos = tk.Button(
-                frame_control_caja,
-                text="📋 Ver Arqueos",
-                font=("Helvetica", 12),
-                bg="#607d8b",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.ver_arqueos_anteriores
-            )
-            btn_ver_arqueos.grid(row=1, column=1, padx=5, pady=5)
-
-
+            btn_otro_ingreso.grid(row=0, column=1, padx=10, pady=10)
 
             btn_egreso = tk.Button(
-                frame_control_caja,
+                frame_botones_principales,
                 text="➖ Registrar Egreso",
                 font=("Helvetica", 12),
                 bg="#f44336",
@@ -1108,23 +1011,37 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.registrar_egreso
             )
-            btn_egreso.grid(row=1, column=0, padx=5, pady=5)
+            btn_egreso.grid(row=0, column=2, padx=10, pady=10)
 
-            btn_resumen = tk.Button(
-                frame_control_caja,
-                text="📈 Resumen del Día",
+            # Botón de arqueo de caja (asegúrate de que esté visible y con el comando correcto)
+            btn_arqueo = tk.Button(
+                frame_botones_principales,
+                text="🧮 Arqueo de Caja",
                 font=("Helvetica", 12),
-                bg="#607d8b",
+                bg="#9c27b0",
                 fg="white",
                 width=15,
                 height=2,
                 cursor="hand2",
-                command=self.resumen_dia
+                command=self.realizar_arqueo_caja
             )
-            btn_resumen.grid(row=2, column=0, padx=5, pady=5)
+            btn_arqueo.grid(row=1, column=0, padx=10, pady=10)
+
+            btn_resumen_ventas = tk.Button(
+                frame_botones_principales,
+                text="📊 Resumen Ventas",
+                font=("Helvetica", 12),
+                bg="#ff9800",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.ver_resumen_ventas_dia
+            )
+            btn_resumen_ventas.grid(row=1, column=1, padx=10, pady=10)
 
             btn_cerrar = tk.Button(
-                frame_control_caja,
+                frame_botones_principales,
                 text="🔒 Cerrar Caja",
                 font=("Helvetica", 12, "bold"),
                 bg="#795548",
@@ -1134,11 +1051,78 @@ class GestionCaja:
                 cursor="hand2",
                 command=self.cerrar_caja
             )
-            btn_cerrar.grid(row=3, column=0, padx=5, pady=10)
+            btn_cerrar.grid(row=1, column=2, padx=10, pady=20)
+
+            # Frame para operaciones especiales (siempre visible)
+            frame_especial = tk.Frame(self.tab_operaciones, bg="#f5f5f5", padx=20, pady=10)
+            frame_especial.pack(fill=tk.X, pady=10)
+
+            ttk.Separator(self.tab_operaciones, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
+
+            lbl_operaciones = tk.Label(
+                frame_especial,
+                text="Operaciones Especiales",
+                font=("Helvetica", 12, "bold"),
+                bg="#f5f5f5"
+            )
+            lbl_operaciones.pack(anchor=tk.W, pady=5)
+
+            frame_botones_especiales = tk.Frame(frame_especial, bg="#f5f5f5")
+            frame_botones_especiales.pack(fill=tk.X)
+
+            btn_ultimo_corte = tk.Button(
+                frame_botones_especiales,
+                text="Ver Último Corte",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.ver_ultimo_corte
+            )
+            btn_ultimo_corte.grid(row=0, column=0, padx=5, pady=5)
+
+            btn_imprimir = tk.Button(
+                frame_botones_especiales,
+                text="Imprimir Estado",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.imprimir_estado_caja
+            )
+            btn_imprimir.grid(row=0, column=1, padx=5, pady=5)
+
+            # Botón para ver arqueos anteriores
+            btn_ver_arqueos = tk.Button(
+                frame_botones_especiales,
+                text="📋 Ver Arqueos",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.ver_arqueos_anteriores
+            )
+            btn_ver_arqueos.grid(row=0, column=2, padx=5, pady=5)
+
+            # Arqueo rápido
+            btn_arqueo_rapido = tk.Button(
+                frame_botones_especiales,
+                text="🔍 Arqueo Rápido",
+                font=("Helvetica", 11),
+                bg="#3f51b5",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=self.realizar_arqueo_rapido
+            )
+            btn_arqueo_rapido.grid(row=1, column=0, padx=5, pady=5)
 
             # Estado actual rápido
-            frame_estado_rapido = tk.Frame(frame_derecho, bg="#f0f7ff", padx=10, pady=5)
-            frame_estado_rapido.pack(fill=tk.X, pady=10)
+            frame_estado_rapido = tk.Frame(self.tab_operaciones, bg="#f0f7ff", padx=10, pady=5)
+            frame_estado_rapido.pack(fill=tk.X, pady=10, padx=20)
 
             self.lbl_ventas_hoy = tk.Label(
                 frame_estado_rapido,
@@ -1176,25 +1160,656 @@ class GestionCaja:
 
     def ver_arqueos_anteriores(self):
         """Muestra los arqueos realizados previamente para la caja actual"""
-        if not self.id_caja_actual:
-            messagebox.showinfo("Información", "No hay una caja seleccionada")
-            return
-
         try:
+            if not self.id_caja_actual:
+                messagebox.showinfo("Información", "No hay una caja seleccionada")
+                return
+
             # Crear ventana para mostrar arqueos
             ventana_arqueos = tk.Toplevel(self.ventana)
             ventana_arqueos.title("Historial de Arqueos")
-            ventana_arqueos.geometry("700x500")
+            ventana_arqueos.geometry("800x500")
             ventana_arqueos.config(bg="#f5f5f5")
-            ventana_arqueos.grab_set()
+            ventana_arqueos.grab_set()  # Hacer modal
+            utl.centrar_ventana(ventana_arqueos, 800, 500)
 
-            utl.centrar_ventana(ventana_arqueos, 700, 500)
+            # Frame principal
+            frame_principal = tk.Frame(ventana_arqueos, bg="#f5f5f5", padx=20, pady=20)
+            frame_principal.pack(fill=tk.BOTH, expand=True)
 
-            # Código para mostrar la tabla de arqueos
-            # (Ver implementación completa en el código previo)
+            # Título
+            tk.Label(
+                frame_principal,
+                text=f"HISTORIAL DE ARQUEOS - Caja #{self.id_caja_actual}",
+                font=("Helvetica", 14, "bold"),
+                bg="#f5f5f5",
+                fg="#3a7ff6"
+            ).pack(pady=(0, 20))
+
+            # Frame para la tabla
+            frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+
+            # Columnas de la tabla
+            columnas = ('id', 'fecha', 'hora', 'saldo_sistema', 'efectivo', 'diferencia', 'usuario')
+
+            tabla_arqueos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
+            utl.aplicar_estilo_tabla(tabla_arqueos)
+
+            # Configurar encabezados
+            tabla_arqueos.heading('id', text='ID')
+            tabla_arqueos.heading('fecha', text='Fecha')
+            tabla_arqueos.heading('hora', text='Hora')
+            tabla_arqueos.heading('saldo_sistema', text='Saldo Sistema')
+            tabla_arqueos.heading('efectivo', text='Efectivo Contado')
+            tabla_arqueos.heading('diferencia', text='Diferencia')
+            tabla_arqueos.heading('usuario', text='Usuario')
+
+            # Configurar anchos
+            tabla_arqueos.column('id', width=50, anchor=tk.CENTER)
+            tabla_arqueos.column('fecha', width=100, anchor=tk.CENTER)
+            tabla_arqueos.column('hora', width=100, anchor=tk.CENTER)
+            tabla_arqueos.column('saldo_sistema', width=120, anchor=tk.E)
+            tabla_arqueos.column('efectivo', width=120, anchor=tk.E)
+            tabla_arqueos.column('diferencia', width=100, anchor=tk.E)
+            tabla_arqueos.column('usuario', width=150)
+
+            # Scrollbar para la tabla
+            scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_arqueos.yview)
+            tabla_arqueos.configure(yscrollcommand=scrollbar.set)
+
+            # Empaquetar tabla y scrollbar
+            tabla_arqueos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            # Definimos las funciones auxiliares
+            def mostrar_detalle_arqueo(id_arqueo):
+                try:
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+
+                    cursor.execute("""
+                        SELECT a.id_arqueo, a.fecha, a.hora, a.saldo_sistema, 
+                               a.efectivo_contado, a.diferencia, a.observaciones, u.nombre
+                        FROM arqueos_caja a
+                        JOIN usuarios u ON a.id_usuario = u.id_usuario
+                        WHERE a.id_arqueo = %s
+                    """, (id_arqueo,))
+
+                    arqueo = cursor.fetchone()
+                    conexion.close()
+
+                    if arqueo:
+                        id_a, fecha, hora, saldo, efectivo, diferencia, observaciones, usuario = arqueo
+
+                        # Crear ventana de detalles
+                        ventana_detalle = tk.Toplevel(ventana_arqueos)
+                        ventana_detalle.title(f"Detalle de Arqueo #{id_a}")
+                        ventana_detalle.geometry("500x400")
+                        ventana_detalle.config(bg="#f5f5f5")
+                        ventana_detalle.grab_set()
+                        utl.centrar_ventana(ventana_detalle, 500, 400)
+
+                        # Frame principal
+                        frame_det = tk.Frame(ventana_detalle, bg="#f5f5f5", padx=20, pady=20)
+                        frame_det.pack(fill=tk.BOTH, expand=True)
+
+                        # Título
+                        tk.Label(
+                            frame_det,
+                            text=f"DETALLE DE ARQUEO #{id_a}",
+                            font=("Helvetica", 14, "bold"),
+                            bg="#f5f5f5",
+                            fg="#3a7ff6"
+                        ).pack(pady=(0, 20))
+
+                        # Información del arqueo en formato de tabla
+                        info_frame = tk.Frame(frame_det, bg="#f0f7ff", padx=15, pady=15, relief=tk.GROOVE, bd=1)
+                        info_frame.pack(fill=tk.BOTH, expand=True)
+
+                        # Fecha y hora formateadas
+                        fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                        hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
+
+                        # Datos
+                        datos = [
+                            ("ID:", str(id_a)),
+                            ("Fecha:", fecha_str),
+                            ("Hora:", hora_str),
+                            ("Realizado por:", usuario),
+                            ("Saldo en Sistema:", f"${float(saldo):.2f}"),
+                            ("Efectivo Contado:", f"${float(efectivo):.2f}")
+                        ]
+
+                        # Diferencia con color
+                        if diferencia > 0:
+                            dif_str = f"Sobrante: ${diferencia:.2f}"
+                            color_dif = "#388e3c"  # Verde
+                        elif diferencia < 0:
+                            dif_str = f"Faltante: ${abs(diferencia):.2f}"
+                            color_dif = "#d32f2f"  # Rojo
+                        else:
+                            dif_str = "Sin diferencia"
+                            color_dif = "#000000"  # Negro
+
+                        for i, (etiqueta, valor) in enumerate(datos):
+                            tk.Label(
+                                info_frame,
+                                text=etiqueta,
+                                font=("Helvetica", 11, "bold"),
+                                bg="#f0f7ff",
+                                anchor=tk.W
+                            ).grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+
+                            tk.Label(
+                                info_frame,
+                                text=valor,
+                                font=("Helvetica", 11),
+                                bg="#f0f7ff",
+                                anchor=tk.W
+                            ).grid(row=i, column=1, sticky=tk.W, padx=5, pady=5)
+
+                        # Diferencia con color especial
+                        tk.Label(
+                            info_frame,
+                            text="Diferencia:",
+                            font=("Helvetica", 11, "bold"),
+                            bg="#f0f7ff",
+                            anchor=tk.W
+                        ).grid(row=len(datos), column=0, sticky=tk.W, padx=5, pady=5)
+
+                        tk.Label(
+                            info_frame,
+                            text=dif_str,
+                            font=("Helvetica", 11, "bold"),
+                            bg="#f0f7ff",
+                            fg=color_dif,
+                            anchor=tk.W
+                        ).grid(row=len(datos), column=1, sticky=tk.W, padx=5, pady=5)
+
+                        # Observaciones
+                        if observaciones:
+                            tk.Label(
+                                frame_det,
+                                text="Observaciones:",
+                                font=("Helvetica", 11, "bold"),
+                                bg="#f5f5f5",
+                                anchor=tk.W
+                            ).pack(anchor=tk.W, pady=(20, 5))
+
+                            txt_obs = tk.Text(frame_det, height=4, width=50, font=("Helvetica", 11))
+                            txt_obs.pack(fill=tk.X, pady=(0, 10))
+                            txt_obs.insert("1.0", observaciones)
+                            txt_obs.config(state=tk.DISABLED)  # Solo lectura
+
+                        # Botones
+                        frame_bot = tk.Frame(frame_det, bg="#f5f5f5")
+                        frame_bot.pack(pady=15)
+
+                        btn_imprimir = tk.Button(
+                            frame_bot,
+                            text="Imprimir",
+                            font=("Helvetica", 11),
+                            bg="#3a7ff6",
+                            fg="white",
+                            width=10,
+                            cursor="hand2",
+                            command=lambda: imprimir_arqueo_existente(id_a)
+                        )
+                        btn_imprimir.pack(side=tk.LEFT, padx=10)
+
+                        btn_cerrar = tk.Button(
+                            frame_bot,
+                            text="Cerrar",
+                            font=("Helvetica", 11),
+                            bg="#e53935",
+                            fg="white",
+                            width=10,
+                            cursor="hand2",
+                            command=ventana_detalle.destroy
+                        )
+                        btn_cerrar.pack(side=tk.LEFT, padx=10)
+
+                    else:
+                        messagebox.showinfo("Información", "No se encontró el arqueo solicitado")
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo mostrar el detalle del arqueo: {str(e)}")
+
+            def imprimir_arqueo_existente(id_arqueo):
+                try:
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+
+                    cursor.execute("""
+                        SELECT a.id_arqueo, a.fecha, a.hora, a.saldo_sistema, 
+                               a.efectivo_contado, a.diferencia, a.observaciones, u.nombre
+                        FROM arqueos_caja a
+                        JOIN usuarios u ON a.id_usuario = u.id_usuario
+                        WHERE a.id_arqueo = %s
+                    """, (id_arqueo,))
+
+                    arqueo = cursor.fetchone()
+                    conexion.close()
+
+                    if arqueo:
+                        id_a, fecha, hora, saldo, efectivo, diferencia, observaciones, usuario = arqueo
+
+                        # Crear ticket
+                        ticket = Ticket()
+
+                        # Encabezado
+                        ticket.agregar_encabezado()
+                        ticket.agregar_titulo("ARQUEO DE CAJA")
+                        ticket.agregar_texto(f"Arqueo #: {id_a}")
+
+                        # Fecha y hora formateadas
+                        fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                        hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
+
+                        ticket.agregar_texto(f"Fecha: {fecha_str}")
+                        ticket.agregar_texto(f"Hora: {hora_str}")
+                        ticket.agregar_texto(f"Realizado por: {usuario}")
+                        ticket.agregar_linea()
+
+                        # Detalles del arqueo
+                        ticket.agregar_texto(f"Saldo en Sistema: ${float(saldo):.2f}")
+                        ticket.agregar_texto(f"Efectivo Contado: ${float(efectivo):.2f}")
+
+                        # Diferencia
+                        if diferencia > 0:
+                            ticket.agregar_texto(f"Sobrante: ${diferencia:.2f}")
+                        elif diferencia < 0:
+                            ticket.agregar_texto(f"Faltante: ${abs(diferencia):.2f}")
+                        else:
+                            ticket.agregar_texto("Sin diferencia")
+
+                        ticket.agregar_linea()
+
+                        # Observaciones
+                        if observaciones:
+                            ticket.agregar_texto("OBSERVACIONES:")
+                            ticket.agregar_texto(observaciones)
+                            ticket.agregar_linea()
+
+                        # Firmas
+                        ticket.agregar_espacio()
+                        ticket.agregar_texto_centrado("___________________")
+                        ticket.agregar_texto_centrado("Firma del Cajero")
+                        ticket.agregar_espacio()
+                        ticket.agregar_texto_centrado("___________________")
+                        ticket.agregar_texto_centrado("Supervisor")
+
+                        # Generar nombre del archivo
+                        nombre_archivo = f"arqueo_caja_{id_a}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+                        # Generar PDF
+                        ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+                        # Mostrar vista previa
+                        ticket.mostrar_vista_previa(ruta_pdf)
+
+                    else:
+                        messagebox.showinfo("Información", "No se encontró el arqueo solicitado")
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
+
+            def ver_detalle_arqueo():
+                seleccion = tabla_arqueos.selection()
+                if not seleccion:
+                    messagebox.showinfo("Información", "Seleccione un arqueo para ver detalles")
+                    return
+
+                item = tabla_arqueos.item(seleccion[0])
+                id_arqueo = item['values'][0]
+                mostrar_detalle_arqueo(id_arqueo)
+
+            def imprimir_arqueo_seleccionado():
+                seleccion = tabla_arqueos.selection()
+                if not seleccion:
+                    messagebox.showinfo("Información", "Seleccione un arqueo para imprimir")
+                    return
+
+                item = tabla_arqueos.item(seleccion[0])
+                id_arqueo = item['values'][0]
+                imprimir_arqueo_existente(id_arqueo)
+
+            # Cargar arqueos
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT a.id_arqueo, a.fecha, a.hora, a.saldo_sistema, 
+                       a.efectivo_contado, a.diferencia, u.nombre
+                FROM arqueos_caja a
+                JOIN usuarios u ON a.id_usuario = u.id_usuario
+                WHERE a.id_caja = %s
+                ORDER BY a.fecha DESC, a.hora DESC
+            """, (self.id_caja_actual,))
+
+            arqueos = cursor.fetchall()
+            conexion.close()
+
+            if arqueos:
+                for arqueo in arqueos:
+                    id_arqueo, fecha, hora, saldo, efectivo, diferencia, usuario = arqueo
+
+                    # Formatear fecha y hora
+                    fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                    hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
+
+                    # Formatear valores monetarios
+                    saldo_str = f"${float(saldo):.2f}"
+                    efectivo_str = f"${float(efectivo):.2f}"
+
+                    # Formatear diferencia con color
+                    if diferencia > 0:
+                        dif_str = f"Sobrante: ${diferencia:.2f}"
+                        tag = 'sobrante'
+                    elif diferencia < 0:
+                        dif_str = f"Faltante: ${abs(diferencia):.2f}"
+                        tag = 'faltante'
+                    else:
+                        dif_str = "Sin diferencia"
+                        tag = 'equilibrado'
+
+                    item = tabla_arqueos.insert('', tk.END, values=(
+                        id_arqueo, fecha_str, hora_str, saldo_str, efectivo_str, dif_str, usuario
+                    ), tags=(tag,))
+
+                # Configurar colores de tags
+                tabla_arqueos.tag_configure('sobrante', background='#e8f5e9')
+                tabla_arqueos.tag_configure('faltante', background='#ffebee')
+                tabla_arqueos.tag_configure('equilibrado', background='#e3f2fd')
+            else:
+                # Mensaje si no hay arqueos
+                tk.Label(
+                    frame_principal,
+                    text="No hay arqueos registrados para esta caja",
+                    font=("Helvetica", 12),
+                    bg="#f5f5f5",
+                    fg="#666"
+                ).pack(pady=50)
+
+            # Frame para botones
+            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_botones.pack(pady=15)
+
+            # Botones
+            btn_detalle = tk.Button(
+                frame_botones,
+                text="Ver Detalle",
+                font=("Helvetica", 11),
+                bg="#3a7ff6",
+                fg="white",
+                width=12,
+                cursor="hand2",
+                command=ver_detalle_arqueo
+            )
+            btn_detalle.pack(side=tk.LEFT, padx=10)
+
+            btn_imprimir = tk.Button(
+                frame_botones,
+                text="Imprimir",
+                font=("Helvetica", 11),
+                bg="#4caf50",
+                fg="white",
+                width=12,
+                cursor="hand2",
+                command=imprimir_arqueo_seleccionado
+            )
+            btn_imprimir.pack(side=tk.LEFT, padx=10)
+
+            btn_exportar = tk.Button(
+                frame_botones,
+                text="Exportar PDF",
+                font=("Helvetica", 11),
+                bg="#ff9800",
+                fg="white",
+                width=12,
+                cursor="hand2",
+                command=self.exportar_arqueos_pdf
+            )
+            btn_exportar.pack(side=tk.LEFT, padx=10)
+
+            btn_cerrar = tk.Button(
+                frame_botones,
+                text="Cerrar",
+                font=("Helvetica", 11),
+                bg="#e53935",
+                fg="white",
+                width=10,
+                cursor="hand2",
+                command=ventana_arqueos.destroy
+            )
+            btn_cerrar.pack(side=tk.LEFT, padx=10)
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar el historial de arqueos: {str(e)}")
+
+    def exportar_arqueos_pdf(self):
+        """Exporta todos los arqueos de la caja actual a un PDF"""
+        try:
+            if not self.id_caja_actual:
+                messagebox.showinfo("Información", "No hay una caja seleccionada")
+                return
+
+            # Obtener información de la caja
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT c.fecha, c.hora_apertura, c.hora_cierre, 
+                       u.nombre as responsable
+                FROM caja c
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.id_caja = %s
+            """, (self.id_caja_actual,))
+
+            caja = cursor.fetchone()
+
+            # Obtener todos los arqueos de la caja
+            cursor.execute("""
+                SELECT a.id_arqueo, a.fecha, a.hora, a.saldo_sistema, 
+                       a.efectivo_contado, a.diferencia, a.observaciones, u.nombre
+                FROM arqueos_caja a
+                JOIN usuarios u ON a.id_usuario = u.id_usuario
+                WHERE a.id_caja = %s
+                ORDER BY a.fecha, a.hora
+            """, (self.id_caja_actual,))
+
+            arqueos = cursor.fetchall()
+            conexion.close()
+
+            if not arqueos:
+                messagebox.showinfo("Información", "No hay arqueos para exportar")
+                return
+
+            # Crear ticket para PDF
+            ticket = Ticket()
+
+            # Encabezado
+            ticket.agregar_encabezado()
+            ticket.agregar_titulo("REPORTE DE ARQUEOS DE CAJA")
+
+            if caja:
+                fecha, hora_ap, hora_ci, resp = caja
+
+                # Formatear fecha y horas
+                fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                hora_ap_str = hora_ap.strftime("%H:%M:%S") if hora_ap and hasattr(hora_ap, 'strftime') else "N/A"
+
+                if hora_ci:
+                    hora_ci_str = hora_ci.strftime("%H:%M:%S") if hasattr(hora_ci, 'strftime') else str(hora_ci)
+                    estado = "CERRADA"
+                else:
+                    hora_ci_str = "No cerrada"
+                    estado = "ABIERTA"
+
+                ticket.agregar_texto(f"Caja #: {self.id_caja_actual} - Estado: {estado}")
+                ticket.agregar_texto(f"Fecha: {fecha_str}")
+                ticket.agregar_texto(f"Apertura: {hora_ap_str} - Cierre: {hora_ci_str}")
+                ticket.agregar_texto(f"Responsable: {resp}")
+            else:
+                ticket.agregar_texto(f"Caja #: {self.id_caja_actual}")
+
+            ticket.agregar_linea()
+
+            # Tabla de arqueos
+            ticket.agregar_texto_centrado("ARQUEOS REALIZADOS")
+            ticket.agregar_texto("")
+
+            # Encabezados de tabla
+            ticket.agregar_texto("ID  FECHA       HORA     SALDO        EFECTIVO     DIFERENCIA    USUARIO")
+            ticket.agregar_linea()
+
+            # Datos de arqueos
+            for arqueo in arqueos:
+                id_a, fecha, hora, saldo, efectivo, diferencia, obs, usuario = arqueo
+
+                # Formatear fecha y hora
+                fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                hora_str = hora.strftime("%H:%M") if hasattr(hora, 'strftime') else str(hora)
+
+                # Formatear valores monetarios
+                saldo_str = f"${float(saldo):.2f}".ljust(12)
+                efectivo_str = f"${float(efectivo):.2f}".ljust(12)
+
+                # Formatear diferencia
+                if diferencia > 0:
+                    dif_str = f"${diferencia:.2f} (S)".ljust(13)  # Sobrante
+                elif diferencia < 0:
+                    dif_str = f"${abs(diferencia):.2f} (F)".ljust(13)  # Faltante
+                else:
+                    dif_str = "$0.00".ljust(13)
+
+                # Limitar longitud del nombre de usuario
+                if len(usuario) > 12:
+                    usuario = usuario[:10] + "..."
+
+                # Agregar línea a la tabla
+                linea = f"{str(id_a).ljust(4)}{fecha_str.ljust(11)}{hora_str.ljust(8)}{saldo_str}{efectivo_str}{dif_str}{usuario}"
+                ticket.agregar_texto(linea)
+
+                # Si hay observaciones, agregarlas con sangría
+                if obs and len(obs.strip()) > 0:
+                    ticket.agregar_texto(f"  Obs: {obs[:50]}")
+                    if len(obs) > 50:
+                        ticket.agregar_texto(f"       {obs[50:100]}")
+
+            ticket.agregar_linea()
+
+            # Resumen
+            total_arqueos = len(arqueos)
+            total_diferencias = sum(a[5] for a in arqueos)
+
+            ticket.agregar_texto(f"Total de arqueos: {total_arqueos}")
+
+            if total_diferencias > 0:
+                ticket.agregar_texto(f"Diferencia acumulada: Sobrante ${total_diferencias:.2f}")
+            elif total_diferencias < 0:
+                ticket.agregar_texto(f"Diferencia acumulada: Faltante ${abs(total_diferencias):.2f}")
+            else:
+                ticket.agregar_texto("Diferencia acumulada: $0.00")
+
+            # Pie del reporte
+            ticket.agregar_espacio()
+            ticket.agregar_texto(f"Reporte generado el: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+
+            # Generar nombre del archivo
+            nombre_archivo = f"reporte_arqueos_caja_{self.id_caja_actual}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+            # Generar PDF
+            ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+            # Mostrar vista previa
+            ticket.mostrar_vista_previa(ruta_pdf)
+
+            messagebox.showinfo("PDF Generado", "El reporte de arqueos ha sido generado correctamente")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el reporte de arqueos: {str(e)}")
+
+    def imprimir_arqueo_existente(self, id_arqueo):
+        """Imprime un arqueo existente en formato de ticket"""
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT a.id_arqueo, a.fecha, a.hora, a.saldo_sistema, 
+                       a.efectivo_contado, a.diferencia, a.observaciones, u.nombre
+                FROM arqueos_caja a
+                JOIN usuarios u ON a.id_usuario = u.id_usuario
+                WHERE a.id_arqueo = %s
+            """, (id_arqueo,))
+
+            arqueo = cursor.fetchone()
+            conexion.close()
+
+            if arqueo:
+                id_a, fecha, hora, saldo, efectivo, diferencia, observaciones, usuario = arqueo
+
+                # Crear ticket
+                ticket = Ticket()
+
+                # Encabezado
+                ticket.agregar_encabezado()
+                ticket.agregar_titulo("ARQUEO DE CAJA")
+                ticket.agregar_texto(f"Arqueo #: {id_a}")
+
+                # Fecha y hora formateadas
+                fecha_str = fecha.strftime("%d/%m/%Y") if hasattr(fecha, 'strftime') else str(fecha)
+                hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
+
+                ticket.agregar_texto(f"Fecha: {fecha_str}")
+                ticket.agregar_texto(f"Hora: {hora_str}")
+                ticket.agregar_texto(f"Realizado por: {usuario}")
+                ticket.agregar_linea()
+
+                # Detalles del arqueo
+                ticket.agregar_texto(f"Saldo en Sistema: ${float(saldo):.2f}")
+                ticket.agregar_texto(f"Efectivo Contado: ${float(efectivo):.2f}")
+
+                # Diferencia
+                if diferencia > 0:
+                    ticket.agregar_texto(f"Sobrante: ${diferencia:.2f}")
+                elif diferencia < 0:
+                    ticket.agregar_texto(f"Faltante: ${abs(diferencia):.2f}")
+                else:
+                    ticket.agregar_texto("Sin diferencia")
+
+                ticket.agregar_linea()
+
+                # Observaciones
+                if observaciones:
+                    ticket.agregar_texto("OBSERVACIONES:")
+                    ticket.agregar_texto(observaciones)
+                    ticket.agregar_linea()
+
+                # Firmas
+                ticket.agregar_espacio()
+                ticket.agregar_texto_centrado("___________________")
+                ticket.agregar_texto_centrado("Firma del Cajero")
+                ticket.agregar_espacio()
+                ticket.agregar_texto_centrado("___________________")
+                ticket.agregar_texto_centrado("Supervisor")
+
+                # Generar nombre del archivo
+                nombre_archivo = f"arqueo_caja_{id_a}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+                # Generar PDF
+                ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+                # Mostrar vista previa
+                ticket.mostrar_vista_previa(ruta_pdf)
+
+            else:
+                messagebox.showinfo("Información", "No se encontró el arqueo solicitado")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
 
     def seguimiento_pedidos(self):
         """Abre el seguimiento de pedidos"""
@@ -2031,138 +2646,6 @@ class GestionCaja:
 
             messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
 
-    def configurar_tab_operaciones(self):
-        """Configura la pestaña de operaciones de caja"""
-        # Limpiar la pestaña
-        for widget in self.tab_operaciones.winfo_children():
-            widget.destroy()
-
-        # Frame para botones principales
-        frame_botones_principales = tk.Frame(self.tab_operaciones, bg="#f5f5f5")
-        frame_botones_principales.pack(pady=20)
-
-        if not self.caja_abierta:
-            # Si la caja está cerrada, mostrar solo botón de apertura
-            # En configurar_tab_operaciones()
-            btn_abrir = tk.Button(
-                frame_botones_principales,
-                text="Abrir Caja",
-                font=("Helvetica", 12, "bold"),
-                bg="#4caf50",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.abrir_caja  # NO debe tener paréntesis ni argumentos
-            )
-            btn_abrir.pack(padx=20, pady=10)
-        else:
-            # Si la caja está abierta, mostrar todos los botones
-            btn_nueva_venta = tk.Button(
-                frame_botones_principales,
-                text="💰 Nueva Venta",
-                font=("Helvetica", 12),
-                bg="#4caf50",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.registrar_ingreso
-            )
-            btn_nueva_venta.grid(row=0, column=0, padx=10, pady=10)
-
-            btn_otro_ingreso = tk.Button(
-                frame_botones_principales,
-                text="➕ Otro Ingreso",
-                font=("Helvetica", 12),
-                bg="#2196f3",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.otro_ingreso
-            )
-            btn_otro_ingreso.grid(row=0, column=1, padx=10, pady=10)
-
-            btn_egreso = tk.Button(
-                frame_botones_principales,
-                text="➖ Registrar Egreso",
-                font=("Helvetica", 12),
-                bg="#f44336",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.registrar_egreso
-            )
-            btn_egreso.grid(row=0, column=2, padx=10, pady=10)
-
-            btn_resumen_ventas = tk.Button(
-                frame_botones_principales,
-                text="📊 Resumen Ventas",
-                font=("Helvetica", 12),
-                bg="#9c27b0",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.ver_resumen_ventas_dia
-            )
-            btn_resumen_ventas.grid(row=1, column=0, padx=10, pady=10)
-
-            btn_cerrar = tk.Button(
-                frame_botones_principales,
-                text="🔒 Cerrar Caja",
-                font=("Helvetica", 12, "bold"),
-                bg="#795548",
-                fg="white",
-                width=15,
-                height=2,
-                cursor="hand2",
-                command=self.cerrar_caja
-            )
-            btn_cerrar.grid(row=1, column=1, columnspan=2, padx=10, pady=20)
-
-            # Frame para operaciones especiales (siempre visible)
-            frame_especial = tk.Frame(self.tab_operaciones, bg="#f5f5f5", padx=20, pady=10)
-            frame_especial.pack(fill=tk.X, pady=10)
-
-            ttk.Separator(self.tab_operaciones, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20)
-
-            lbl_operaciones = tk.Label(
-                frame_especial,
-                text="Operaciones Especiales",
-                font=("Helvetica", 12, "bold"),
-                bg="#f5f5f5"
-            )
-            lbl_operaciones.pack(anchor=tk.W, pady=5)
-
-            frame_botones_especiales = tk.Frame(frame_especial, bg="#f5f5f5")
-            frame_botones_especiales.pack(fill=tk.X)
-
-            btn_ultimo_corte = tk.Button(
-                frame_botones_especiales,
-                text="Ver Último Corte",
-                font=("Helvetica", 11),
-                bg="#3f51b5",
-                fg="white",
-                width=15,
-                cursor="hand2",
-                command=self.ver_ultimo_corte
-            )
-            btn_ultimo_corte.grid(row=0, column=0, padx=5, pady=5)
-
-            btn_imprimir = tk.Button(
-                frame_botones_especiales,
-                text="Imprimir Estado",
-                font=("Helvetica", 11),
-                bg="#3f51b5",
-                fg="white",
-                width=15,
-                cursor="hand2",
-                command=self.imprimir_estado_caja
-            )
-            btn_imprimir.grid(row=0, column=1, padx=5, pady=5)
 
     def registrar_egreso(self):
         """Registra un egreso en la caja actual"""
@@ -2952,6 +3435,397 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
             print(f"Error al registrar ingreso: {e}")
 
+    def realizar_arqueo_caja(self):
+        """Realiza un arqueo de caja para contabilizar el efectivo y verificar contra el sistema"""
+        try:
+            if not self.caja_abierta:
+                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                return
+
+            # Crear ventana para arqueo
+            ventana_arqueo = tk.Toplevel(self.ventana)
+            ventana_arqueo.title("Arqueo de Caja")
+            ventana_arqueo.geometry("650x550")
+            ventana_arqueo.config(bg="#f5f5f5")
+            ventana_arqueo.grab_set()  # Hacer modal
+
+            # Centrar ventana
+            utl.centrar_ventana(ventana_arqueo, 650, 550)
+
+            # Frame principal
+            frame_principal = tk.Frame(ventana_arqueo, bg="#f5f5f5", padx=20, pady=20)
+            frame_principal.pack(fill=tk.BOTH, expand=True)
+
+            # Título
+            tk.Label(
+                frame_principal,
+                text="ARQUEO DE CAJA",
+                font=("Helvetica", 16, "bold"),
+                bg="#f5f5f5",
+                fg="#3a7ff6"
+            ).pack(pady=(0, 20))
+
+            # Obtener saldo actual según sistema
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT total_ingresos, total_egresos, saldo_final
+                FROM caja WHERE id_caja = %s
+            """, (self.id_caja_actual,))
+
+            caja_info = cursor.fetchone()
+
+            if not caja_info:
+                messagebox.showerror("Error", "No se pudo obtener información de la caja actual")
+                ventana_arqueo.destroy()
+                return
+
+            ingresos, egresos, saldo_sistema = caja_info
+            conexion.close()
+
+            # Frame para información del sistema
+            frame_sistema = tk.Frame(frame_principal, bg="#e8f5e9", padx=15, pady=15, relief=tk.GROOVE, bd=1)
+            frame_sistema.pack(fill=tk.X, pady=10)
+
+            tk.Label(
+                frame_sistema,
+                text="SEGÚN SISTEMA",
+                font=("Helvetica", 12, "bold"),
+                bg="#e8f5e9"
+            ).pack(anchor=tk.W)
+
+            tk.Label(
+                frame_sistema,
+                text=f"Total Ingresos: ${ingresos:.2f}",
+                font=("Helvetica", 11),
+                bg="#e8f5e9"
+            ).pack(anchor=tk.W, pady=2)
+
+            tk.Label(
+                frame_sistema,
+                text=f"Total Egresos: ${egresos:.2f}",
+                font=("Helvetica", 11),
+                bg="#e8f5e9"
+            ).pack(anchor=tk.W, pady=2)
+
+            tk.Label(
+                frame_sistema,
+                text=f"Saldo en Sistema: ${saldo_sistema:.2f}",
+                font=("Helvetica", 12, "bold"),
+                bg="#e8f5e9"
+            ).pack(anchor=tk.W, pady=2)
+
+            # Frame para conteo de efectivo
+            frame_conteo = tk.Frame(frame_principal, bg="#f5f5f5", pady=10)
+            frame_conteo.pack(fill=tk.X, pady=10)
+
+            tk.Label(
+                frame_conteo,
+                text="CONTEO DE EFECTIVO",
+                font=("Helvetica", 12, "bold"),
+                bg="#f5f5f5"
+            ).pack(anchor=tk.W, pady=(0, 10))
+
+            # Crear campos para denomincaciones de billetes y monedas
+            denominaciones = [
+                ("Billetes $500:", 500),
+                ("Billetes $200:", 200),
+                ("Billetes $100:", 100),
+                ("Billetes $50:", 50),
+                ("Billetes $20:", 20),
+                ("Monedas $10:", 10),
+                ("Monedas $5:", 5),
+                ("Monedas $2:", 2),
+                ("Monedas $1:", 1),
+                ("Monedas $0.50:", 0.5),
+                ("Monedas $0.20:", 0.2),
+                ("Monedas $0.10:", 0.1)
+            ]
+
+            # Frame para grid de denominaciones
+            frame_grid = tk.Frame(frame_conteo, bg="#f5f5f5")
+            frame_grid.pack(fill=tk.X, pady=5)
+
+            # Variables para cantidad por denominación
+            cantidades = {}
+            subtotales = {}
+
+            # Función para calcular subtotal cuando cambia la cantidad
+            def calcular_subtotal(denominacion, indice):
+                try:
+                    cantidad = int(cantidades[denominacion].get()) if cantidades[denominacion].get() else 0
+                    valor = denominaciones[indice][1]
+                    subtotal = cantidad * valor
+                    subtotales[denominacion].set(f"${subtotal:.2f}")
+                    calcular_total()
+                except ValueError:
+                    subtotales[denominacion].set("$0.00")
+                    calcular_total()
+
+            # Función para calcular el total
+            def calcular_total():
+                total = 0.0
+                for i, (etiqueta, valor) in enumerate(denominaciones):
+                    clave = f"denom_{i}"
+                    try:
+                        cantidad = int(cantidades[clave].get()) if cantidades[clave].get() else 0
+                        total += cantidad * valor
+                    except ValueError:
+                        pass
+
+                var_total.set(f"${total:.2f}")
+
+                # Calcular diferencia
+                try:
+                    total_efectivo = float(var_total.get().replace('$', ''))
+                    diferencia = total_efectivo - saldo_sistema
+                    if diferencia > 0:
+                        var_diferencia.set(f"Sobrante: ${diferencia:.2f}")
+                        lbl_diferencia.config(fg="#388e3c")
+                    elif diferencia < 0:
+                        var_diferencia.set(f"Faltante: ${abs(diferencia):.2f}")
+                        lbl_diferencia.config(fg="#d32f2f")
+                    else:
+                        var_diferencia.set("Sin diferencia")
+                        lbl_diferencia.config(fg="#000000")
+                except:
+                    var_diferencia.set("Error en cálculo")
+
+            # Crear campos en grid (3 columnas x n filas)
+            for i, (etiqueta, valor) in enumerate(denominaciones):
+                fila = i // 2
+                columna = (i % 2) * 3
+
+                # Etiqueta
+                tk.Label(
+                    frame_grid,
+                    text=etiqueta,
+                    font=("Helvetica", 11),
+                    width=12,
+                    anchor=tk.W,
+                    bg="#f5f5f5"
+                ).grid(row=fila, column=columna, padx=5, pady=5, sticky=tk.W)
+
+                # Campo de entrada para cantidad
+                clave = f"denom_{i}"
+                cantidades[clave] = tk.StringVar(value="0")
+                entry = tk.Entry(
+                    frame_grid,
+                    textvariable=cantidades[clave],
+                    font=("Helvetica", 11),
+                    width=5
+                )
+                entry.grid(row=fila, column=columna + 1, padx=5, pady=5)
+
+                # Función lambda con argumentos fijos para esta denominación
+                entry.bind("<KeyRelease>", lambda event, d=clave, idx=i: calcular_subtotal(d, idx))
+
+                # Subtotal
+                subtotales[clave] = tk.StringVar(value="$0.00")
+                tk.Label(
+                    frame_grid,
+                    textvariable=subtotales[clave],
+                    font=("Helvetica", 11),
+                    width=10,
+                    bg="#f5f5f5"
+                ).grid(row=fila, column=columna + 2, padx=5, pady=5, sticky=tk.E)
+
+            # Frame para total
+            frame_total = tk.Frame(frame_principal, bg="#e3f2fd", padx=15, pady=15, relief=tk.GROOVE, bd=1)
+            frame_total.pack(fill=tk.X, pady=(20, 10))
+
+            var_total = tk.StringVar(value="$0.00")
+
+            tk.Label(
+                frame_total,
+                text="TOTAL EFECTIVO CONTADO:",
+                font=("Helvetica", 12, "bold"),
+                bg="#e3f2fd"
+            ).pack(side=tk.LEFT, padx=5)
+
+            tk.Label(
+                frame_total,
+                textvariable=var_total,
+                font=("Helvetica", 14, "bold"),
+                bg="#e3f2fd",
+                fg="#3a7ff6"
+            ).pack(side=tk.LEFT, padx=10)
+
+            # Diferencia
+            var_diferencia = tk.StringVar(value="---")
+
+            tk.Label(
+                frame_total,
+                text="Diferencia:",
+                font=("Helvetica", 11),
+                bg="#e3f2fd"
+            ).pack(side=tk.LEFT, padx=(20, 5))
+
+            lbl_diferencia = tk.Label(
+                frame_total,
+                textvariable=var_diferencia,
+                font=("Helvetica", 11, "bold"),
+                bg="#e3f2fd"
+            )
+            lbl_diferencia.pack(side=tk.LEFT)
+
+            # Observaciones
+            tk.Label(
+                frame_principal,
+                text="Observaciones:",
+                font=("Helvetica", 11),
+                bg="#f5f5f5"
+            ).pack(anchor=tk.W, pady=(15, 5))
+
+            txt_observaciones = tk.Text(frame_principal, height=3, width=50, font=("Helvetica", 11))
+            txt_observaciones.pack(fill=tk.X, pady=(0, 15))
+
+            # Botones
+            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_botones.pack(pady=10)
+
+            def guardar_arqueo():
+                try:
+                    total_efectivo = float(var_total.get().replace('$', ''))
+                    diferencia = total_efectivo - saldo_sistema
+                    observaciones = txt_observaciones.get("1.0", "end-1c").strip()
+
+                    # Guardar en la base de datos
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+
+                    cursor.execute("""
+                        INSERT INTO arqueos_caja 
+                        (id_caja, fecha, hora, saldo_sistema, efectivo_contado, diferencia, observaciones, id_usuario)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        self.id_caja_actual,
+                        date.today().strftime("%Y-%m-%d"),
+                        datetime.now().strftime("%H:%M:%S"),
+                        saldo_sistema,
+                        total_efectivo,
+                        diferencia,
+                        observaciones,
+                        self.id_usuario
+                    ))
+
+                    conexion.commit()
+
+                    # Obtener el ID del arqueo para imprimirlo
+                    arqueo_id = cursor.lastrowid
+                    conexion.close()
+
+                    messagebox.showinfo("Éxito", "Arqueo de caja guardado correctamente")
+
+                    # Preguntar si desea imprimir
+                    if messagebox.askyesno("Imprimir", "¿Desea imprimir el arqueo de caja?"):
+                        imprimir_arqueo(arqueo_id)
+
+                    ventana_arqueo.destroy()
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo guardar el arqueo: {str(e)}")
+
+            def imprimir_arqueo(id_arqueo):
+                try:
+                    # Crear ticket
+                    ticket = Ticket()
+
+                    # Encabezado
+                    ticket.agregar_encabezado()
+                    ticket.agregar_titulo("ARQUEO DE CAJA")
+                    ticket.agregar_texto(f"Fecha: {date.today().strftime('%d/%m/%Y')}")
+                    ticket.agregar_texto(f"Hora: {datetime.now().strftime('%H:%M:%S')}")
+                    ticket.agregar_linea()
+
+                    # Información del sistema
+                    ticket.agregar_texto_centrado("SEGÚN SISTEMA")
+                    ticket.agregar_texto(f"Total Ingresos: ${ingresos:.2f}")
+                    ticket.agregar_texto(f"Total Egresos: ${egresos:.2f}")
+                    ticket.agregar_texto(f"Saldo en Sistema: ${saldo_sistema:.2f}")
+                    ticket.agregar_linea()
+
+                    # Conteo de efectivo
+                    ticket.agregar_texto_centrado("CONTEO DE EFECTIVO")
+
+                    for i, (etiqueta, valor) in enumerate(denominaciones):
+                        clave = f"denom_{i}"
+                        cantidad = int(cantidades[clave].get() or 0)
+                        if cantidad > 0:
+                            subtotal = cantidad * valor
+                            ticket.agregar_texto(f"{etiqueta} {cantidad} = ${subtotal:.2f}")
+
+                    ticket.agregar_linea()
+
+                    # Total y diferencia
+                    total_efectivo = float(var_total.get().replace('$', ''))
+                    diferencia = total_efectivo - saldo_sistema
+
+                    ticket.agregar_texto(f"Total Efectivo: ${total_efectivo:.2f}")
+
+                    if diferencia > 0:
+                        ticket.agregar_texto(f"Sobrante: ${diferencia:.2f}")
+                    elif diferencia < 0:
+                        ticket.agregar_texto(f"Faltante: ${abs(diferencia):.2f}")
+                    else:
+                        ticket.agregar_texto("Sin diferencia")
+
+                    ticket.agregar_linea()
+
+                    # Observaciones
+                    observaciones = txt_observaciones.get("1.0", "end-1c").strip()
+                    if observaciones:
+                        ticket.agregar_texto("Observaciones:")
+                        ticket.agregar_texto(observaciones)
+                        ticket.agregar_linea()
+
+                    # Firmas
+                    ticket.agregar_espacio()
+                    ticket.agregar_texto_centrado("___________________")
+                    ticket.agregar_texto_centrado("Firma del Cajero")
+                    ticket.agregar_espacio()
+                    ticket.agregar_texto_centrado("___________________")
+                    ticket.agregar_texto_centrado("Supervisor")
+
+                    # Generar nombre del archivo
+                    nombre_archivo = f"arqueo_caja_{id_arqueo}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+
+                    # Generar PDF
+                    ruta_pdf = ticket.generar_pdf(nombre_archivo)
+
+                    # Mostrar vista previa
+                    ticket.mostrar_vista_previa(ruta_pdf)
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
+
+            btn_guardar = tk.Button(
+                frame_botones,
+                text="Guardar Arqueo",
+                font=("Helvetica", 11),
+                bg="#3a7ff6",
+                fg="white",
+                width=15,
+                cursor="hand2",
+                command=guardar_arqueo
+            )
+            btn_guardar.pack(side=tk.LEFT, padx=10)
+
+            btn_cancelar = tk.Button(
+                frame_botones,
+                text="Cancelar",
+                font=("Helvetica", 11),
+                bg="#e53935",
+                fg="white",
+                width=10,
+                cursor="hand2",
+                command=ventana_arqueo.destroy
+            )
+            btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo realizar el arqueo: {str(e)}")
+            print(f"Error en arqueo: {e}")
     def actualizar_vista_tabla(self):
         """Forza la actualización visual de la tabla"""
         if hasattr(self, 'tabla_cortes'):
@@ -3131,7 +4005,6 @@ class GestionCaja:
 
         # Cargar movimientos iniciales
         self.cargar_movimientos()
-
 
 
     def verificar_estado_caja(self):

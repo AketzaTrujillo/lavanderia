@@ -875,28 +875,7 @@ class Ventas:
                 cursor.execute("ROLLBACK")
             messagebox.showerror("Error", f"No se pudo registrar la venta:\n{e}")
 
-    def realizar_arqueo_caja(self):
-        """Realiza un arqueo de caja con resumen detallado"""
-        if not self.caja_abierta:
-            messagebox.showinfo("Información", "No hay una caja abierta para realizar el arqueo")
-            return
 
-        try:
-            # Crear ventana de arqueo
-            ventana_arqueo = tk.Toplevel(self.ventana)
-            ventana_arqueo.title("Arqueo de Caja")
-            ventana_arqueo.geometry("600x700")
-            ventana_arqueo.config(bg="#f5f5f5")
-            ventana_arqueo.resizable(True, True)
-            ventana_arqueo.grab_set()
-
-            utl.centrar_ventana(ventana_arqueo, 600, 700)
-
-            # Resto del código de la interfaz y lógica del arqueo
-            # (Ver implementación completa en el código previo)
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo realizar el arqueo: {str(e)}")
 
 
     def generar_ticket_html(self, id_venta):

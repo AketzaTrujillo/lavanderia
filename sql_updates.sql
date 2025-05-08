@@ -138,6 +138,19 @@ CREATE TABLE IF NOT EXISTS arqueos_caja (
     FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
+CREATE TABLE IF NOT EXISTS arqueos_caja (
+    id_arqueo INT AUTO_INCREMENT PRIMARY KEY,
+    id_caja INT NOT NULL,
+    fecha DATE NOT NULL,
+    hora TIME NOT NULL,
+    saldo_sistema DECIMAL(10,2) NOT NULL,
+    efectivo_contado DECIMAL(10,2) NOT NULL,
+    diferencia DECIMAL(10,2) NOT NULL,
+    observaciones TEXT,
+    id_usuario INT NOT NULL,
+    FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
 
 -- 4. Verificar y corregir estructura de la tabla caja
 ALTER TABLE caja
