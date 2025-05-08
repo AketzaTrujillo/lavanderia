@@ -292,12 +292,9 @@ class MasterPanel:
         """Abre la ventana de gestión de caja"""
         try:
             # Importación del módulo de caja
-            from caja import abrir_caja
-            abrir_caja(self.ventana, self.id_usuario)
-        except ImportError:
-            messagebox.showerror("Error de importación",
-                                 "No se pudo importar el módulo de caja.\n"
-                                 "Verifique que el archivo 'caja.py' existe.")
+            from caja import GestionCaja
+            # Crear una instancia pasando el ID de usuario correctamente
+            GestionCaja(self.ventana, self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
 

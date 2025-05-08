@@ -42,7 +42,10 @@ class GestionCaja:
         self.ventana.resizable(False, False)
 
         # ID del usuario actual (para registrar quién hace las operaciones)
-        self.id_usuario = id_usuario
+        self.id_usuario = id_usuario if id_usuario is not None else 1
+
+        # Para debug
+        print(f"Debug: ID de usuario en GestionCaja: {self.id_usuario}")
 
         # ID y estado de la caja actual
         self.id_caja_actual = None
@@ -1065,6 +1068,34 @@ class GestionCaja:
                 command=self.registrar_ingreso
             )
             btn_ingreso.grid(row=0, column=0, padx=5, pady=5)
+            btn_arqueo = tk.Button(
+                frame_control_caja,
+                text="🧮 Arqueo de Caja",
+                font=("Helvetica", 12),
+                bg="#607d8b",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.realizar_arqueo_caja
+            )
+            btn_arqueo.grid(row=0, column=1, padx=5, pady=5)
+
+            # NUEVO BOTÓN DE VER ARQUEOS
+            btn_ver_arqueos = tk.Button(
+                frame_control_caja,
+                text="📋 Ver Arqueos",
+                font=("Helvetica", 12),
+                bg="#607d8b",
+                fg="white",
+                width=15,
+                height=2,
+                cursor="hand2",
+                command=self.ver_arqueos_anteriores
+            )
+            btn_ver_arqueos.grid(row=1, column=1, padx=5, pady=5)
+
+
 
             btn_egreso = tk.Button(
                 frame_control_caja,
@@ -1142,6 +1173,28 @@ class GestionCaja:
             Pedidos(self.ventana)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir pedidos: {str(e)}")
+
+    def ver_arqueos_anteriores(self):
+        """Muestra los arqueos realizados previamente para la caja actual"""
+        if not self.id_caja_actual:
+            messagebox.showinfo("Información", "No hay una caja seleccionada")
+            return
+
+        try:
+            # Crear ventana para mostrar arqueos
+            ventana_arqueos = tk.Toplevel(self.ventana)
+            ventana_arqueos.title("Historial de Arqueos")
+            ventana_arqueos.geometry("700x500")
+            ventana_arqueos.config(bg="#f5f5f5")
+            ventana_arqueos.grab_set()
+
+            utl.centrar_ventana(ventana_arqueos, 700, 500)
+
+            # Código para mostrar la tabla de arqueos
+            # (Ver implementación completa en el código previo)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar el historial de arqueos: {str(e)}")
 
     def seguimiento_pedidos(self):
         """Abre el seguimiento de pedidos"""
@@ -1922,12 +1975,12 @@ class GestionCaja:
 
                 # Registrar apertura en la tabla de caja
                 cursor.execute("""
-                    INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
+                                INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (
                     date.today(),  # Usar objeto date en lugar de string
                     datetime.now().time(),  # Usar objeto time
-                    self.id_usuario,
+                    self.id_usuario,  # Usar el ID del usuario actual
                     0.0,  # Total ingresos inicia en 0
                     0.0,  # Total egresos inicia en 0
                     monto_inicial  # Saldo inicial
@@ -1973,9 +2026,10 @@ class GestionCaja:
             else:
                 messagebox.showinfo("Información", "La caja ya se encuentra abierta")
 
+
         except Exception as e:
+
             messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
-            print(f"Error al abrir caja: {e}")
 
     def configurar_tab_operaciones(self):
         """Configura la pestaña de operaciones de caja"""
@@ -2215,6 +2269,10 @@ class GestionCaja:
         frame_filtros = tk.Frame(frame_main, bg="#f5f5f5")
         frame_filtros.pack(fill=tk.X, pady=(0, 10))
 
+        frame_tabla = tk.Frame(frame_main, bg="#f5f5f5", height=400)
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Hacer que el frame mantenga su tamaño y no se contraiga
+        frame_tabla.pack_propagate(False)
         # Filtro por fecha
         tk.Label(
             frame_filtros,

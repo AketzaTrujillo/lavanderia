@@ -274,9 +274,7 @@ class CajeroPanel:
     def gestionar_caja(self):
         """Abre la ventana de gestión de caja"""
         try:
-            # Importar la clase en lugar de la función
             from caja import GestionCaja
-            # Crear una instancia de la clase
             GestionCaja(self.ventana, self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
