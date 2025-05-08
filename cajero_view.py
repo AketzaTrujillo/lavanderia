@@ -274,10 +274,19 @@ class CajeroPanel:
     def gestionar_caja(self):
         """Abre la ventana de gestión de caja"""
         try:
+            # Importación del módulo de caja
             from caja import GestionCaja
-            GestionCaja(self.ventana, self.id_usuario)
+
+            # Agregar depuración para verificar el ID de usuario
+            print(f"Debug - Cajero abriendo caja con usuario ID: {self.id_usuario}")
+
+            # Crear una instancia pasando el ID de usuario correctamente con parámetros nombrados
+            GestionCaja(ventana_padre=self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
+            print(f"Error detallado al abrir caja desde cajero: {e}")
+            import traceback
+            traceback.print_exc()
 
     def seguimiento_pedidos(self):
         """Abre la ventana de seguimiento de pedidos"""

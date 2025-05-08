@@ -41,11 +41,39 @@ class GestionCaja:
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(False, False)
 
-        # ID del usuario actual (para registrar quién hace las operaciones)
-        self.id_usuario = id_usuario if id_usuario is not None else 1
+        # Importante: pedir explícitamente el ID del usuario al iniciar
+        if id_usuario is None:
+            # Solicitar manualmente ID del usuario
+            id_usuario_manual = simpledialog.askinteger(
+                "ID de Usuario",
+                "Ingrese su ID de usuario:",
+                minvalue=1
+            )
+            self.id_usuario = id_usuario_manual if id_usuario_manual is not None else 1
+        else:
+            self.id_usuario = id_usuario
 
-        # Para debug
-        print(f"Debug: ID de usuario en GestionCaja: {self.id_usuario}")
+        print(f"Debug - GestionCaja inicializada con ID usuario: {self.id_usuario}")
+
+        # Verificar si el usuario existe en la BD
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT nombre FROM usuarios WHERE id_usuario = %s", (self.id_usuario,))
+            nombre_usuario = cursor.fetchone()
+            if nombre_usuario:
+                print(f"Debug - Usuario verificado: {nombre_usuario[0]}")
+            else:
+                print(f"Debug - ¡ALERTA! Usuario ID {self.id_usuario} no existe en la BD")
+
+                # Mostrar todos los usuarios disponibles
+                cursor.execute("SELECT id_usuario, nombre FROM usuarios ORDER BY id_usuario")
+                print("Usuarios disponibles en la BD:")
+                for usuario in cursor.fetchall():
+                    print(f"ID={usuario[0]}, Nombre={usuario[1]}")
+            conexion.close()
+        except Exception as e:
+            print(f"Error al verificar usuario en constructor: {e}")
 
         # ID y estado de la caja actual
         self.id_caja_actual = None
@@ -144,26 +172,71 @@ class GestionCaja:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
 
-                cursor.execute("""
-                    SELECT c.fecha, c.hora_apertura, u.nombre, 
-                           COALESCE(c.total_ingresos, 0), 
-                           COALESCE(c.total_egresos, 0), 
-                           COALESCE(c.saldo_final, 0),
-                           (SELECT m.concepto FROM movimientos_caja m 
-                            WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso' 
-                            ORDER BY m.hora ASC LIMIT 1) as primer_movimiento
-                    FROM caja c
-                    JOIN usuarios u ON c.responsable = u.id_usuario
-                    WHERE c.id_caja = %s
-                """, (self.id_caja_actual,))
+                # Verificar qué columnas existen en la tabla
+                cursor.execute("DESCRIBE caja")
+                columnas = {col[0] for col in cursor.fetchall()}
 
+                # Depuración para estructura de tabla
+                print(f"Debug - Columnas de tabla caja: {', '.join(columnas)}")
+
+                # Construir consulta basada en columnas disponibles
+                if 'total_ingresos' in columnas and 'total_egresos' in columnas and 'saldo_final' in columnas:
+                    consulta = """
+                        SELECT c.fecha, c.hora_apertura, u.nombre, 
+                               c.total_ingresos, c.total_egresos, c.saldo_final
+                        FROM caja c
+                        JOIN usuarios u ON c.responsable = u.id_usuario
+                        WHERE c.id_caja = %s
+                    """
+                else:
+                    # Consulta con cálculo manual
+                    consulta = """
+                        SELECT c.fecha, c.hora_apertura, u.nombre, 
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) as total_ingresos,
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as total_egresos,
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) -
+                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
+                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as saldo_final
+                        FROM caja c
+                        JOIN usuarios u ON c.responsable = u.id_usuario
+                        WHERE c.id_caja = %s
+                    """
+
+                cursor.execute(consulta, (self.id_caja_actual,))
                 caja = cursor.fetchone()
+
+                # Depuración para verificar datos de caja
+                print(f"Debug - Datos de caja: {caja}")
+
                 conexion.close()
 
                 if caja:
-                    fecha, hora_apertura, responsable, ingresos, egresos, saldo, primer_movimiento = caja
+                    fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
                     fecha_formateada = utl.formatear_fecha(fecha)
-                    hora_formateada = hora_apertura.strftime("%H:%M:%S") if hora_apertura else ""
+
+                    # Formatear hora_apertura correctamente
+                    hora_formateada = "No disponible"
+                    if hora_apertura:
+                        try:
+                            if hasattr(hora_apertura, 'strftime'):  # datetime o time
+                                hora_formateada = hora_apertura.strftime("%H:%M:%S")
+                            elif isinstance(hora_apertura, timedelta):  # timedelta
+                                segundos = hora_apertura.total_seconds()
+                                horas = int(segundos // 3600)
+                                minutos = int((segundos % 3600) // 60)
+                                segundos = int(segundos % 60)
+                                hora_formateada = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+                            else:
+                                hora_formateada = str(hora_apertura)
+                        except Exception as e:
+                            print(f"Error al formatear hora: {e}")
+                            hora_formateada = str(hora_apertura)
+
+                    # Depuración para el nombre del responsable
+                    print(f"Debug - Responsable de caja: {responsable}")
 
                     # Mostrar información de caja abierta
                     lbl_estado = tk.Label(
@@ -222,21 +295,59 @@ class GestionCaja:
                         bg="#f5f5f5"
                     ).grid(row=0, column=4, rowspan=2, sticky=tk.W, padx=15, pady=2)
 
-                    # Mostrar el origen del saldo inicial
-                    if primer_movimiento:
-                        origen_texto = "(Saldo del cierre anterior)" if "cierre anterior" in primer_movimiento else "(Saldo inicial)"
-                        tk.Label(
-                            self.frame_estado,
-                            text=origen_texto,
-                            font=("Helvetica", 10),
-                            bg="#f5f5f5",
-                            fg="#666666"
-                        ).grid(row=1, column=4, sticky=tk.W, padx=15, pady=2)
+                else:
+                    # Si no hay datos, mostrar mensaje simple
+                    lbl_estado = tk.Label(
+                        self.frame_estado,
+                        text="CAJA ABIERTA - Sin detalles disponibles",
+                        font=("Helvetica", 14, "bold"),
+                        bg="#b2ff59",
+                        fg="#33691e",
+                        padx=15,
+                        pady=5
+                    )
+                    lbl_estado.pack(padx=10, pady=10)
 
             except Exception as e:
                 # Si hay error, mostrar un estado simplificado
+                lbl_estado = tk.Label(
+                    self.frame_estado,
+                    text="CAJA ABIERTA",
+                    font=("Helvetica", 14, "bold"),
+                    bg="#b2ff59",
+                    fg="#33691e",
+                    padx=15,
+                    pady=5
+                )
+                lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
+
+                tk.Label(
+                    self.frame_estado,
+                    text=f"ID Caja: {self.id_caja_actual}",
+                    font=("Helvetica", 12),
+                    bg="#f5f5f5"
+                ).pack(side=tk.LEFT, padx=15, pady=10)
+
                 print(f"Error al obtener detalles de caja: {e}")
-                # ... código de estado simplificado ...
+        else:
+            # Mostrar que la caja está cerrada
+            lbl_estado = tk.Label(
+                self.frame_estado,
+                text="CAJA CERRADA",
+                font=("Helvetica", 14, "bold"),
+                bg="#ffcdd2",
+                fg="#c62828",
+                padx=15,
+                pady=5
+            )
+            lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
+
+            tk.Label(
+                self.frame_estado,
+                text="Debe abrir la caja para operar",
+                font=("Helvetica", 12),
+                bg="#f5f5f5"
+            ).pack(side=tk.LEFT, padx=15, pady=10)
 
     def imprimir_estado_caja(self):
         """Imprime el estado actual de la caja"""
@@ -2303,15 +2414,24 @@ class GestionCaja:
             if resultado:
                 self.id_caja_actual = resultado[0]
                 self.caja_abierta = True
-                print(f"Caja abierta encontrada: ID {self.id_caja_actual}")  # Debug
+
+                # Verificar el responsable asignado
+                cursor.execute(
+                    "SELECT u.nombre FROM usuarios u JOIN caja c ON u.id_usuario = c.responsable WHERE c.id_caja = %s",
+                    (self.id_caja_actual,)
+                )
+                responsable = cursor.fetchone()
+                print(
+                    f"Debug - Caja abierta encontrada: ID {self.id_caja_actual}, Responsable: {responsable[0] if responsable else 'Desconocido'}")
             else:
                 self.id_caja_actual = None
                 self.caja_abierta = False
-                print("No hay caja abierta")  # Debug
+                print("Debug - No hay caja abierta")
 
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"Error al verificar estado de caja: {str(e)}")
+            print(f"Error detallado al verificar estado: {e}")
             self.caja_abierta = False
 
     def verificar_formato_fecha(self):
@@ -2328,174 +2448,6 @@ class GestionCaja:
             self.fecha_cortes.set(date.today().strftime("%Y-%m-%d"))
             messagebox.showwarning("Formato incorrecto", "La fecha debe estar en formato YYYY-MM-DD")
 
-    def actualizar_estado_caja(self):
-        """Actualiza la visualización del estado actual de la caja"""
-        # Limpiar frame de estado
-        for widget in self.frame_estado.winfo_children():
-            widget.destroy()
-
-        # Verificar estado antes de mostrar
-        self.verificar_estado_caja()
-
-        if self.caja_abierta:
-            # Obtener información detallada de la caja actual
-            try:
-                conexion = conectar_bd()
-                cursor = conexion.cursor()
-
-                # Verificar qué columnas existen en la tabla
-                cursor.execute("DESCRIBE caja")
-                columnas = {col[0] for col in cursor.fetchall()}
-
-                # Construir consulta basada en columnas disponibles
-                if 'total_ingresos' in columnas and 'total_egresos' in columnas and 'saldo_final' in columnas:
-                    consulta = """
-                        SELECT c.fecha, c.hora_apertura, u.nombre, 
-                               c.total_ingresos, c.total_egresos, c.saldo_final
-                        FROM caja c
-                        JOIN usuarios u ON c.responsable = u.id_usuario
-                        WHERE c.id_caja = %s
-                    """
-                else:
-                    # Consulta con cálculo manual
-                    consulta = """
-                        SELECT c.fecha, c.hora_apertura, u.nombre, 
-                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
-                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) as total_ingresos,
-                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
-                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as total_egresos,
-                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
-                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso'), 0) -
-                               COALESCE((SELECT SUM(m.monto) FROM movimientos_caja m 
-                                        WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso'), 0) as saldo_final
-                        FROM caja c
-                        JOIN usuarios u ON c.responsable = u.id_usuario
-                        WHERE c.id_caja = %s
-                    """
-
-                cursor.execute(consulta, (self.id_caja_actual,))
-                caja = cursor.fetchone()
-                conexion.close()
-
-                if caja:
-                    fecha, hora_apertura, responsable, ingresos, egresos, saldo = caja
-                    fecha_formateada = utl.formatear_fecha(fecha)
-
-                    # Formatear hora_apertura correctamente
-                    hora_formateada = "No disponible"
-                    if hora_apertura:
-                        try:
-                            if hasattr(hora_apertura, 'strftime'):  # datetime o time
-                                hora_formateada = hora_apertura.strftime("%H:%M:%S")
-                            elif isinstance(hora_apertura, timedelta):  # timedelta
-                                segundos = hora_apertura.total_seconds()
-                                horas = int(segundos // 3600)
-                                minutos = int((segundos % 3600) // 60)
-                                segundos = int(segundos % 60)
-                                hora_formateada = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
-                            else:
-                                hora_formateada = str(hora_apertura)
-                        except Exception as e:
-                            print(f"Error al formatear hora: {e}")
-                            hora_formateada = str(hora_apertura)
-
-                    # Mostrar información de caja abierta
-                    lbl_estado = tk.Label(
-                        self.frame_estado,
-                        text="CAJA ABIERTA",
-                        font=("Helvetica", 14, "bold"),
-                        bg="#b2ff59",
-                        fg="#33691e",
-                        padx=15,
-                        pady=5
-                    )
-                    lbl_estado.grid(row=0, column=0, rowspan=2, padx=10, pady=10)
-
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Fecha: {fecha_formateada}",
-                        font=("Helvetica", 12),
-                        bg="#f5f5f5"
-                    ).grid(row=0, column=1, sticky=tk.W, padx=5, pady=2)
-
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Hora apertura: {hora_formateada}",
-                        font=("Helvetica", 12),
-                        bg="#f5f5f5"
-                    ).grid(row=0, column=2, sticky=tk.W, padx=5, pady=2)
-
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Responsable: {responsable}",
-                        font=("Helvetica", 12),
-                        bg="#f5f5f5"
-                    ).grid(row=1, column=1, sticky=tk.W, padx=5, pady=2)
-
-                    # Mostrar ingresos, egresos y saldo actual
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Ingresos: ${ingresos:.2f}",
-                        font=("Helvetica", 12),
-                        bg="#f5f5f5",
-                        fg="#388e3c"
-                    ).grid(row=0, column=3, sticky=tk.W, padx=5, pady=2)
-
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Egresos: ${egresos:.2f}",
-                        font=("Helvetica", 12),
-                        bg="#f5f5f5",
-                        fg="#d32f2f"
-                    ).grid(row=1, column=3, sticky=tk.W, padx=5, pady=2)
-
-                    tk.Label(
-                        self.frame_estado,
-                        text=f"Saldo: ${saldo:.2f}",
-                        font=("Helvetica", 12, "bold"),
-                        bg="#f5f5f5"
-                    ).grid(row=0, column=4, rowspan=2, sticky=tk.W, padx=15, pady=2)
-
-            except Exception as e:
-                # Si hay error, mostrar un estado simplificado
-                lbl_estado = tk.Label(
-                    self.frame_estado,
-                    text="CAJA ABIERTA",
-                    font=("Helvetica", 14, "bold"),
-                    bg="#b2ff59",
-                    fg="#33691e",
-                    padx=15,
-                    pady=5
-                )
-                lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
-
-                tk.Label(
-                    self.frame_estado,
-                    text=f"ID Caja: {self.id_caja_actual}",
-                    font=("Helvetica", 12),
-                    bg="#f5f5f5"
-                ).pack(side=tk.LEFT, padx=15, pady=10)
-
-                print(f"Error al obtener detalles de caja: {e}")
-        else:
-            # Mostrar que la caja está cerrada
-            lbl_estado = tk.Label(
-                self.frame_estado,
-                text="CAJA CERRADA",
-                font=("Helvetica", 14, "bold"),
-                bg="#ffcdd2",
-                fg="#c62828",
-                padx=15,
-                pady=5
-            )
-            lbl_estado.pack(side=tk.LEFT, padx=10, pady=10)
-
-            tk.Label(
-                self.frame_estado,
-                text="Debe abrir la caja para operar",
-                font=("Helvetica", 12),
-                bg="#f5f5f5"
-            ).pack(side=tk.LEFT, padx=15, pady=10)
 
     def reconstruir_pestanas(self):
         """Reconstruye completamente las pestañas problemáticas"""
@@ -2583,130 +2535,139 @@ class GestionCaja:
         btn_volver.pack(pady=10, anchor=tk.SE)
 
     def abrir_caja(self):
-        """Método para abrir la caja"""
+        """Método para abrir la caja con usuario correcto"""
         try:
-            if not self.caja_abierta:
-                # Preguntar si desea usar el saldo del último corte
-                usar_saldo_anterior = messagebox.askyesno(
-                    "Apertura de Caja",
-                    "¿Desea iniciar con el saldo del último cierre de caja?"
-                )
+            print(f"Debug - Valor de self.id_usuario antes de abrir caja: {self.id_usuario}")
 
-                monto_inicial = 0.0
-                if usar_saldo_anterior:
-                    # Obtener el último corte
-                    try:
-                        conexion = conectar_bd()
-                        cursor = conexion.cursor()
+            # 1. Verificación directa del usuario en la BD
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
 
-                        cursor.execute("""
-                            SELECT c.saldo_final 
-                            FROM caja c
-                            WHERE c.hora_cierre IS NOT NULL
-                            ORDER BY c.fecha DESC, c.hora_cierre DESC
-                            LIMIT 1
-                        """)
+            # Verificar qué usuario somos realmente
+            cursor.execute("SELECT id_usuario, nombre FROM usuarios WHERE id_usuario = %s", (self.id_usuario,))
+            usuario_actual = cursor.fetchone()
 
-                        ultimo_corte = cursor.fetchone()
-                        conexion.close()
+            if usuario_actual:
+                print(f"Debug - Usuario verificado: ID={usuario_actual[0]}, Nombre={usuario_actual[1]}")
+            else:
+                print(f"Debug - ADVERTENCIA: No se pudo encontrar usuario con ID={self.id_usuario}")
+                # Buscar a Aketzaly para verificar su ID
+                cursor.execute("SELECT id_usuario, nombre FROM usuarios WHERE nombre = 'Aketzaly'")
+                usuario_aketzaly = cursor.fetchone()
+                if usuario_aketzaly:
+                    print(f"Debug - Usuario Aketzaly: ID={usuario_aketzaly[0]}, Nombre={usuario_aketzaly[1]}")
 
-                        if ultimo_corte and ultimo_corte[0] is not None:
-                            monto_inicial = float(ultimo_corte[0])
-                            # Preguntar si desea modificar el monto
-                            modificar = messagebox.askyesno(
-                                "Confirmar Saldo",
-                                f"Saldo del último cierre: ${monto_inicial:.2f}\n¿Desea modificar este monto?"
-                            )
+                # Mostrar todos los usuarios para diagnóstico
+                cursor.execute("SELECT id_usuario, nombre FROM usuarios LIMIT 10")
+                print("Debug - Usuarios en BD:")
+                for usuario in cursor.fetchall():
+                    print(f"  ID={usuario[0]}, Nombre={usuario[1]}")
 
-                            if modificar:
-                                monto_inicial = simpledialog.askfloat(
-                                    "Modificar Saldo",
-                                    "Ingrese el monto inicial en caja:",
-                                    initialvalue=monto_inicial,
-                                    minvalue=0.0
-                                )
+            # 2. Si ya hay una caja abierta, solo informar y salir
+            if self.caja_abierta:
+                messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+                conexion.close()
+                return
 
-                                if monto_inicial is None:
-                                    messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
-                                    return
-                        else:
-                            messagebox.showinfo("Información", "No se encontró un corte anterior. Iniciando con $0.00")
-                            monto_inicial = 0.0
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Error al obtener último corte: {str(e)}")
-                        monto_inicial = 0.0
-                else:
-                    # Pedir monto inicial manualmente
-                    monto_inicial = simpledialog.askfloat(
-                        "Apertura de Caja",
-                        "Ingrese el monto inicial en caja:",
-                        minvalue=0.0
-                    )
+            # 3. Preguntar por el monto inicial (código simplificado para claridad)
+            monto_inicial = simpledialog.askfloat(
+                "Apertura de Caja",
+                "Ingrese el monto inicial en caja:",
+                minvalue=0.0
+            )
 
-                    if monto_inicial is None:
-                        messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
-                        return
+            if monto_inicial is None:
+                messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
+                conexion.close()
+                return
 
-                conexion = conectar_bd()
-                cursor = conexion.cursor()
+            # 4. Insertar en la tabla caja - ASEGURAR que se use el ID correcto
+            fecha_actual = date.today()
+            hora_actual = datetime.now().time()
 
-                # Registrar apertura en la tabla de caja
-                cursor.execute("""
-                                INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (
-                    date.today(),  # Usar objeto date en lugar de string
-                    datetime.now().time(),  # Usar objeto time
-                    self.id_usuario,  # Usar el ID del usuario actual
-                    0.0,  # Total ingresos inicia en 0
-                    0.0,  # Total egresos inicia en 0
-                    monto_inicial  # Saldo inicial
-                ))
+            print(f"Debug - Ejecutando INSERT con ID usuario: {self.id_usuario}")
 
-                # Obtener el ID de la caja recién abierta
-                self.id_caja_actual = cursor.lastrowid
-                self.caja_abierta = True
+            # Usar sentencia SQL con valores explícitos para verificar
+            cursor.execute(f"""
+                INSERT INTO caja 
+                  (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+                VALUES 
+                  ('{fecha_actual}', '{hora_actual}', {self.id_usuario}, 0.0, 0.0, {monto_inicial})
+            """)
 
-                # Si hay monto inicial, registrarlo como ingreso
-                if monto_inicial > 0:
-                    cursor.execute("""
-                        INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        self.id_caja_actual,
-                        'ingreso',
-                        'Saldo inicial' if not usar_saldo_anterior else 'Saldo del cierre anterior',
-                        monto_inicial,
-                        datetime.now(),
-                        self.id_usuario
-                    ))
+            # Obtener el ID de la caja insertada
+            self.id_caja_actual = cursor.lastrowid
+            self.caja_abierta = True
 
-                    # Actualizar el total de ingresos
+            # 5. Verificar inmediatamente que se haya insertado correctamente
+            cursor.execute("""
+                SELECT c.id_caja, c.responsable, u.nombre 
+                FROM caja c 
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.id_caja = %s
+            """, (self.id_caja_actual,))
+
+            caja_creada = cursor.fetchone()
+            if caja_creada:
+                print(
+                    f"Debug - Caja creada: ID={caja_creada[0]}, ResponsableID={caja_creada[1]}, Nombre={caja_creada[2]}")
+
+                # Si el responsable no es el esperado, corregir manualmente
+                if caja_creada[1] != self.id_usuario:
+                    print("Debug - CORRECCIÓN MANUAL: Responsable no es el usuario actual, corrigiendo...")
                     cursor.execute("""
                         UPDATE caja 
-                        SET total_ingresos = %s
+                        SET responsable = %s 
                         WHERE id_caja = %s
-                    """, (monto_inicial, self.id_caja_actual))
+                    """, (self.id_usuario, self.id_caja_actual))
 
-                conexion.commit()
-                conexion.close()
+                    # Verificar la corrección
+                    cursor.execute("""
+                        SELECT c.id_caja, c.responsable, u.nombre 
+                        FROM caja c 
+                        JOIN usuarios u ON c.responsable = u.id_usuario
+                        WHERE c.id_caja = %s
+                    """, (self.id_caja_actual,))
+                    caja_corregida = cursor.fetchone()
+                    print(
+                        f"Debug - Después de corrección: ID={caja_corregida[0]}, ResponsableID={caja_corregida[1]}, Nombre={caja_corregida[2]}")
 
-                mensaje = f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
-                if usar_saldo_anterior:
-                    mensaje += "\n(Saldo del cierre anterior)"
+            # 6. Registrar el movimiento inicial
+            if monto_inicial > 0:
+                cursor.execute("""
+                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                    VALUES (%s, 'ingreso', 'Saldo inicial', %s, %s, %s)
+                """, (
+                    self.id_caja_actual,
+                    monto_inicial,
+                    datetime.now(),
+                    self.id_usuario
+                ))
 
-                messagebox.showinfo("Apertura Exitosa", mensaje)
+                # Actualizar saldo e ingresos
+                cursor.execute("""
+                    UPDATE caja 
+                    SET total_ingresos = %s, saldo_final = %s
+                    WHERE id_caja = %s
+                """, (monto_inicial, monto_inicial, self.id_caja_actual))
 
-                # Actualizar la interfaz
-                self.actualizar_estado_caja()
-                self.configurar_tab_operaciones()
-            else:
-                messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+            # 7. Confirmar transacción y cerrar conexión
+            conexion.commit()
+            conexion.close()
 
+            # 8. Mostrar mensaje de éxito y actualizar interfaz
+            messagebox.showinfo("Apertura Exitosa",
+                                f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}")
+
+            # 9. Actualizar la interfaz
+            self.actualizar_estado_caja()
+            self.configurar_tab_operaciones()
 
         except Exception as e:
-
             messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
+            print(f"Error detallado al abrir caja: {e}")
+            import traceback
+            traceback.print_exc()
 
 
     def registrar_egreso(self):
@@ -4098,35 +4059,6 @@ class GestionCaja:
         self.ventana.after(100, self.cargar_movimientos)
 
 
-    def verificar_estado_caja(self):
-        """Verifica si hay una caja abierta para la fecha actual"""
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Consultar si hay una caja abierta para hoy (hora_cierre es NULL)
-            fecha_actual = date.today().strftime("%Y-%m-%d")
-            cursor.execute(
-                "SELECT id_caja, responsable FROM caja WHERE fecha = %s AND hora_cierre IS NULL",
-                (fecha_actual,)
-            )
-
-            resultado = cursor.fetchone()
-
-            if resultado:
-                self.id_caja_actual = resultado[0]
-                self.caja_abierta = True
-                print(f"Caja abierta encontrada: ID {self.id_caja_actual}")  # Debug
-            else:
-                self.id_caja_actual = None
-                self.caja_abierta = False
-                print("No hay caja abierta")  # Debug
-
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al verificar estado de caja: {str(e)}")
-            self.caja_abierta = False
-
     def ver_ultimo_corte(self):
         """Muestra información del último corte de caja registrado"""
         try:
@@ -4284,73 +4216,135 @@ class GestionCaja:
 # Agrega esta función al final de tu archivo caja.py
 
 def abrir_caja(self):
-    """Método para abrir la caja"""
+    """Método para abrir la caja con usuario correcto"""
     try:
-        if not self.caja_abierta:
-            # Solicitar monto inicial
-            monto_inicial = simpledialog.askfloat(
-                "Apertura de Caja",
-                "Ingrese el monto inicial en caja:",
-                minvalue=0.0
-            )
+        print(f"Debug - Valor de self.id_usuario antes de abrir caja: {self.id_usuario}")
 
-            if monto_inicial is not None:
-                conexion = conectar_bd()
-                cursor = conexion.cursor()
+        # 1. Verificación directa del usuario en la BD
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
 
-                # Registrar apertura en la tabla de caja - sin usar monto_inicial en caja
-                cursor.execute("""
-                    INSERT INTO caja (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    date.today().strftime("%Y-%m-%d"),
-                    datetime.now().strftime("%H:%M:%S"),
-                    self.id_usuario,
-                    0.0,  # Total ingresos inicia en 0
-                    0.0,  # Total egresos inicia en 0
-                    monto_inicial  # Saldo inicial igual al monto inicial
-                ))
+        # Verificar qué usuario somos realmente
+        cursor.execute("SELECT id_usuario, nombre FROM usuarios WHERE id_usuario = %s", (self.id_usuario,))
+        usuario_actual = cursor.fetchone()
 
-                # Obtener el ID de la caja recién abierta
-                self.id_caja_actual = cursor.lastrowid
-                self.caja_abierta = True  # Establecer el estado ANTES de cualquier otra operación
+        if usuario_actual:
+            print(f"Debug - Usuario verificado: ID={usuario_actual[0]}, Nombre={usuario_actual[1]}")
+        else:
+            print(f"Debug - ADVERTENCIA: No se pudo encontrar usuario con ID={self.id_usuario}")
+            # Buscar a Aketzaly para verificar su ID
+            cursor.execute("SELECT id_usuario, nombre FROM usuarios WHERE nombre = 'Aketzaly'")
+            usuario_aketzaly = cursor.fetchone()
+            if usuario_aketzaly:
+                print(f"Debug - Usuario Aketzaly: ID={usuario_aketzaly[0]}, Nombre={usuario_aketzaly[1]}")
 
-                # Registrar el monto inicial como un ingreso inicial
-                cursor.execute("""
-                    INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    self.id_caja_actual,
-                    'ingreso',  # Tipo debe ser 'ingreso' o 'egreso' (minúsculas)
-                    'Saldo inicial',
-                    monto_inicial,
-                    datetime.now(),
-                    self.id_usuario
-                ))
+            # Mostrar todos los usuarios para diagnóstico
+            cursor.execute("SELECT id_usuario, nombre FROM usuarios LIMIT 10")
+            print("Debug - Usuarios en BD:")
+            for usuario in cursor.fetchall():
+                print(f"  ID={usuario[0]}, Nombre={usuario[1]}")
 
-                # Actualizar el total de ingresos y saldo final
+        # 2. Si ya hay una caja abierta, solo informar y salir
+        if self.caja_abierta:
+            messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+            conexion.close()
+            return
+
+        # 3. Preguntar por el monto inicial (código simplificado para claridad)
+        monto_inicial = simpledialog.askfloat(
+            "Apertura de Caja",
+            "Ingrese el monto inicial en caja:",
+            minvalue=0.0
+        )
+
+        if monto_inicial is None:
+            messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
+            conexion.close()
+            return
+
+        # 4. Insertar en la tabla caja - ASEGURAR que se use el ID correcto
+        fecha_actual = date.today()
+        hora_actual = datetime.now().time()
+
+        print(f"Debug - Ejecutando INSERT con ID usuario: {self.id_usuario}")
+
+        # Usar sentencia SQL con valores explícitos para verificar
+        cursor.execute(f"""
+            INSERT INTO caja 
+              (fecha, hora_apertura, responsable, total_ingresos, total_egresos, saldo_final)
+            VALUES 
+              ('{fecha_actual}', '{hora_actual}', {self.id_usuario}, 0.0, 0.0, {monto_inicial})
+        """)
+
+        # Obtener el ID de la caja insertada
+        self.id_caja_actual = cursor.lastrowid
+        self.caja_abierta = True
+
+        # 5. Verificar inmediatamente que se haya insertado correctamente
+        cursor.execute("""
+            SELECT c.id_caja, c.responsable, u.nombre 
+            FROM caja c 
+            JOIN usuarios u ON c.responsable = u.id_usuario
+            WHERE c.id_caja = %s
+        """, (self.id_caja_actual,))
+
+        caja_creada = cursor.fetchone()
+        if caja_creada:
+            print(f"Debug - Caja creada: ID={caja_creada[0]}, ResponsableID={caja_creada[1]}, Nombre={caja_creada[2]}")
+
+            # Si el responsable no es el esperado, corregir manualmente
+            if caja_creada[1] != self.id_usuario:
+                print("Debug - CORRECCIÓN MANUAL: Responsable no es el usuario actual, corrigiendo...")
                 cursor.execute("""
                     UPDATE caja 
-                    SET total_ingresos = %s, saldo_final = %s
+                    SET responsable = %s 
                     WHERE id_caja = %s
-                """, (monto_inicial, monto_inicial, self.id_caja_actual))
+                """, (self.id_usuario, self.id_caja_actual))
 
-                conexion.commit()
-                conexion.close()
+                # Verificar la corrección
+                cursor.execute("""
+                    SELECT c.id_caja, c.responsable, u.nombre 
+                    FROM caja c 
+                    JOIN usuarios u ON c.responsable = u.id_usuario
+                    WHERE c.id_caja = %s
+                """, (self.id_caja_actual,))
+                caja_corregida = cursor.fetchone()
+                print(
+                    f"Debug - Después de corrección: ID={caja_corregida[0]}, ResponsableID={caja_corregida[1]}, Nombre={caja_corregida[2]}")
 
-                messagebox.showinfo(
-                    "Apertura Exitosa",
-                    f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}"
-                )
+        # 6. Registrar el movimiento inicial
+        if monto_inicial > 0:
+            cursor.execute("""
+                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                VALUES (%s, 'ingreso', 'Saldo inicial', %s, %s, %s)
+            """, (
+                self.id_caja_actual,
+                monto_inicial,
+                datetime.now(),
+                self.id_usuario
+            ))
 
-                # Actualizar la interfaz
-                self.actualizar_estado_caja()
-                self.configurar_tab_operaciones()
-            else:
-                messagebox.showinfo("Cancelado", "Apertura de caja cancelada")
-        else:
-            messagebox.showinfo("Información", "La caja ya se encuentra abierta")
+            # Actualizar saldo e ingresos
+            cursor.execute("""
+                UPDATE caja 
+                SET total_ingresos = %s, saldo_final = %s
+                WHERE id_caja = %s
+            """, (monto_inicial, monto_inicial, self.id_caja_actual))
+
+        # 7. Confirmar transacción y cerrar conexión
+        conexion.commit()
+        conexion.close()
+
+        # 8. Mostrar mensaje de éxito y actualizar interfaz
+        messagebox.showinfo("Apertura Exitosa",
+                            f"La caja se ha abierto correctamente con un monto inicial de ${monto_inicial:.2f}")
+
+        # 9. Actualizar la interfaz
+        self.actualizar_estado_caja()
+        self.configurar_tab_operaciones()
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo abrir la caja: {str(e)}")
         print(f"Error detallado al abrir caja: {e}")
+        import traceback
+        traceback.print_exc()
