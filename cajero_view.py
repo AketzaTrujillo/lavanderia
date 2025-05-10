@@ -24,7 +24,9 @@ class CajeroPanel:
         self.ventana.resizable(False, False)
 
         # ID del usuario actual (para registrar operaciones)
-        self.id_usuario = id_usuario
+        # Si no se proporciona, usar un valor por defecto
+        self.id_usuario = id_usuario if id_usuario is not None else 2  # Por defecto, usar ID 2 para cajero
+        print(f"DEBUG - Panel Cajero iniciado con ID usuario: {self.id_usuario}")
 
         # Centrar ventana
         utl.centrar_ventana(self.ventana, 800, 600)
@@ -259,7 +261,8 @@ class CajeroPanel:
         try:
             # Importar justo cuando se necesita
             from ventas import Ventas
-            Ventas(self.ventana)
+            # Pasar el ID del usuario al módulo de ventas
+            Ventas(self.ventana, id_usuario=self.id_usuario)
         except ImportError:
             messagebox.showerror("Error de importación",
                                 "No se pudo importar el módulo de ventas.\n"

@@ -1,9 +1,3 @@
-"""
-Módulo de Caja para el Sistema de Gestión de Lavandería
-Permite gestionar apertura y cierre de caja, registrar movimientos,
-y generar reportes de cortes de caja.
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import os
@@ -11,8 +5,6 @@ import sys
 import utileria as utl
 from datetime import datetime, date, time, timedelta
 import decimal
-
-
 
 # Asegurar que podamos importar módulos del sistema
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +21,7 @@ except ImportError as e:
 class GestionCaja:
     """Clase para gestionar las operaciones de caja"""
 
+    # Busca esta sección en tu archivo caja.py actual (debe estar cerca del inicio de la clase GestionCaja)
     def __init__(self, ventana_padre=None, id_usuario=None):
         # Si hay una ventana padre, crear Toplevel en lugar de Tk
         if ventana_padre:
@@ -41,15 +34,13 @@ class GestionCaja:
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(False, False)
 
-        # Importante: pedir explícitamente el ID del usuario al iniciar
+        # IMPORTANTE: Reemplaza la sección donde se pide el ID manualmente
+        # con este código que usa el ID proporcionado
         if id_usuario is None:
-            # Solicitar manualmente ID del usuario
-            id_usuario_manual = simpledialog.askinteger(
-                "ID de Usuario",
-                "Ingrese su ID de usuario:",
-                minvalue=1
-            )
-            self.id_usuario = id_usuario_manual if id_usuario_manual is not None else 1
+            # Establecer a un valor por defecto (administrador) si no hay ID proporcionado
+            self.id_usuario = 1
+            print(
+                f"ADVERTENCIA: GestionCaja inicializada sin ID de usuario. Usando valor por defecto: {self.id_usuario}")
         else:
             self.id_usuario = id_usuario
 
@@ -2569,12 +2560,47 @@ class GestionCaja:
                 conexion.close()
                 return
 
-            # 3. Preguntar por el monto inicial (código simplificado para claridad)
-            monto_inicial = simpledialog.askfloat(
-                "Apertura de Caja",
-                "Ingrese el monto inicial en caja:",
-                minvalue=0.0
-            )
+            # Verificar si hay saldo anterior disponible
+            cursor.execute("""
+                SELECT c.id_caja, c.fecha, c.saldo_final, u.nombre 
+                FROM caja c 
+                JOIN usuarios u ON c.responsable = u.id_usuario
+                WHERE c.hora_cierre IS NOT NULL
+                ORDER BY c.fecha DESC, c.hora_cierre DESC
+                LIMIT 1
+            """)
+
+            ultimo_saldo = cursor.fetchone()
+
+            # 3. Preguntar si se desea abrir la caja con saldo anterior o con nuevo saldo
+            if ultimo_saldo and ultimo_saldo[2] > 0:
+                fecha_ultimo = ultimo_saldo[1].strftime("%d/%m/%Y") if hasattr(ultimo_saldo[1], 'strftime') else str(
+                    ultimo_saldo[1])
+                respuesta = messagebox.askyesno(
+                    "Saldo anterior disponible",
+                    f"Existe un saldo anterior de ${ultimo_saldo[2]:.2f} del {fecha_ultimo}.\n"
+                    f"Responsable: {ultimo_saldo[3]}\n\n"
+                    "¿Desea abrir la caja con este saldo?",
+                    icon='question'
+                )
+
+                if respuesta:
+                    # Usar saldo anterior
+                    monto_inicial = ultimo_saldo[2]
+                else:
+                    # Pedir nuevo monto
+                    monto_inicial = simpledialog.askfloat(
+                        "Apertura de Caja",
+                        "Ingrese el monto inicial en caja:",
+                        minvalue=0.0
+                    )
+            else:
+                # Sin saldo anterior, pedir monto inicial
+                monto_inicial = simpledialog.askfloat(
+                    "Apertura de Caja",
+                    "Ingrese el monto inicial en caja:",
+                    minvalue=0.0
+                )
 
             if monto_inicial is None:
                 messagebox.showinfo("Cancelado", "Apertura de caja cancelada")

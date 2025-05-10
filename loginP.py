@@ -195,24 +195,24 @@ class App:
             conexion = conectar_bd()
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT nombre, rol FROM usuarios WHERE correo = %s AND contraseña = %s",
+                "SELECT id_usuario, nombre, rol FROM usuarios WHERE correo = %s AND contraseña = %s",
                 (correo, password)
             )
             resultado = cursor.fetchone()
             conexion.close()
 
             if resultado:
-                nombre_usuario, rol = resultado
+                id_usuario, nombre_usuario, rol = resultado
                 messagebox.showinfo("Bienvenido", f"Hola {nombre_usuario}, rol: {rol}")
                 self.ventana.destroy()
 
-                # Abrir panel según rol
+                # Abrir panel según rol con el ID de usuario
                 if rol == "admin":
                     from admin_view import MasterPanel
-                    MasterPanel()
+                    MasterPanel(id_usuario=id_usuario)  # Pasar el ID de usuario
                 elif rol == "cajero":
                     from cajero_view import CajeroPanel
-                    CajeroPanel()
+                    CajeroPanel(id_usuario=id_usuario)  # Pasar el ID de usuario
                 else:
                     messagebox.showwarning("Rol desconocido", f"Rol no reconocido: {rol}")
             else:

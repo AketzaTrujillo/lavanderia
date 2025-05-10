@@ -10,7 +10,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 class MasterPanel:
     """Clase que implementa el panel principal de administrador"""
 
-    def __init__(self):
+    def __init__(self, id_usuario=None):
         self.ventana = tk.Tk()
         self.ventana.title("Panel de Administrador - Lavandería")
         self.ventana.geometry("800x600")
@@ -18,7 +18,9 @@ class MasterPanel:
         self.ventana.resizable(False, False)
 
         # ID del usuario actual (para registrar operaciones)
-        self.id_usuario = 1  # Por defecto, asumimos usuario ID 1 (admin)
+        # Si no se proporciona, usar un valor por defecto
+        self.id_usuario = id_usuario if id_usuario is not None else 1
+        print(f"DEBUG - Panel Admin iniciado con ID usuario: {self.id_usuario}")
 
         # Centrar ventana
         utl.centrar_ventana(self.ventana, 800, 600)
@@ -325,11 +327,12 @@ class MasterPanel:
         try:
             # Importar justo cuando se necesita
             from ventas import Ventas
-            Ventas(self.ventana)
+            # Pasar el ID del usuario al módulo de ventas
+            Ventas(self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
 
-# Actualizacion 
+# Actualizacion
 
     def generar_reportes(self):
         """Abre la ventana de generación de reportes"""
@@ -351,7 +354,8 @@ class MasterPanel:
         try:
             # Importar el módulo de seguimiento
             from seguimiento_pedidos import SeguimientoPedidos
-            SeguimientoPedidos(self.ventana)
+            # Pasar el ID del usuario al módulo de seguimiento
+            SeguimientoPedidos(self.ventana, self.id_usuario)
         except ImportError:
             messagebox.showerror("Error de importación",
                                  "No se pudo importar el módulo de seguimiento.\n"
