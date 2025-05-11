@@ -137,6 +137,35 @@ class Reportes:
         # Inicializar con el primer tipo de reporte
         self.cambiar_tipo_reporte()
 
+    def guardar_grafico_como_imagen(self):
+        """Guarda el gráfico actual como una imagen"""
+        # Verificar si hay un gráfico para guardar
+        if not hasattr(self, 'fig') or self.fig is None:
+            messagebox.showwarning("Sin gráfico", "No hay un gráfico para guardar. Genere un reporte primero.")
+            return
+
+        # Tipo de archivo
+        filetypes = [
+            ("PNG", "*.png"),
+            ("JPEG", "*.jpg"),
+            ("SVG", "*.svg"),
+            ("PDF", "*.pdf")
+        ]
+
+        # Solicitar nombre de archivo
+        filename = filedialog.asksaveasfilename(
+            title="Guardar gráfico como",
+            filetypes=filetypes,
+            defaultextension=".png"
+        )
+
+        if filename:
+            try:
+                # Guardar figura actual
+                self.fig.savefig(filename, dpi=300, bbox_inches='tight')
+                messagebox.showinfo("Éxito", f"Gráfico guardado como {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo guardar la imagen: {str(e)}")
     def configurar_filtros(self):
         """Configura los filtros para los reportes"""
         # Primera fila: Tipo de reporte y periodo
@@ -789,6 +818,432 @@ class Reportes:
             canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             self.dashboard_figs.append(fig)
             self.dashboard_canvas.append(canvas)
+
+    def calcular_rfm_real(self, cursor, fecha_inicio, fecha_fin):
+        """Calcula datos RFM reales para análisis de clientes"""
+        # Consulta SQL para obtener métricas RFM reales de la base de datos
+        consulta_rfm = """
+            SELECT 
+                c.id_cliente,
+                c.nombre,
+                COUNT(v.id_venta) as frecuencia,
+                DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) as recencia,
+                SUM(v.total) as valor_monetario,
+                CASE 
+                    WHEN COUNT(v.id_venta) > 5 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 30 THEN 'VIP'
+                    WHEN COUNT(v.id_venta) > 3 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 60 THEN 'Regular'
+                    WHEN DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) > 90 THEN 'Inactivo'
+                    ELSE 'Ocasional'
+                END as categoria
+            FROM clientes c
+            JOIN ventas v ON c.id_cliente = v.id_cliente
+            WHERE DATE(v.fecha) BETWEEN %s AND %s
+            GROUP BY c.id_cliente, c.nombre
+            ORDER BY valor_monetario DESC, frecuencia DESC
+        """
+
+        cursor.execute(consulta_rfm, (fecha_inicio, fecha_fin))
+        resultados = cursor.fetchall()
+
+        return resultados
+
+    def graficar_comportamiento_clientes(self, ax, tipo_grafico):
+        """Genera gráfico de comportamiento de clientes basado en datos reales de la BD"""
+        # Obtener datos del historial de clientes directamente de la base de datos
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Consulta para análisis RFM (Recencia, Frecuencia, Valor Monetario)
+            consulta_rfm = """
+                SELECT 
+                    c.id_cliente,
+                    c.nombre,
+                    COUNT(v.id_venta) as frecuencia,
+                    DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) as recencia,
+                    SUM(v.total) as valor_monetario,
+                    CASE 
+                        WHEN COUNT(v.id_venta) > 5 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 30 THEN 'VIP'
+                        WHEN COUNT(v.id_venta) > 3 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 60 THEN 'Regular'
+                        WHEN DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) > 90 THEN 'Inactivo'
+                        ELSE 'Ocasional'
+                    END as categoria,
+                    CASE
+                        WHEN COUNT(v.id_venta) > 5 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 30 THEN 'Alto'
+                        WHEN COUNT(v.id_venta) > 3 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 60 THEN 'Medio'
+                        ELSE 'Bajo'
+                    END as potencial
+                FROM clientes c
+                JOIN ventas v ON c.id_cliente = v.id_cliente
+                WHERE DATE(v.fecha) BETWEEN %s AND %s
+                GROUP BY c.id_cliente, c.nombre
+                ORDER BY valor_monetario DESC, frecuencia DESC
+            """
+
+            cursor.execute(consulta_rfm, (self.fecha_inicio.get(), self.fecha_fin.get()))
+            clientes_rfm = cursor.fetchall()
+
+            # Consulta para obtener distribución de categorías
+            consulta_categorias = """
+                SELECT 
+                    CASE 
+                        WHEN COUNT(v.id_venta) > 5 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 30 THEN 'VIP'
+                        WHEN COUNT(v.id_venta) > 3 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 60 THEN 'Regular'
+                        WHEN DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) > 90 THEN 'Inactivo'
+                        ELSE 'Ocasional'
+                    END as categoria,
+                    COUNT(DISTINCT c.id_cliente) as total_clientes
+                FROM clientes c
+                JOIN ventas v ON c.id_cliente = v.id_cliente
+                WHERE DATE(v.fecha) BETWEEN %s AND %s
+                GROUP BY 
+                    CASE 
+                        WHEN COUNT(v.id_venta) > 5 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 30 THEN 'VIP'
+                        WHEN COUNT(v.id_venta) > 3 AND DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) < 60 THEN 'Regular'
+                        WHEN DATEDIFF(CURRENT_DATE, MAX(DATE(v.fecha))) > 90 THEN 'Inactivo'
+                        ELSE 'Ocasional'
+                    END
+            """
+
+            cursor.execute(consulta_categorias, (self.fecha_inicio.get(), self.fecha_fin.get()))
+            categorias_clientes = {row[0]: row[1] for row in cursor.fetchall()}
+
+            if tipo_grafico == "Pastel":
+                # Gráfico de torta para distribución de categorías
+                labels = list(categorias_clientes.keys())
+                sizes = list(categorias_clientes.values())
+
+                # Colores para categorías
+                colores = []
+                for cat in labels:
+                    if cat == "VIP":
+                        colores.append('#4CAF50')
+                    elif cat == "Regular":
+                        colores.append('#2196F3')
+                    elif cat == "Ocasional":
+                        colores.append('#FFC107')
+                    else:  # Inactivo
+                        colores.append('#F44336')
+
+                wedges, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.1f%%',
+                                                  startangle=90, colors=colores,
+                                                  wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+
+                ax.axis('equal')
+                ax.set_title('Distribución de Clientes por Categoría')
+
+            elif tipo_grafico == "Barras":
+                # Gráfico de barras para conteo por categoría
+                categorias_nombres = list(categorias_clientes.keys())
+                categorias_valores = list(categorias_clientes.values())
+
+                # Ordenar por frecuencia
+                indices = np.argsort(categorias_valores)
+                categorias_nombres = [categorias_nombres[i] for i in indices]
+                categorias_valores = [categorias_valores[i] for i in indices]
+
+                # Colores para categorías
+                colores = []
+                for cat in categorias_nombres:
+                    if cat == "VIP":
+                        colores.append('#4CAF50')
+                    elif cat == "Regular":
+                        colores.append('#2196F3')
+                    elif cat == "Ocasional":
+                        colores.append('#FFC107')
+                    else:  # Inactivo
+                        colores.append('#F44336')
+
+                bars = ax.bar(categorias_nombres, categorias_valores, color=colores)
+
+                # Agregar etiquetas de valor
+                for bar in bars:
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width() / 2., height + 0.1,
+                            f'{height}', ha='center', va='bottom', fontsize=9)
+
+                ax.set_xlabel('Categoría')
+                ax.set_ylabel('Cantidad de Clientes')
+                ax.set_title('Distribución de Clientes por Categoría')
+
+            elif tipo_grafico == "Barras Horizontales":
+                # Gráfico horizontal para mejor visualización de categoria vs. cantidad
+                categorias_nombres = list(categorias_clientes.keys())
+                categorias_valores = list(categorias_clientes.values())
+
+                # Ordenar por frecuencia descendente
+                indices = np.argsort(categorias_valores)[::-1]
+                categorias_nombres = [categorias_nombres[i] for i in indices]
+                categorias_valores = [categorias_valores[i] for i in indices]
+
+                # Colores para categorías
+                colores = []
+                for cat in categorias_nombres:
+                    if cat == "VIP":
+                        colores.append('#4CAF50')
+                    elif cat == "Regular":
+                        colores.append('#2196F3')
+                    elif cat == "Ocasional":
+                        colores.append('#FFC107')
+                    else:  # Inactivo
+                        colores.append('#F44336')
+
+                bars = ax.barh(categorias_nombres, categorias_valores, color=colores)
+
+                # Agregar etiquetas de valor
+                for bar in bars:
+                    width = bar.get_width()
+                    ax.text(width + 0.1, bar.get_y() + bar.get_height() / 2.,
+                            f'{width}', ha='left', va='center', fontsize=9)
+
+                ax.set_ylabel('Categoría')
+                ax.set_xlabel('Cantidad de Clientes')
+                ax.set_title('Distribución de Clientes por Categoría')
+
+            elif tipo_grafico == "Dispersión":
+                # Gráfico de dispersión para RFM
+                # Limitar a 20 clientes para mejor visualización
+                top_clientes = clientes_rfm[:20] if len(clientes_rfm) > 20 else clientes_rfm
+
+                # Extraer datos RFM
+                nombres = [cliente[1] for cliente in top_clientes]
+                frecuencias = [int(cliente[2]) for cliente in top_clientes]
+                recencias = [int(cliente[3]) for cliente in top_clientes]
+                valores = [float(cliente[4]) for cliente in top_clientes]
+                categorias_cliente = [cliente[5] for cliente in top_clientes]
+
+                # Colores según categoría
+                colores = []
+                for cat in categorias_cliente:
+                    if cat == "VIP":
+                        colores.append('#4CAF50')
+                    elif cat == "Regular":
+                        colores.append('#2196F3')
+                    elif cat == "Ocasional":
+                        colores.append('#FFC107')
+                    else:  # Inactivo
+                        colores.append('#F44336')
+
+                # Tamaño del punto basado en valor monetario
+                tamaños = [max(50, min(500, v / 10)) for v in valores]
+
+                # Crear gráfico de dispersión
+                scatter = ax.scatter(frecuencias, recencias, c=colores, s=tamaños, alpha=0.7, edgecolors='black')
+
+                # Agregar etiquetas a los puntos
+                for i, txt in enumerate(nombres):
+                    ax.annotate(txt[:10], (frecuencias[i], recencias[i]),
+                                xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+                # Invertir eje Y para que menor recencia (más reciente) esté arriba
+                ax.invert_yaxis()
+
+                ax.set_xlabel('Frecuencia (Visitas)')
+                ax.set_ylabel('Recencia (Días)')
+                ax.set_title('Análisis RFM - Recencia vs Frecuencia')
+                ax.grid(True, linestyle='--', alpha=0.7)
+
+                # Agregar leyenda para categorías
+                import matplotlib.patches as mpatches
+                vip_patch = mpatches.Patch(color='#4CAF50', label='VIP')
+                regular_patch = mpatches.Patch(color='#2196F3', label='Regular')
+                ocasional_patch = mpatches.Patch(color='#FFC107', label='Ocasional')
+                inactivo_patch = mpatches.Patch(color='#F44336', label='Inactivo')
+
+                ax.legend(handles=[vip_patch, regular_patch, ocasional_patch, inactivo_patch],
+                          loc='best')
+
+            elif tipo_grafico == "Líneas" or tipo_grafico == "Área":
+                # Obtener evolución real de categorías de clientes por mes
+                consulta_evolucion = """
+                    SELECT 
+                        DATE_FORMAT(v.fecha, '%Y-%m') as mes,
+                        CASE 
+                            WHEN COUNT(DISTINCT v.id_venta) > 5 AND 
+                                 DATEDIFF(LAST_DAY(DATE(v.fecha)), 
+                                          CAST(CONCAT(SUBSTRING_INDEX(DATE_FORMAT(v.fecha, '%Y-%m'), '-', 1), '-', 
+                                                    SUBSTRING_INDEX(DATE_FORMAT(v.fecha, '%Y-%m'), '-', -1), '-01') AS DATE)
+                                         ) < 30 THEN 'VIP'
+                            WHEN COUNT(DISTINCT v.id_venta) > 3 THEN 'Regular'
+                            WHEN COUNT(DISTINCT v.id_venta) > 1 THEN 'Ocasional'
+                            ELSE 'Inactivo'
+                        END as categoria,
+                        COUNT(DISTINCT c.id_cliente) as cantidad
+                    FROM clientes c
+                    JOIN ventas v ON c.id_cliente = v.id_cliente
+                    WHERE DATE(v.fecha) BETWEEN DATE_SUB(%s, INTERVAL 6 MONTH) AND %s
+                    GROUP BY 
+                        DATE_FORMAT(v.fecha, '%Y-%m'),
+                        CASE 
+                            WHEN COUNT(DISTINCT v.id_venta) > 5 AND 
+                                 DATEDIFF(LAST_DAY(DATE(v.fecha)), 
+                                          CAST(CONCAT(SUBSTRING_INDEX(DATE_FORMAT(v.fecha, '%Y-%m'), '-', 1), '-', 
+                                                    SUBSTRING_INDEX(DATE_FORMAT(v.fecha, '%Y-%m'), '-', -1), '-01') AS DATE)
+                                         ) < 30 THEN 'VIP'
+                            WHEN COUNT(DISTINCT v.id_venta) > 3 THEN 'Regular'
+                            WHEN COUNT(DISTINCT v.id_venta) > 1 THEN 'Ocasional'
+                            ELSE 'Inactivo'
+                        END
+                    ORDER BY mes, categoria
+                """
+
+                cursor.execute(consulta_evolucion, (self.fecha_inicio.get(), self.fecha_fin.get()))
+                resultados = cursor.fetchall()
+
+                # Procesar resultados
+                meses_unicos = sorted(set(r[0] for r in resultados))
+
+                # Convertir a formato legible
+                meses_formato = []
+                for mes in meses_unicos:
+                    try:
+                        fecha = datetime.strptime(mes, '%Y-%m')
+                        meses_formato.append(fecha.strftime('%b %Y'))
+                    except:
+                        meses_formato.append(mes)
+
+                # Estructurar datos por categoría
+                datos_categoria = {
+                    'VIP': [0] * len(meses_unicos),
+                    'Regular': [0] * len(meses_unicos),
+                    'Ocasional': [0] * len(meses_unicos),
+                    'Inactivo': [0] * len(meses_unicos)
+                }
+
+                # Llenar datos reales de evolución
+                for resultado in resultados:
+                    mes = resultado[0]
+                    categoria = resultado[1]
+                    cantidad = resultado[2]
+
+                    if categoria in datos_categoria and mes in meses_unicos:
+                        mes_idx = meses_unicos.index(mes)
+                        datos_categoria[categoria][mes_idx] = cantidad
+
+                # Colores para categorías
+                colors = {
+                    'VIP': '#4CAF50',
+                    'Regular': '#2196F3',
+                    'Ocasional': '#FFC107',
+                    'Inactivo': '#F44336'
+                }
+
+                # Crear gráfico con datos reales
+                for categoria, valores in datos_categoria.items():
+                    if tipo_grafico == "Líneas":
+                        ax.plot(meses_formato, valores, 'o-', linewidth=2,
+                                label=categoria, color=colors.get(categoria, '#999999'))
+                    else:  # Área
+                        ax.fill_between(meses_formato, valores, alpha=0.4,
+                                        label=categoria, color=colors.get(categoria, '#999999'))
+                        ax.plot(meses_formato, valores, 'o-', linewidth=1, color=colors.get(categoria, '#999999'))
+
+                ax.set_title('Evolución de Clientes por Categoría')
+                ax.set_ylabel('Cantidad')
+                ax.legend()
+                ax.grid(True, linestyle='--', alpha=0.7)
+                plt.xticks(rotation=45, ha='right')
+
+            elif tipo_grafico == "Calor":
+                # Crear matriz para mapa de calor con las métricas RFM
+                # Limitar a 10 clientes para mejor visualización
+                top_clientes = clientes_rfm[:10]
+
+                if not top_clientes:
+                    ax.text(0.5, 0.5, 'No hay datos suficientes para este análisis',
+                            ha='center', va='center', fontsize=12)
+                    return
+
+                # Extraer datos
+                nombres = [cliente[1][:15] for cliente in top_clientes]
+                frecuencias = [int(cliente[2]) for cliente in top_clientes]
+                recencias = [int(cliente[3]) for cliente in top_clientes]
+                valores = [float(cliente[4]) for cliente in top_clientes]
+
+                # Normalizar los valores para mejor visualización
+                max_frecuencia = max(frecuencias) if frecuencias else 1
+                max_recencia = max(recencias) if recencias else 1
+                max_valor = max(valores) if valores else 1
+
+                norm_frecuencias = [f / max_frecuencia for f in frecuencias]
+                # Invertir recencia para que 1.0 sea lo más reciente
+                norm_recencias = [1 - (r / max_recencia) for r in recencias]
+                norm_valores = [v / max_valor for v in valores]
+
+                # Crear matriz para el mapa de calor
+                matriz = np.array([norm_recencias, norm_frecuencias, norm_valores])
+
+                # Crear mapa de calor
+                sns.heatmap(matriz, ax=ax, cmap="YlGnBu", annot=True, fmt=".2f",
+                            xticklabels=nombres,
+                            yticklabels=['Recencia', 'Frecuencia', 'Valor'])
+
+                ax.set_title('Análisis RFM por Cliente (Valores Normalizados)')
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+
+            # Cerrar conexión
+            conexion.close()
+
+        except Exception as e:
+            print(f"Error en gráfico de comportamiento de clientes: {e}")
+            import traceback
+            traceback.print_exc()
+            ax.text(0.5, 0.5, f'Error al obtener datos: {str(e)}',
+                    ha='center', va='center', fontsize=10, wrap=True)
+
+    def crear_grafico_radar_rfm(self, ax, datos_rfm):
+        """Crea un gráfico de radar para el análisis RFM con datos reales"""
+        try:
+            import matplotlib.pyplot as plt
+            from matplotlib.path import Path
+            from matplotlib.spines import Spine
+            from matplotlib.transforms import Affine2D
+
+            # Limitar a 5 clientes para mejor visualización
+            datos_rfm = datos_rfm[:5]
+
+            # Número de variables
+            N = 3
+            theta = np.linspace(0, 2 * np.pi, N, endpoint=False)
+
+            # Completar el círculo
+            theta = np.append(theta, theta[0])
+
+            # Configurar ejes radiales
+            ax.set_theta_zero_location('N')
+            ax.set_theta_direction(-1)
+            ax.set_rlabel_position(0)
+
+            # Normalizar valores para el gráfico radar
+            max_frecuencia = max(d[2] for d in datos_rfm)
+            max_recencia = max(d[3] for d in datos_rfm)
+            max_valor = max(d[4] for d in datos_rfm)
+
+            # Etiquetas
+            labels = ['Frecuencia', 'Recencia', 'Valor', 'Frecuencia']
+            ax.set_xticks(theta)
+            ax.set_xticklabels(labels)
+
+            # Dibujar para cada cliente
+            for dato in datos_rfm:
+                nombre = dato[1][:15]
+                frecuencia_norm = dato[2] / max_frecuencia
+                # Invertir recencia (menor es mejor)
+                recencia_norm = 1 - (dato[3] / max_recencia) if max_recencia > 0 else 0
+                valor_norm = dato[4] / max_valor if max_valor > 0 else 0
+
+                values = [frecuencia_norm, recencia_norm, valor_norm, frecuencia_norm]
+                ax.plot(theta, values, 'o-', linewidth=2, label=nombre)
+                ax.fill(theta, values, alpha=0.25)
+
+            ax.set_ylim(0, 1)
+            ax.set_title('Análisis RFM por Cliente')
+            ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+
+        except Exception as e:
+            print(f"Error en gráfico radar: {e}")
+            ax.text(0.5, 0.5, 'Error al generar gráfico de radar',
+                    ha='center', va='center', fontsize=10)
 
     def cambiar_periodo(self, event=None):
         """Actualiza las fechas según el periodo seleccionado"""
@@ -1970,8 +2425,9 @@ class Reportes:
             top_clientes
         )
 
+    # Para la pestaña Dashboard, asegurar que se usen datos reales
     def generar_graficos_dashboard(self, ventas_diarias, top_servicios, pedidos_por_estado, top_clientes):
-        """Genera los gráficos para el dashboard general"""
+        """Genera los gráficos para el dashboard general con datos reales"""
         # Limpiar figuras existentes
         for fig in self.dashboard_figs:
             fig.clear()
@@ -1993,12 +2449,15 @@ class Reportes:
             # Agregar texto del total
             total_ventas = sum(totales)
             ax1.text(0.02, 0.95, f'Total: ${total_ventas:.2f}', transform=ax1.transAxes,
-                     fontsize=10, verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
+                     fontsize=10, verticalalignment='top',
+                     bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
         else:
             ax1.text(0.5, 0.5, 'No hay datos disponibles', ha='center', va='center', fontsize=12)
 
         self.dashboard_figs[0].tight_layout()
         self.dashboard_canvas[0].draw()
+
+
 
         # 2. Gráfico de servicios más solicitados (barras)
         ax2 = self.dashboard_figs[1].add_subplot(111)
@@ -2414,29 +2873,27 @@ class Reportes:
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
             return  # Salir temprano para no aplicar configuración estándar
 
-    def graficar_servicios(self, ax, tipo_grafico):
-        """Genera gráfico de servicios más solicitados"""
-        servicios = self.datos_grafico['servicios']
+    def graficar_clientes(self, ax, tipo_grafico):
+        """Genera gráfico de clientes frecuentes"""
+        clientes = self.datos_grafico['clientes']
 
-        # Limitar a los 10 servicios más solicitados para mejor visualización
-        top_servicios = servicios[:10] if len(servicios) > 10 else servicios
+        # Limitar a los 10 clientes más frecuentes
+        top_clientes = clientes[:10] if len(clientes) > 10 else clientes
 
-        nombres = [servicio[1] for servicio in top_servicios]
-        cantidades = [int(servicio[2]) for servicio in top_servicios]
-        ingresos = [float(servicio[3]) for servicio in top_servicios]
+        nombres = [cliente[1] for cliente in top_clientes]
+        visitas = [int(cliente[2]) for cliente in top_clientes]
+        gastos = [float(cliente[3]) for cliente in top_clientes]
 
         # Acortar nombres largos
         nombres_cortos = [nombre[:20] + "..." if len(nombre) > 20 else nombre for nombre in nombres]
 
-        # La implementación de la visualización es similar a la de productos
-        # Pero con colores diferentes para diferenciarlos
-
         if tipo_grafico == "Barras":
+            # Barras para visitas y gastos
             ax2 = ax.twinx()
-            bars1 = ax.bar([i - 0.2 for i in range(len(nombres_cortos))], cantidades, width=0.4,
-                          color='lightgreen', label='Cantidad')
-            bars2 = ax2.bar([i + 0.2 for i in range(len(nombres_cortos))], ingresos, width=0.4,
-                           color='orange', label='Ingresos ($)')
+            bars1 = ax.bar([i - 0.2 for i in range(len(nombres_cortos))], visitas, width=0.4,
+                           color='#6495ED', label='Visitas')
+            bars2 = ax2.bar([i + 0.2 for i in range(len(nombres_cortos))], gastos, width=0.4,
+                            color='#FF7F50', label='Gasto ($)')
 
             ax.set_xticks(range(len(nombres_cortos)))
             ax.set_xticklabels(nombres_cortos, rotation=45, ha='right')
@@ -2445,172 +2902,2374 @@ class Reportes:
             lines2, labels2 = ax2.get_legend_handles_labels()
             ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
 
-            ax.set_ylabel('Cantidad')
-            ax2.set_ylabel('Ingresos ($)')
-            ax.set_title('Top Servicios por Cantidad y Ventas')
-
-        elif tipo_grafico == "Líneas":
-            ax.plot(nombres_cortos, cantidades, marker='o', linestyle='-', color='green', label='Cantidad')
-
-            ax2 = ax.twinx()
-            ax2.plot(nombres_cortos, ingresos, marker='s', linestyle='--', color='orange', label='Ingresos ($)')
-
-            plt.xticks(rotation=45, ha='right')
-
-            lines1, labels1 = ax.get_legend_handles_labels()
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
-
-            ax.set_ylabel('Cantidad')
-            ax2.set_ylabel('Ingresos ($)')
-            ax.set_title('Servicios por Cantidad e Ingresos')
+            ax.set_ylabel('Visitas')
+            ax2.set_ylabel('Gasto ($)')
+            ax.set_title('Clientes Frecuentes por Visitas y Gasto')
 
         elif tipo_grafico == "Pastel":
+            # Gráfico de pastel para mostrar proporción de visitas
             plt.rcParams.update({'font.size': 9})
-            wedges, texts, autotexts = ax.pie(cantidades, labels=nombres_cortos, autopct='%1.1f%%',
-                                            startangle=90, colors=plt.cm.Set3.colors,
-                                            wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+            wedges, texts, autotexts = ax.pie(visitas, labels=nombres_cortos, autopct='%1.1f%%',
+                                              startangle=90, colors=plt.cm.Pastel1.colors,
+                                              wedgeprops={'edgecolor': 'white', 'linewidth': 1})
 
             plt.setp(texts, size=8)
             plt.setp(autotexts, size=8, weight='bold')
 
             ax.axis('equal')
-            ax.set_title('Distribución de Servicios Solicitados')
+            ax.set_title('Distribución de Visitas por Cliente')
 
         elif tipo_grafico == "Barras Horizontales":
+            # Invertir orden para mejor visualización
             nombres_cortos = nombres_cortos[::-1]
-            cantidades = cantidades[::-1]
-            ingresos = ingresos[::-1]
+            visitas = visitas[::-1]
+            gastos = gastos[::-1]
 
-            ax.barh(nombres_cortos, cantidades, color='lightgreen', alpha=0.7, label='Cantidad')
+            ax.barh(nombres_cortos, visitas, color='#6495ED', alpha=0.7, label='Visitas')
             ax2 = ax.twiny()
-            ax2.barh(nombres_cortos, ingresos, color='orange', alpha=0.5, label='Ingresos ($)')
+            ax2.barh(nombres_cortos, gastos, color='#FF7F50', alpha=0.5, label='Gasto ($)')
 
-            for i, v in enumerate(cantidades):
+            for i, v in enumerate(visitas):
                 ax.text(v + 0.5, i, f'{v}', va='center', fontsize=8)
 
             ax.legend(loc='lower right')
             ax2.legend(loc='upper right')
 
-            ax.set_title('Servicios por Cantidad y Ventas')
-            ax.set_xlabel('Cantidad')
-            ax2.set_xlabel('Ingresos ($)')
+            ax.set_title('Clientes por Visitas y Gasto Total')
+            ax.set_xlabel('Visitas')
+            ax2.set_xlabel('Gasto ($)')
+
+        elif tipo_grafico == "Dispersión":
+            # Gráfico de dispersión para relacionar visitas con gasto
+            ax.scatter(visitas, gastos, c=range(len(visitas)), cmap='plasma',
+                       s=100, alpha=0.7, edgecolors='black')
+
+            for i, txt in enumerate(nombres_cortos):
+                ax.annotate(txt, (visitas[i], gastos[i]),
+                            xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+            ax.set_xlabel('Número de Visitas')
+            ax.set_ylabel('Gasto Total ($)')
+            ax.set_title('Relación entre Visitas y Gasto por Cliente')
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        elif tipo_grafico == "Líneas":
+            # Para clientes, usamos un enfoque diferente mostrando su evolución de gasto
+            try:
+                for i, cliente in enumerate(top_clientes):
+                    if i < 5:  # Limitar a 5 clientes para evitar sobrecarga visual
+                        ax.plot([1, 2, 3], [gastos[i] * 0.7, gastos[i], gastos[i] * 1.1],
+                                marker='o', label=nombres_cortos[i])
+
+                ax.set_xticks([1, 2, 3])
+                ax.set_xticklabels(['Periodo Previo', 'Actual', 'Proyección'])
+                ax.set_ylabel('Gasto ($)')
+                ax.set_title('Evolución de Gasto por Cliente')
+                ax.legend(loc='best')
+                ax.grid(True, linestyle='--', alpha=0.7)
+            except:
+                ax.text(0.5, 0.5, 'No hay suficientes datos para este gráfico',
+                        ha='center', va='center', fontsize=12)
+
+        elif tipo_grafico == "Área" or tipo_grafico == "Calor":
+            # Para estos tipos, mostramos un análisis RFM (Recencia, Frecuencia, Monetización)
+            try:
+                # Preparar datos para RFM
+                datos_rfm = []
+                for cliente in top_clientes:
+                    # Normalizar los valores entre 0 y 1 para mejor visualización
+                    recencia = min(int(cliente[3]) / 100, 1)  # Días desde última compra
+                    frecuencia = min(int(cliente[2]) / 10, 1)  # Número de visitas
+                    monetizacion = min(float(cliente[3]) / 1000, 1)  # Gasto total
+
+                    datos_rfm.append([cliente[1], recencia, frecuencia, monetizacion])
+
+                if tipo_grafico == "Área":
+                    # Gráfico de radar para análisis RFM
+                    from matplotlib.path import Path
+                    from matplotlib.spines import Spine
+                    from matplotlib.transforms import Affine2D
+
+                    # Número de variables
+                    N = 3
+                    theta = np.linspace(0, 2 * np.pi, N, endpoint=False)
+
+                    # Completar el círculo
+                    theta = np.append(theta, theta[0])
+
+                    # Configurar ejes radiales
+                    ax.set_theta_zero_location('N')
+                    ax.set_theta_direction(-1)
+                    ax.set_rlabel_position(0)
+
+                    # Etiquetas
+                    labels = ['Recencia', 'Frecuencia', 'Monetización', 'Recencia']
+                    ax.set_xticks(theta)
+                    ax.set_xticklabels(labels)
+
+                    for i, cliente in enumerate(datos_rfm[:5]):  # Limitar a 5 clientes
+                        values = [cliente[1], cliente[2], cliente[3], cliente[1]]
+                        ax.plot(theta, values, 'o-', linewidth=2, label=cliente[0][:15])
+                        ax.fill(theta, values, alpha=0.25)
+
+                    ax.set_ylim(0, 1)
+                    ax.set_title('Análisis RFM por Cliente')
+                    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+
+                elif tipo_grafico == "Calor":
+                    # Crear matriz para mapa de calor
+                    matrix = np.zeros((len(datos_rfm[:10]), 3))
+                    for i, cliente in enumerate(datos_rfm[:10]):
+                        matrix[i, 0] = cliente[1]  # Recencia
+                        matrix[i, 1] = cliente[2]  # Frecuencia
+                        matrix[i, 2] = cliente[3]  # Monetización
+
+                    sns.heatmap(matrix, ax=ax, cmap="YlGnBu",
+                                xticklabels=['Recencia', 'Frecuencia', 'Monetización'],
+                                yticklabels=[d[0][:15] for d in datos_rfm[:10]],
+                                annot=True, fmt=".2f")
+
+                    ax.set_title('Análisis RFM por Cliente (Valores Normalizados)')
+            except Exception as e:
+                print(f"Error en visualización RFM: {e}")
+                ax.text(0.5, 0.5, 'No se pudo generar este tipo de gráfico con los datos disponibles',
+                        ha='center', va='center', fontsize=10)
+
+    def graficar_ingresos_mensuales(self, ax, tipo_grafico):
+        """Genera gráfico de ingresos mensuales"""
+        datos_por_mes = self.datos_grafico['datos_por_mes']
+
+        # Preparar los datos
+        meses = []
+        ingresos_ventas = []
+        ingresos_servicios = []
+
+        for clave in sorted(datos_por_mes.keys()):
+            datos = datos_por_mes[clave]
+
+            # Obtener nombre del mes
+            try:
+                nombre_mes = calendar.month_name[datos['mes']]
+            except:
+                nombre_mes = f"Mes {datos['mes']}"
+
+            etiqueta_mes = f"{nombre_mes[:3]} {datos['año']}"
+
+            meses.append(etiqueta_mes)
+            ingresos_ventas.append(float(datos['total_ventas']))
+            ingresos_servicios.append(float(datos['total_servicios']))
+
+        # Crear gráfico según tipo seleccionado
+        if tipo_grafico == "Barras":
+            # Barras apiladas
+            width = 0.8
+
+            # Crear barras apiladas
+            p1 = ax.bar(meses, ingresos_ventas, width, color='#4CAF50', label='Ventas')
+            p2 = ax.bar(meses, ingresos_servicios, width, bottom=ingresos_ventas,
+                        color='#2196F3', label='Servicios')
+
+            # Agregar etiquetas con totales
+            for i in range(len(meses)):
+                total = ingresos_ventas[i] + ingresos_servicios[i]
+                ax.text(i, total + 10, f"${total:.0f}", ha='center', fontsize=8)
+
+            ax.set_title('Ingresos Mensuales')
+            ax.set_ylabel('Ingresos ($)')
+            ax.set_xticks(range(len(meses)))
+            ax.set_xticklabels(meses, rotation=45, ha='right')
+            ax.legend()
+
+        elif tipo_grafico == "Líneas":
+            # Gráfico de líneas para tendencia
+            totales = [v + s for v, s in zip(ingresos_ventas, ingresos_servicios)]
+
+            ax.plot(meses, ingresos_ventas, 'o-', color='#4CAF50', linewidth=2, label='Ventas')
+            ax.plot(meses, ingresos_servicios, 's-', color='#2196F3', linewidth=2, label='Servicios')
+            ax.plot(meses, totales, '^-', color='#F44336', linewidth=3, label='Total')
+
+            ax.set_title('Tendencia de Ingresos Mensuales')
+            ax.set_ylabel('Ingresos ($)')
+            plt.xticks(rotation=45, ha='right')
+            ax.legend()
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+            # Agregar línea de tendencia para el total
+            if len(totales) > 1:
+                z = np.polyfit(range(len(totales)), totales, 1)
+                p = np.poly1d(z)
+                ax.plot(meses, p(range(len(totales))), "k--", alpha=0.5, linewidth=1)
 
         elif tipo_grafico == "Área":
-            ax.fill_between(nombres_cortos, cantidades, alpha=0.5, color='lightgreen', label='Cantidad')
-            ax.plot(nombres_cortos, cantidades, 'o-', color='green')
+            # Gráfico de área apilada
+            ax.fill_between(meses, ingresos_ventas, color='#4CAF50', alpha=0.7, label='Ventas')
+            ax.fill_between(meses, [v + s for v, s in zip(ingresos_ventas, ingresos_servicios)],
+                            ingresos_ventas, color='#2196F3', alpha=0.7, label='Servicios')
+
+            ax.set_title('Ingresos Mensuales por Categoría')
+            ax.set_ylabel('Ingresos ($)')
+            plt.xticks(rotation=45, ha='right')
+            ax.legend()
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        elif tipo_grafico == "Pastel":
+            # Para gráfico de pastel, mostrar el total por mes
+            totales = [ingresos_ventas[i] + ingresos_servicios[i] for i in range(len(meses))]
+
+            plt.rcParams.update({'font.size': 9})
+            wedges, texts, autotexts = ax.pie(totales, labels=meses, autopct='%1.1f%%',
+                                              startangle=90, colors=plt.cm.tab20.colors,
+                                              wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+
+            plt.setp(texts, size=8)
+            plt.setp(autotexts, size=8, weight='bold')
+
+            ax.axis('equal')
+            ax.set_title('Distribución de Ingresos por Mes')
+
+        elif tipo_grafico == "Barras Horizontales":
+            # Preparar datos para barras horizontales (invertimos el orden)
+            meses_inv = meses[::-1]
+            ventas_inv = ingresos_ventas[::-1]
+            servicios_inv = ingresos_servicios[::-1]
+
+            # Crear barras apiladas horizontales
+            ax.barh(meses_inv, ventas_inv, color='#4CAF50', label='Ventas')
+            ax.barh(meses_inv, servicios_inv, left=ventas_inv, color='#2196F3', label='Servicios')
+
+            # Agregar etiquetas con totales
+            for i in range(len(meses_inv)):
+                total = ventas_inv[i] + servicios_inv[i]
+                ax.text(total + 10, i, f"${total:.0f}", va='center', fontsize=8)
+
+            ax.set_title('Ingresos Mensuales por Categoría')
+            ax.set_xlabel('Ingresos ($)')
+            ax.legend()
+
+        elif tipo_grafico == "Calor":
+            # Crear matriz para mapa de calor
+            data = np.array([ingresos_ventas, ingresos_servicios])
+
+            # Normalizar para mejor visualización
+            data_norm = data / data.max()
+
+            sns.heatmap(data_norm, ax=ax, cmap="YlGnBu", annot=True, fmt=".2f",
+                        xticklabels=meses,
+                        yticklabels=['Ventas', 'Servicios'])
+
+            ax.set_title('Distribución de Ingresos (Normalizado)')
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+
+    def graficar_pedidos_estado(self, ax, tipo_grafico):
+        """Genera gráfico de pedidos por estado"""
+        pedidos_por_estado = self.datos_grafico['pedidos_por_estado']
+
+        # Preparar datos
+        estados = [p[0] for p in pedidos_por_estado]
+        cantidades = [int(p[1]) for p in pedidos_por_estado]
+        tiempos = [float(p[2]) if p[2] is not None else 0 for p in pedidos_por_estado]
+
+        # Colores para cada estado
+        colores = []
+        for estado in estados:
+            if estado == "Recibido":
+                colores.append('#ffecb3')
+            elif estado == "En proceso":
+                colores.append('#e3f2fd')
+            elif estado == "Listo para entrega":
+                colores.append('#e8f5e9')
+            elif estado == "Entregado":
+                colores.append('#c8e6c9')
+            elif estado == "Cancelado":
+                colores.append('#ffcdd2')
+            else:
+                colores.append('#e0e0e0')
+
+        if tipo_grafico == "Barras":
+            # Barras para cantidad
+            bars = ax.bar(estados, cantidades, color=colores)
+
+            # Añadir etiquetas sobre las barras
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2., height + 0.1,
+                        f'{height:.0f}', ha='center', va='bottom', fontsize=9)
+
+            ax.set_xlabel('Estado')
+            ax.set_ylabel('Cantidad')
+            ax.set_title('Cantidad de Pedidos por Estado')
+
+        elif tipo_grafico == "Pastel":
+            # Gráfico de torta para distribución
+            wedges, texts, autotexts = ax.pie(cantidades, labels=estados, autopct='%1.1f%%',
+                                              startangle=90, colors=colores,
+                                              wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+
+            ax.axis('equal')
+            ax.set_title('Distribución de Pedidos por Estado')
+
+        elif tipo_grafico == "Barras Horizontales":
+            # Ordenar datos para mejor visualización
+            indices = np.argsort(cantidades)
+            estados_ord = [estados[i] for i in indices]
+            cantidades_ord = [cantidades[i] for i in indices]
+            colores_ord = [colores[i] for i in indices]
+
+            bars = ax.barh(estados_ord, cantidades_ord, color=colores_ord)
+
+            # Añadir etiquetas
+            for bar in bars:
+                width = bar.get_width()
+                ax.text(width + 0.1, bar.get_y() + bar.get_height() / 2.,
+                        f'{width:.0f}', ha='left', va='center', fontsize=9)
+
+            ax.set_xlabel('Cantidad')
+            ax.set_title('Cantidad de Pedidos por Estado')
+
+
+        elif tipo_grafico == "Líneas" or tipo_grafico == "Área":
+
+            # Obtener evolución temporal real de la base de datos
+
+            try:
+
+                conexion = conectar_bd()
+
+                cursor = conexion.cursor()
+
+                # Consultar datos de evolución semanal
+
+                consulta_evolucion = """
+
+                    SELECT 
+
+                        YEARWEEK(fecha_pedido) as semana,
+
+                        estado,
+
+                        COUNT(*) as cantidad
+
+                    FROM pedidos
+
+                    WHERE DATE(fecha_pedido) BETWEEN %s AND %s
+
+                    GROUP BY YEARWEEK(fecha_pedido), estado
+
+                    ORDER BY semana
+
+                """
+
+                cursor.execute(consulta_evolucion, (self.fecha_inicio.get(), self.fecha_fin.get()))
+
+                resultados = cursor.fetchall()
+
+                # Procesar resultados
+
+                semanas_unicas = sorted(set(r[0] for r in resultados))
+
+                # Convertir números de semana a etiquetas legibles
+
+                fechas = []
+
+                for semana in semanas_unicas:
+                    # Extraer año y número de semana
+
+                    year = int(str(semana)[:4])
+
+                    week = int(str(semana)[4:])
+
+                    # Crear etiqueta
+
+                    fechas.append(f"Sem {week}/{year}")
+
+                datos_evolucion = {estado: [0] * len(semanas_unicas) for estado in estados}
+
+                # Llenar datos reales
+
+                for resultado in resultados:
+
+                    semana_idx = semanas_unicas.index(resultado[0])
+
+                    estado = resultado[1]
+
+                    cantidad = resultado[2]
+
+                    if estado in datos_evolucion:
+                        datos_evolucion[estado][semana_idx] = cantidad
+
+                # Crear gráfico con datos reales
+
+                for estado in estados:
+
+                    if estado in datos_evolucion:
+
+                        if tipo_grafico == "Líneas":
+
+                            ax.plot(fechas, datos_evolucion[estado], 'o-', linewidth=2, label=estado)
+
+                        else:  # Área
+
+                            ax.fill_between(fechas, datos_evolucion[estado], alpha=0.4, label=estado)
+
+                            ax.plot(fechas, datos_evolucion[estado], 'o-', linewidth=1)
+
+                ax.set_title('Evolución de Pedidos por Estado')
+
+                ax.set_ylabel('Cantidad')
+
+                ax.legend()
+
+                ax.grid(True, linestyle='--', alpha=0.7)
+
+                plt.xticks(rotation=45, ha='right')
+
+                conexion.close()
+
+
+            except Exception as e:
+
+                print(f"Error en gráfico de evolución: {e}")
+
+                ax.text(0.5, 0.5, 'Error al obtener datos de evolución',
+
+                        ha='center', va='center', fontsize=12)
+
+        elif tipo_grafico == "Dispersión":
+            # Gráfico de dispersión para relacionar cantidad con tiempo promedio
+
+            # Filtrar estados sin tiempo promedio
+            estados_filtrados = []
+            cantidades_filtradas = []
+            tiempos_filtrados = []
+            colores_filtrados = []
+
+            for i, (estado, cantidad, tiempo) in enumerate(zip(estados, cantidades, tiempos)):
+                if tiempo > 0:
+                    estados_filtrados.append(estado)
+                    cantidades_filtradas.append(cantidad)
+                    tiempos_filtrados.append(tiempo)
+                    colores_filtrados.append(colores[i])
+
+            if not estados_filtrados:
+                ax.text(0.5, 0.5, 'No hay datos de tiempo disponibles para este gráfico',
+                        ha='center', va='center', fontsize=12)
+                return
+
+            # Convertir horas a días para mejor visualización
+            tiempos_dias = [t / 24 for t in tiempos_filtrados]
+
+            ax.scatter(cantidades_filtradas, tiempos_dias, c=colores_filtrados,
+                       s=100, alpha=0.7, edgecolors='black')
+
+            for i, txt in enumerate(estados_filtrados):
+                ax.annotate(txt, (cantidades_filtradas[i], tiempos_dias[i]),
+                            xytext=(5, 5), textcoords='offset points', fontsize=9)
+
+            ax.set_xlabel('Cantidad de Pedidos')
+            ax.set_ylabel('Tiempo Promedio (días)')
+            ax.set_title('Relación entre Cantidad y Tiempo Promedio por Estado')
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+
+        elif tipo_grafico == "Calor":
+
+            # Obtener datos reales de transición entre estados
+
+            try:
+
+                conexion = conectar_bd()
+
+                cursor = conexion.cursor()
+
+                # Verificar si existe la tabla de historial
+
+                cursor.execute("""
+
+                    SELECT COUNT(*) 
+
+                    FROM information_schema.tables 
+
+                    WHERE table_schema = DATABASE() 
+
+                    AND table_name = 'historial_estados_pedido'
+
+                """)
+
+                tabla_existe = cursor.fetchone()[0] > 0
+
+                if tabla_existe:
+
+                    # Consultar historial de cambios de estado
+
+                    consulta_transicion = """
+
+                        SELECT 
+
+                            estado_anterior,
+
+                            estado_nuevo,
+
+                            COUNT(*) as cantidad
+
+                        FROM historial_estados_pedido
+
+                        WHERE id_pedido IN (
+
+                            SELECT id_pedido FROM pedidos 
+
+                            WHERE DATE(fecha_pedido) BETWEEN %s AND %s
+
+                        )
+
+                        GROUP BY estado_anterior, estado_nuevo
+
+                    """
+
+                    cursor.execute(consulta_transicion, (self.fecha_inicio.get(), self.fecha_fin.get()))
+
+                    transiciones = cursor.fetchall()
+
+                    # Crear matriz de transición
+
+                    matriz_transicion = np.zeros((len(estados), len(estados)))
+
+                    # Llenar con datos reales
+
+                    for transicion in transiciones:
+
+                        if transicion[0] in estados and transicion[1] in estados:
+                            i = estados.index(transicion[0])
+
+                            j = estados.index(transicion[1])
+
+                            matriz_transicion[i, j] = transicion[2]
+
+                    # Crear mapa de calor
+
+                    sns.heatmap(matriz_transicion, ax=ax, cmap="YlGnBu", annot=True, fmt=".0f",
+
+                                xticklabels=estados,
+
+                                yticklabels=estados)
+
+                    ax.set_title('Matriz de Transición entre Estados')
+
+                else:
+
+                    # Si no existe la tabla, usar distribución actual como alternativa
+
+                    consulta_distribución = """
+
+                        SELECT estado, COUNT(*) as cantidad
+
+                        FROM pedidos
+
+                        WHERE DATE(fecha_pedido) BETWEEN %s AND %s
+
+                        GROUP BY estado
+
+                    """
+
+                    cursor.execute(consulta_distribución, (self.fecha_inicio.get(), self.fecha_fin.get()))
+
+                    distribución = {estado: 0 for estado in estados}
+
+                    for resultado in cursor.fetchall():
+
+                        if resultado[0] in distribución:
+                            distribución[resultado[0]] = resultado[1]
+
+                    # Crear matriz para el mapa de calor
+
+                    matriz = np.zeros((len(estados), 1))
+
+                    for i, estado in enumerate(estados):
+                        matriz[i, 0] = distribución[estado]
+
+                    sns.heatmap(matriz, ax=ax, cmap="YlGnBu", annot=True, fmt=".0f",
+
+                                yticklabels=estados,
+
+                                xticklabels=['Cantidad'])
+
+                    ax.set_title('Distribución de Pedidos por Estado')
+
+                conexion.close()
+
+
+            except Exception as e:
+
+                print(f"Error en matriz de transición: {e}")
+
+                ax.text(0.5, 0.5, 'Error al obtener datos de transición de estados',
+
+                        ha='center', va='center', fontsize=12)
+
+    def graficar_rentabilidad(self, ax, tipo_grafico):
+        """Genera gráfico de rentabilidad de servicios"""
+        servicios = self.datos_grafico['servicios']
+
+        # Limitar a los 10 servicios más rentables
+        top_servicios = servicios[:10] if len(servicios) > 10 else servicios
+
+        nombres = [s[1] for s in top_servicios]
+        margenes = [float(s[5]) for s in top_servicios]
+        rentabilidades = [float(s[6]) for s in top_servicios]
+        ingresos = [float(s[3]) for s in top_servicios]
+        costos = [float(s[4]) for s in top_servicios]
+
+        # Acortar nombres largos
+        nombres_cortos = [nombre[:15] + "..." if len(nombre) > 15 else nombre for nombre in nombres]
+
+        if tipo_grafico == "Barras":
+            # Barras para margen y rentabilidad
+            x = np.arange(len(nombres_cortos))
+            width = 0.4
 
             ax2 = ax.twinx()
-            ax2.plot(nombres_cortos, ingresos, 's--', color='orange', label='Ingresos ($)')
+            bars1 = ax.bar(x - width / 2, margenes, width, color='#4CAF50', label='Margen ($)')
+            bars2 = ax2.bar(x + width / 2, rentabilidades, width, color='#FFC107', label='Rentabilidad (%)')
 
-            plt.xticks(rotation=45, ha='right')
+            ax.set_xticks(x)
+            ax.set_xticklabels(nombres_cortos, rotation=45, ha='right')
 
+            # Agregar etiquetas a las barras
+            for bar in bars1:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2., height + 1,
+                        f'${height:.0f}', ha='center', va='bottom', fontsize=7)
+
+            for bar in bars2:
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width() / 2., height + 1,
+                         f'{height:.1f}%', ha='center', va='bottom', fontsize=7)
+
+            # Leyenda combinada
             lines1, labels1 = ax.get_legend_handles_labels()
             lines2, labels2 = ax2.get_legend_handles_labels()
             ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
 
-            ax.set_ylabel('Cantidad')
-            ax2.set_ylabel('Ingresos ($)')
-            ax.set_title('Servicios por Cantidad e Ingresos')
+            ax.set_ylabel('Margen ($)')
+            ax2.set_ylabel('Rentabilidad (%)')
+            ax.set_title('Rentabilidad por Servicio')
 
-        elif tipo_grafico == "Dispersión":
-            ax.scatter(cantidades, ingresos, c=range(len(cantidades)), cmap='Greens',
-                     s=100, alpha=0.7, edgecolors='black')
+        elif tipo_grafico == "Pastel":
+            # Gráfico de torta para rentabilidad
+            # Usar colores basados en rentabilidad
+            colores = []
+            for r in rentabilidades:
+                if r >= 40:
+                    colores.append('#4CAF50')  # Verde para alta rentabilidad
+                elif r >= 20:
+                    colores.append('#FFC107')  # Amarillo para rentabilidad media
+                else:
+                    colores.append('#F44336')  # Rojo para baja rentabilidad
 
-            for i, txt in enumerate(nombres_cortos):
-                ax.annotate(txt, (cantidades[i], ingresos[i]),
-                          xytext=(5, 5), textcoords='offset points', fontsize=8)
+            wedges, texts, autotexts = ax.pie(margenes, labels=nombres_cortos, autopct='%1.1f%%',
+                                              startangle=90, colors=colores,
+                                              wedgeprops={'edgecolor': 'white', 'linewidth': 1})
 
-            ax.set_xlabel('Cantidad Solicitada')
-            ax.set_ylabel('Ingresos ($)')
-            ax.set_title('Relación entre Cantidad e Ingresos por Servicio')
+            plt.setp(texts, size=8)
+            plt.setp(autotexts, size=8, weight='bold')
+
+            ax.axis('equal')
+            ax.set_title('Distribución de Margen por Servicio')
+
+        elif tipo_grafico == "Barras Horizontales":
+            # Ordenar para mejor visualización
+            indices = np.argsort(rentabilidades)
+            nombres_ord = [nombres_cortos[i] for i in indices]
+            rentabilidades_ord = [rentabilidades[i] for i in indices]
+
+            # Colores basados en rentabilidad
+            colores = []
+            for r in rentabilidades_ord:
+                if r >= 40:
+                    colores.append('#4CAF50')  # Verde para alta rentabilidad
+                elif r >= 20:
+                    colores.append('#FFC107')  # Amarillo para rentabilidad media
+                else:
+                    colores.append('#F44336')  # Rojo para baja rentabilidad
+
+            bars = ax.barh(nombres_ord, rentabilidades_ord, color=colores)
+
+            # Línea de referencia para rentabilidad objetivo (30%)
+            ax.axvline(x=30, color='black', linestyle='--', alpha=0.7)
+            ax.text(30, len(nombres_ord) - 1, 'Objetivo (30%)', rotation=90,
+                    va='bottom', ha='right', fontsize=8)
+
+            # Añadir etiquetas
+            for bar in bars:
+                width = bar.get_width()
+                ax.text(width + 0.5, bar.get_y() + bar.get_height() / 2.,
+                        f'{width:.1f}%', ha='left', va='center', fontsize=8)
+
+            ax.set_xlabel('Rentabilidad (%)')
+            ax.set_title('Rentabilidad por Servicio')
+
+        elif tipo_grafico == "Líneas" or tipo_grafico == "Área":
+            # Para estos tipos, mostrar comparación de ingresos vs costos y margen
+            x = np.arange(len(nombres_cortos))
+
+            if tipo_grafico == "Líneas":
+                ax.plot(nombres_cortos, ingresos, 'o-', color='#4CAF50', linewidth=2, label='Ingresos')
+                ax.plot(nombres_cortos, costos, 's-', color='#F44336', linewidth=2, label='Costos')
+                ax.plot(nombres_cortos, margenes, '^-', color='#2196F3', linewidth=2, label='Margen')
+            else:  # Área
+                ax.fill_between(x, ingresos, costos, color='#4CAF50', alpha=0.5, label='Margen')
+                ax.plot(x, ingresos, 'o-', color='green', label='Ingresos')
+                ax.plot(x, costos, 's-', color='red', label='Costos')
+
+                ax.set_xticks(x)
+                ax.set_xticklabels(nombres_cortos, rotation=45, ha='right')
+
+            ax.set_title('Análisis de Ingresos, Costos y Margen por Servicio')
+            ax.set_ylabel('Monto ($)')
+            ax.legend()
             ax.grid(True, linestyle='--', alpha=0.7)
 
+
+        elif tipo_grafico == "Dispersión":
+
+            # Gráfico de dispersión para relacionar ingresos con rentabilidad
+
+            ax.scatter(ingresos, rentabilidades, c=margenes, cmap='viridis',
+
+                       s=100, alpha=0.7, edgecolors='black')
+
+            for i, txt in enumerate(nombres_cortos):
+                ax.annotate(txt, (ingresos[i], rentabilidades[i]),
+
+                            xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+            ax.set_xlabel('Ingresos ($)')
+
+            ax.set_ylabel('Rentabilidad (%)')
+
+            ax.set_title('Relación entre Ingresos y Rentabilidad por Servicio')
+
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+            # Agregar líneas de referencia
+
+            ax.axhline(y=30, color='black', linestyle='--', alpha=0.5)
+
+            ax.text(min(ingresos), 30, 'Objetivo 30%', va='bottom', ha='left', fontsize=8)
+
+
         elif tipo_grafico == "Calor":
-            # Similar a productos
+
+            # Crear matriz para mapa de calor con ingresos, costos, margen y rentabilidad
+
             data = []
+
             for i, nombre in enumerate(nombres_cortos):
-                fila = [nombre, cantidades[i], ingresos[i], ingresos[i]/cantidades[i]]
+                fila = [nombre, ingresos[i], costos[i], margenes[i], rentabilidades[i]]
+
                 data.append(fila)
 
+            # Convertir a DataFrame
+
             import pandas as pd
-            df = pd.DataFrame(data, columns=['Servicio', 'Cantidad', 'Ingresos', 'Precio Unitario'])
+
+            df = pd.DataFrame(data, columns=['Servicio', 'Ingresos', 'Costos', 'Margen', 'Rentabilidad'])
+
+            # Normalizar los valores para mejor visualización
+
             matriz = df.iloc[:, 1:].apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=0)
 
             sns.heatmap(matriz.T, ax=ax, annot=True, fmt=".2f", cmap="YlGnBu",
-                       xticklabels=nombres_cortos,
-                       yticklabels=['Cantidad', 'Ingresos', 'Precio Unit.'])
 
-            ax.set_title('Análisis de Servicios (Valores Normalizados)')
-            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right='ID')
-            self.tabla_reporte.heading('nombre', text='Servicio')
-            self.tabla_reporte.heading('cantidad_total', text='Cantidad Solicitada')
-            self.tabla_reporte.heading('ingresos_total', text='Ingresos Generados')
-            self.tabla_reporte.heading('precio_promedio', text='Precio Promedio')
+                        xticklabels=nombres_cortos,
 
-            self.tabla_reporte.column('id_servicio', width=50, anchor=tk.CENTER)
-            self.tabla_reporte.column('nombre', width=300)
-            self.tabla_reporte.column('cantidad_total', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('ingresos_total', width=150, anchor=tk.E)
-            self.tabla_reporte.column('precio_promedio', width=120, anchor=tk.E)
+                        yticklabels=['Ingresos', 'Costos', 'Margen', 'Rentabilidad'])
 
-        elif tipo_seleccionado == "Clientes Frecuentes":
-            columnas = ('id_cliente', 'nombre', 'visitas', 'gasto_total', 'puntos', 'ultima_visita', 'promedio_compra')
-            self.tabla_reporte['columns'] = columnas
+            ax.set_title('Análisis de Rentabilidad (Valores Normalizados)')
 
-            self.tabla_reporte.heading('id_cliente', text='ID')
-            self.tabla_reporte.heading('nombre', text='Cliente')
-            self.tabla_reporte.heading('visitas', text='Visitas')
-            self.tabla_reporte.heading('gasto_total', text='Gasto Total')
-            self.tabla_reporte.heading('puntos', text='Puntos')
-            self.tabla_reporte.heading('ultima_visita', text='Última Visita')
-            self.tabla_reporte.heading('promedio_compra', text='Promedio/Compra')
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
 
-            self.tabla_reporte.column('id_cliente', width=50, anchor=tk.CENTER)
-            self.tabla_reporte.column('nombre', width=200)
-            self.tabla_reporte.column('visitas', width=80, anchor=tk.CENTER)
-            self.tabla_reporte.column('gasto_total', width=100, anchor=tk.E)
-            self.tabla_reporte.column('puntos', width=80, anchor=tk.CENTER)
-            self.tabla_reporte.column('ultima_visita', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('promedio_compra', width=120, anchor=tk.E)
+        def graficar_comportamiento_clientes(self, ax, tipo_grafico):
 
-        elif tipo_seleccionado == "Ingresos Mensuales":
-            columnas = ('mes', 'ventas', 'total_ventas', 'servicios', 'total_servicios', 'total_general')
-            self.tabla_reporte['columns'] = columnas
+            """Genera gráfico de comportamiento de clientes"""
 
-            self.tabla_reporte.heading('mes', text='Mes')
-            self.tabla_reporte.heading('ventas', text='Cant. Ventas')
-            self.tabla_reporte.heading('total_ventas', text='Total Ventas')
-            self.tabla_reporte.heading('servicios', text='Cant. Servicios')
-            self.tabla_reporte.heading('total_servicios', text='Total Servicios')
-            self.tabla_reporte.heading('total_general', text='Total General')
+            clientes = self.datos_grafico['clientes']
 
-            self.tabla_reporte.column('mes', width=100, anchor=tk.W)
-            self.tabla_reporte.column('ventas', width=100, anchor=tk.CENTER)
-            self.tabla_reporte.column('total_ventas', width=120, anchor=tk.E)
-            self.tabla_reporte.column('servicios', width=120, anchor=tk.CENTER)
-            self.tabla_reporte.column('total_servicios', width=120, anchor=tk.E)
-            self.tabla_reporte.column('total_general', width=120, anchor=tk.E)
+            categorias = self.datos_grafico['categorias']
 
-        elif tipo_seleccionado == "Pedidos por Estado":
-            columnas = ('estado', 'cantidad', 'porcentaje', 'tiempo_promedio')
-            self.tabla_reporte['columns'] = columnas
+            if tipo_grafico == "Pastel":
 
-            self.tabla_reporte.heading('estado', text='Estado')
-            self.tabla_reporte.heading('cantidad', text='Cantidad')
-            self.tabla_reporte.heading('porcentaje', text='Porcentaje')
-            self.tabla_reporte.heading('tiempo_promedio', text='Tiempo Promedio')
+                # Gráfico de torta para distribución de categorías
 
-            self.tabla_reporte.column('estado', width=150, anchor=tk.W)
-            self.tabla_reporte.column('cantidad', width=100, anchor=tk.CENTER)
-            self.tabla_reporte.column('porcentaje', width=100, anchor=tk.CENTER)
-            self.tabla_reporte.column('tiempo_promedio', width=150, anchor=tk.CENTER)
+                labels = list(categorias.keys())
 
-            # Filtros adicionales
-            self.crear_filtros_pedidos()
+                sizes = list(categorias.values())
 
-        elif tipo_seleccionado == "Rentabilidad de Servicios":
-            columnas = ('id_servicio', 'nombre', 'cantidad', 'ingresos', 'costos', 'margen', 'rentabilidad')
-            self.tabla_reporte['columns'] = columnas
+                # Colores para categorías
 
-            self.tabla_reporte.heading('id_servicio', text
+                colores = []
+
+                for cat in labels:
+
+                    if cat == "VIP":
+
+                        colores.append('#4CAF50')
+
+                    elif cat == "Regular":
+
+                        colores.append('#2196F3')
+
+                    elif cat == "Ocasional":
+
+                        colores.append('#FFC107')
+
+                    else:  # Inactivo
+
+                        colores.append('#F44336')
+
+                wedges, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.1f%%',
+
+                                                  startangle=90, colors=colores,
+
+                                                  wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+
+                ax.axis('equal')
+
+                ax.set_title('Distribución de Clientes por Categoría')
+
+
+            elif tipo_grafico == "Barras":
+
+                # Gráfico de barras para conteo por categoría
+
+                categorias_nombres = list(categorias.keys())
+
+                categorias_valores = list(categorias.values())
+
+                # Ordenar por frecuencia
+
+                indices = np.argsort(categorias_valores)
+
+                categorias_nombres = [categorias_nombres[i] for i in indices]
+
+                categorias_valores = [categorias_valores[i] for i in indices]
+
+                # Colores para categorías
+
+                colores = []
+
+                for cat in categorias_nombres:
+
+                    if cat == "VIP":
+
+                        colores.append('#4CAF50')
+
+                    elif cat == "Regular":
+
+                        colores.append('#2196F3')
+
+                    elif cat == "Ocasional":
+
+                        colores.append('#FFC107')
+
+                    else:  # Inactivo
+
+                        colores.append('#F44336')
+
+                bars = ax.bar(categorias_nombres, categorias_valores, color=colores)
+
+                # Agregar etiquetas de valor
+
+                for bar in bars:
+                    height = bar.get_height()
+
+                    ax.text(bar.get_x() + bar.get_width() / 2., height + 0.1,
+
+                            f'{height}', ha='center', va='bottom', fontsize=9)
+
+                ax.set_xlabel('Categoría')
+
+                ax.set_ylabel('Cantidad de Clientes')
+
+                ax.set_title('Distribución de Clientes por Categoría')
+
+
+            elif tipo_grafico == "Barras Horizontales":
+
+                # Gráfico horizontal para mejor visualización de categoria vs. cantidad
+
+                categorias_nombres = list(categorias.keys())
+
+                categorias_valores = list(categorias.values())
+
+                # Ordenar por frecuencia descendente
+
+                indices = np.argsort(categorias_valores)[::-1]
+
+                categorias_nombres = [categorias_nombres[i] for i in indices]
+
+                categorias_valores = [categorias_valores[i] for i in indices]
+
+                # Colores para categorías
+
+                colores = []
+
+                for cat in categorias_nombres:
+
+                    if cat == "VIP":
+
+                        colores.append('#4CAF50')
+
+                    elif cat == "Regular":
+
+                        colores.append('#2196F3')
+
+                    elif cat == "Ocasional":
+
+                        colores.append('#FFC107')
+
+                    else:  # Inactivo
+
+                        colores.append('#F44336')
+
+                bars = ax.barh(categorias_nombres, categorias_valores, color=colores)
+
+                # Agregar etiquetas de valor
+
+                for bar in bars:
+                    width = bar.get_width()
+
+                    ax.text(width + 0.1, bar.get_y() + bar.get_height() / 2.,
+
+                            f'{width}', ha='left', va='center', fontsize=9)
+
+                ax.set_ylabel('Categoría')
+
+                ax.set_xlabel('Cantidad de Clientes')
+
+                ax.set_title('Distribución de Clientes por Categoría')
+
+
+            elif tipo_grafico == "Dispersión":
+
+                # Gráfico de dispersión para RFM
+
+                # Limitar a 20 clientes para mejor visualización
+
+                top_clientes = clientes[:20]
+
+                # Extraer datos RFM
+
+                nombres = [cliente[1] for cliente in top_clientes]
+
+                frecuencias = [int(cliente[2]) for cliente in top_clientes]
+
+                recencias = [int(cliente[3]) for cliente in top_clientes]
+
+                valores = [float(cliente[4]) for cliente in top_clientes]
+
+                categorias_cliente = [cliente[5] for cliente in top_clientes]
+
+                # Colores según categoría
+
+                colores = []
+
+                for cat in categorias_cliente:
+
+                    if cat == "VIP":
+
+                        colores.append('#4CAF50')
+
+                    elif cat == "Regular":
+
+                        colores.append('#2196F3')
+
+                    elif cat == "Ocasional":
+
+                        colores.append('#FFC107')
+
+                    else:  # Inactivo
+
+                        colores.append('#F44336')
+
+                # Tamaño del punto basado en valor monetario
+
+                tamaños = [max(50, min(500, v / 10)) for v in valores]
+
+                # Crear gráfico de dispersión
+
+                scatter = ax.scatter(frecuencias, recencias, c=colores, s=tamaños, alpha=0.7, edgecolors='black')
+
+                # Agregar etiquetas a los puntos
+
+                for i, txt in enumerate(nombres):
+                    ax.annotate(txt[:10], (frecuencias[i], recencias[i]),
+
+                                xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+                # Invertir eje Y para que menor recencia (más reciente) esté arriba
+
+                ax.invert_yaxis()
+
+                ax.set_xlabel('Frecuencia (Visitas)')
+
+                ax.set_ylabel('Recencia (Días)')
+
+                ax.set_title('Análisis RFM - Recencia vs Frecuencia')
+
+                ax.grid(True, linestyle='--', alpha=0.7)
+
+                # Agregar leyenda para categorías
+
+                import matplotlib.patches as mpatches
+
+                vip_patch = mpatches.Patch(color='#4CAF50', label='VIP')
+
+                regular_patch = mpatches.Patch(color='#2196F3', label='Regular')
+
+                ocasional_patch = mpatches.Patch(color='#FFC107', label='Ocasional')
+
+                inactivo_patch = mpatches.Patch(color='#F44336', label='Inactivo')
+
+                ax.legend(handles=[vip_patch, regular_patch, ocasional_patch, inactivo_patch],
+
+                          loc='best')
+
+
+            elif tipo_grafico == "Líneas" or tipo_grafico == "Área":
+
+                # Para estos tipos, mostrar evolución de categorías (simulada)
+
+                # En un caso real, estos datos vendrían de la base de datos
+
+                # Simular evolución de categorías por mes
+
+                meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
+
+                data = {
+
+                    'VIP': [categorias.get('VIP', 0) * 0.8,
+
+                            categorias.get('VIP', 0) * 0.85,
+
+                            categorias.get('VIP', 0) * 0.9,
+
+                            categorias.get('VIP', 0) * 0.95,
+
+                            categorias.get('VIP', 0),
+
+                            categorias.get('VIP', 0) * 1.05],
+
+                    'Regular': [categorias.get('Regular', 0) * 0.7,
+
+                                categorias.get('Regular', 0) * 0.8,
+
+                                categorias.get('Regular', 0) * 0.9,
+
+                                categorias.get('Regular', 0) * 0.95,
+
+                                categorias.get('Regular', 0),
+
+                                categorias.get('Regular', 0) * 1.1],
+
+                    'Ocasional': [categorias.get('Ocasional', 0) * 0.9,
+
+                                  categorias.get('Ocasional', 0) * 0.95,
+
+                                  categorias.get('Ocasional', 0),
+
+                                  categorias.get('Ocasional', 0) * 1.05,
+
+                                  categorias.get('Ocasional', 0) * 1.1,
+
+                                  categorias.get('Ocasional', 0) * 1.15],
+
+                    'Inactivo': [categorias.get('Inactivo', 0) * 1.1,
+
+                                 categorias.get('Inactivo', 0) * 1.05,
+
+                                 categorias.get('Inactivo', 0),
+
+                                 categorias.get('Inactivo', 0) * 0.95,
+
+                                 categorias.get('Inactivo', 0) * 0.9,
+
+                                 categorias.get('Inactivo', 0) * 0.85]
+
+                }
+
+                # Colores para categorías
+
+                colors = {
+
+                    'VIP': '#4CAF50',
+
+                    'Regular': '#2196F3',
+
+                    'Ocasional': '#FFC107',
+
+                    'Inactivo': '#F44336'
+
+                }
+
+                if tipo_grafico == "Líneas":
+
+                    for categoria, valores in data.items():
+
+                        if categoria in categorias:  # Solo mostrar categorías que existen
+
+                            ax.plot(meses, valores, 'o-', linewidth=2,
+
+                                    label=categoria, color=colors[categoria])
+
+                else:  # Área
+
+                    for categoria, valores in data.items():
+
+                        if categoria in categorias:  # Solo mostrar categorías que existen
+
+                            ax.fill_between(meses, valores, alpha=0.4,
+
+                                            label=categoria, color=colors[categoria])
+
+                            ax.plot(meses, valores, 'o-', linewidth=1, color=colors[categoria])
+
+                ax.set_title('Evolución de Clientes por Categoría')
+
+                ax.set_ylabel('Cantidad')
+
+                ax.legend()
+
+                ax.grid(True, linestyle='--', alpha=0.7)
+
+
+            elif tipo_grafico == "Calor":
+
+                # Crear matriz para mapa de calor con las métricas RFM
+
+                # Limitar a 10 clientes para mejor visualización
+
+                top_clientes = clientes[:10]
+
+                # Extraer datos
+
+                nombres = [cliente[1][:15] for cliente in top_clientes]
+
+                frecuencias = [int(cliente[2]) for cliente in top_clientes]
+
+                recencias = [int(cliente[3]) for cliente in top_clientes]
+
+                valores = [float(cliente[4]) for cliente in top_clientes]
+
+                # Normalizar los valores para mejor visualización
+
+                max_frecuencia = max(frecuencias)
+
+                max_recencia = max(recencias)
+
+                max_valor = max(valores)
+
+                norm_frecuencias = [f / max_frecuencia for f in frecuencias]
+
+                # Invertir recencia para que 1.0 sea lo más reciente
+
+                norm_recencias = [1 - (r / max_recencia) for r in recencias]
+
+                norm_valores = [v / max_valor for v in valores]
+
+                # Crear matriz para el mapa de calor
+
+                matriz = np.array([norm_recencias, norm_frecuencias, norm_valores])
+
+                sns.heatmap(matriz, ax=ax, cmap="YlGnBu", annot=True, fmt=".2f",
+
+                            xticklabels=nombres,
+
+                            yticklabels=['Recencia', 'Frecuencia', 'Valor'])
+
+                ax.set_title('Análisis RFM por Cliente (Valores Normalizados)')
+
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+
+        def cambiar_estilo_grafico(self):
+
+            """Cambia el estilo del gráfico según la selección del usuario"""
+
+            estilo = self.estilo_grafico.get()
+
+            if estilo == "predeterminado":
+
+                plt.style.use('ggplot')
+
+                sns.set_style("whitegrid")
+
+            else:
+
+                try:
+
+                    sns.set_palette(estilo)
+
+                except:
+
+                    pass
+
+            # Actualizar gráfico con el nuevo estilo
+
+            self.actualizar_grafico()
+
+        def personalizar_colores(self):
+
+            """Permite al usuario personalizar los colores del gráfico"""
+
+            # Esta función abrirá diálogos para seleccionar colores
+
+            colors = []
+
+            # Determinar cuántos colores necesitamos según el tipo de gráfico
+
+            num_colors = 1
+
+            if hasattr(self, 'datos_grafico'):
+
+                tipo_datos = self.datos_grafico.get('tipo', '')
+
+                if tipo_datos == 'ventas':
+
+                    num_colors = 2  # Ventas y métodos de pago
+
+                elif tipo_datos in ['productos', 'servicios']:
+
+                    num_colors = 3  # Productos/servicios, cantidades, ingresos
+
+                elif tipo_datos == 'clientes':
+
+                    num_colors = len(self.datos_grafico.get('categorias', {}).keys())
+
+                elif tipo_datos == 'pedidos_estado':
+
+                    num_colors = len(self.datos_grafico.get('pedidos_por_estado', []))
+
+                else:
+
+                    num_colors = 4  # Predeterminado para otros tipos
+
+            # Solicitar colores al usuario
+
+            for i in range(min(num_colors, 5)):  # Limitar a máximo 5 colores para no ser tedioso
+
+                color = colorchooser.askcolor(title=f"Seleccione color {i + 1}")[1]
+
+                if color:
+
+                    colors.append(color)
+
+                else:
+
+                    break
+
+            # Si se seleccionaron colores, actualizar paleta y gráfico
+
+            if colors:
+                sns.set_palette(colors)
+
+                self.actualizar_grafico()
+
+        def guardar_grafico_como_imagen(self):
+
+            """Guarda el gráfico actual como una imagen"""
+
+            # Tipo de archivo
+
+            filetypes = [
+
+                ("PNG", "*.png"),
+
+                ("JPEG", "*.jpg"),
+
+                ("SVG", "*.svg"),
+
+                ("PDF", "*.pdf")
+
+            ]
+
+            # Solicitar nombre de archivo
+
+            filename = filedialog.asksaveasfilename(
+
+                title="Guardar gráfico como",
+
+                filetypes=filetypes,
+
+                defaultextension=".png"
+
+            )
+
+            if filename:
+
+                try:
+
+                    # Guardar figura actual
+
+                    self.fig.savefig(filename, dpi=300, bbox_inches='tight')
+
+                    messagebox.showinfo("Éxito", f"Gráfico guardado como {filename}")
+
+                except Exception as e:
+
+                    messagebox.showerror("Error", f"No se pudo guardar la imagen: {str(e)}")
+
+        def exportar_reporte(self):
+
+            """Exporta el reporte actual en varios formatos"""
+
+            # Comprobar si hay datos para exportar
+
+            if not hasattr(self, 'ultimo_resultado_consulta') or not self.ultimo_resultado_consulta:
+                messagebox.showwarning("Sin datos", "No hay datos para exportar.")
+
+                return
+
+            # Mostrar opciones de exportación
+
+            ventana_exportar = tk.Toplevel(self.ventana)
+
+            ventana_exportar.title("Exportar Reporte")
+
+            ventana_exportar.geometry("400x300")
+
+            ventana_exportar.config(bg="#f5f5f5")
+
+            ventana_exportar.transient(self.ventana)
+
+            ventana_exportar.grab_set()
+
+            utl.centrar_ventana(ventana_exportar, 400, 300)
+
+            tk.Label(
+
+                ventana_exportar,
+
+                text="Seleccione formato de exportación:",
+
+                font=("Helvetica", 12, "bold"),
+
+                bg="#f5f5f5",
+
+                pady=10
+
+            ).pack()
+
+            # Variables para las opciones
+
+            var_excel = tk.IntVar(value=1)
+
+            var_csv = tk.IntVar(value=0)
+
+            var_pdf = tk.IntVar(value=0)
+
+            var_html = tk.IntVar(value=0)
+
+            # Frame para checkboxes
+
+            frame_opciones = tk.Frame(ventana_exportar, bg="#f5f5f5", pady=10)
+
+            frame_opciones.pack(fill=tk.X, padx=20)
+
+            # Checkboxes para formatos
+
+            cb_excel = tk.Checkbutton(
+
+                frame_opciones,
+
+                text="Excel (.xlsx)",
+
+                variable=var_excel,
+
+                font=("Helvetica", 11),
+
+                bg="#f5f5f5"
+
+            )
+
+            cb_excel.grid(row=0, column=0, sticky=tk.W, pady=5)
+
+            cb_csv = tk.Checkbutton(
+
+                frame_opciones,
+
+                text="CSV (.csv)",
+
+                variable=var_csv,
+
+                font=("Helvetica", 11),
+
+                bg="#f5f5f5"
+
+            )
+
+            cb_csv.grid(row=1, column=0, sticky=tk.W, pady=5)
+
+            cb_pdf = tk.Checkbutton(
+
+                frame_opciones,
+
+                text="PDF (.pdf)",
+
+                variable=var_pdf,
+
+                font=("Helvetica", 11),
+
+                bg="#f5f5f5"
+
+            )
+
+            cb_pdf.grid(row=2, column=0, sticky=tk.W, pady=5)
+
+            cb_html = tk.Checkbutton(
+
+                frame_opciones,
+
+                text="HTML (.html)",
+
+                variable=var_html,
+
+                font=("Helvetica", 11),
+
+                bg="#f5f5f5"
+
+            )
+
+            cb_html.grid(row=3, column=0, sticky=tk.W, pady=5)
+
+            # Opciones adicionales
+
+            tk.Label(
+
+                ventana_exportar,
+
+                text="Opciones:",
+
+                font=("Helvetica", 12, "bold"),
+
+                bg="#f5f5f5",
+
+                pady=5
+
+            ).pack(anchor=tk.W, padx=20)
+
+            var_incluir_grafico = tk.IntVar(value=1)
+
+            cb_grafico = tk.Checkbutton(
+
+                ventana_exportar,
+
+                text="Incluir gráfico en la exportación",
+
+                variable=var_incluir_grafico,
+
+                font=("Helvetica", 11),
+
+                bg="#f5f5f5"
+
+            )
+
+            cb_grafico.pack(anchor=tk.W, padx=20, pady=5)
+
+            # Botones de acción
+
+            frame_botones = tk.Frame(ventana_exportar, bg="#f5f5f5", pady=10)
+
+            frame_botones.pack(fill=tk.X, padx=20, pady=10)
+
+            btn_exportar = tk.Button(
+
+                frame_botones,
+
+                text="Exportar",
+
+                bg="#4CAF50",
+
+                fg="white",
+
+                font=("Helvetica", 11),
+
+                width=10,
+
+                command=lambda: self.realizar_exportacion(
+
+                    var_excel.get(), var_csv.get(), var_pdf.get(), var_html.get(),
+
+                    var_incluir_grafico.get(), ventana_exportar
+
+                )
+
+            )
+
+            btn_exportar.pack(side=tk.LEFT, padx=10)
+
+            btn_cancelar = tk.Button(
+
+                frame_botones,
+
+                text="Cancelar",
+
+                bg="#F44336",
+
+                fg="white",
+
+                font=("Helvetica", 11),
+
+                width=10,
+
+                command=ventana_exportar.destroy
+
+            )
+
+            btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        def realizar_exportacion(self, excel, csv, pdf, html, incluir_grafico, ventana):
+            """Realiza la exportación en los formatos seleccionados"""
+            # Obtener nombre de archivo base
+            filename = filedialog.asksaveasfilename(
+                title="Guardar reporte como",
+                defaultextension=".xlsx"
+            )
+
+            if not filename:
+                return
+
+            # Quitar extensión para usar como base
+            filename_base = os.path.splitext(filename)[0]
+
+            # Convertir datos a DataFrame
+            try:
+                import pandas as pd
+                from datetime import datetime
+
+                # Obtener títulos de columnas
+                columnas = [col['text'] for col in self.tabla_reporte['columns']]
+
+                # Crear DataFrame con los datos
+                datos = []
+                for item in self.tabla_reporte.get_children():
+                    valores = self.tabla_reporte.item(item, 'values')
+                    datos.append(valores)
+
+                df = pd.DataFrame(datos, columns=columnas)
+
+                # Exportar según formatos seleccionados
+                if excel:
+                    try:
+                        # Crear un ExcelWriter
+                        excel_file = f"{filename_base}.xlsx"
+                        writer = pd.ExcelWriter(excel_file, engine='xlsxwriter')
+
+                        # Escribir los datos en la primera hoja
+                        df.to_excel(writer, sheet_name='Datos', index=False)
+
+                        # Añadir hoja con resumen
+                        resumen = pd.DataFrame({
+                            'Métrica': ['Fecha de Generación', 'Tipo de Reporte', 'Periodo', 'Total de Registros'],
+                            'Valor': [
+                                datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                                self.tipo_reporte.get(),
+                                f"{self.fecha_inicio.get()} a {self.fecha_fin.get()}",
+                                len(datos)
+                            ]
+                        })
+                        resumen.to_excel(writer, sheet_name='Resumen', index=False)
+
+                        # Si se solicitó incluir gráfico
+                        if incluir_grafico:
+                            # Guardar gráfico como imagen en memoria
+                            img_buf = io.BytesIO()
+                            self.fig.savefig(img_buf, format='png', dpi=150)
+                            img_buf.seek(0)
+
+                            # Insertar imagen en hoja de Excel
+                            worksheet = writer.sheets['Resumen']
+                            worksheet.insert_image('D5', 'grafico.png', {'image_data': img_buf})
+
+                        # Guardar archivo Excel
+                        writer.close()
+
+                    except Exception as e:
+                        messagebox.showerror("Error Excel", f"Error al exportar a Excel: {str(e)}")
+
+                if csv:
+                    try:
+                        csv_file = f"{filename_base}.csv"
+                        df.to_csv(csv_file, index=False)
+                    except Exception as e:
+                        messagebox.showerror("Error CSV", f"Error al exportar a CSV: {str(e)}")
+
+                if pdf:
+                    try:
+                        from reportlab.lib import colors
+                        from reportlab.lib.pagesizes import letter
+                        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+                        from reportlab.lib.styles import getSampleStyleSheet
+
+                        pdf_file = f"{filename_base}.pdf"
+                        doc = SimpleDocTemplate(pdf_file, pagesize=letter)
+
+                        # Lista de elementos para el PDF
+                        elements = []
+
+                        # Estilos
+                        styles = getSampleStyleSheet()
+
+                        # Título del reporte
+                        title_style = styles['Heading1']
+                        title = Paragraph(f"Reporte: {self.tipo_reporte.get()}", title_style)
+                        elements.append(title)
+                        elements.append(Spacer(1, 10))
+
+                        # Información del reporte
+                        info_style = styles['Normal']
+                        fecha_gen = Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                                              info_style)
+                        periodo = Paragraph(f"Periodo: {self.fecha_inicio.get()} a {self.fecha_fin.get()}", info_style)
+                        elements.append(fecha_gen)
+                        elements.append(periodo)
+                        elements.append(Spacer(1, 20))
+
+                        # Si se solicitó incluir gráfico
+                        if incluir_grafico:
+                            # Guardar gráfico como imagen temporal
+                            img_temp = f"{filename_base}_temp.png"
+                            self.fig.savefig(img_temp, format='png', dpi=150, bbox_inches='tight')
+
+                            # Agregar imagen al PDF
+                            img = Image(img_temp)
+                            img.drawHeight = 300
+                            img.drawWidth = 500
+                            elements.append(img)
+                            elements.append(Spacer(1, 20))
+
+                        # Tabla de datos
+                        data = [columnas]  # Encabezados
+                        for row in datos:
+                            # Convertir cualquier none a string vacío
+                            data.append([str(cell) if cell is not None else '' for cell in row])
+
+                        # Crear tabla
+                        table = Table(data)
+
+                        # Estilo de tabla
+                        style = TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 9),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ])
+
+                        # Aplicar estilo a la tabla
+                        table.setStyle(style)
+
+                        # Agregar tabla al PDF
+                        elements.append(table)
+
+                        # Generar PDF
+                        doc.build(elements)
+
+                        # Eliminar imagen temporal si existe
+                        if incluir_grafico and os.path.exists(img_temp):
+                            os.remove(img_temp)
+
+                    except Exception as e:
+                        messagebox.showerror("Error PDF", f"Error al exportar a PDF: {str(e)}")
+
+                if html:
+                    try:
+                        html_file = f"{filename_base}.html"
+
+                        # Crear contenido HTML con Bootstrap para estilo
+                        html_string = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Reporte de Lavandería</title>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1">
+                            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+                            <style>
+                                body { padding: 20px; }
+                                .report-header { margin-bottom: 30px; }
+                                .table-container { margin-top: 20px; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="container">
+                                <div class="report-header">
+                                    <h1>Reporte: {}</h1>
+                                    <p><strong>Fecha:</strong> {}</p>
+                                    <p><strong>Periodo:</strong> {} a {}</p>
+                                </div>
+                        """.format(
+                            self.tipo_reporte.get(),
+                            datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                            self.fecha_inicio.get(),
+                            self.fecha_fin.get()
+                        )
+
+                        # Agregar gráfico si se solicitó
+                        if incluir_grafico:
+                            # Guardar gráfico como imagen
+                            img_path = f"{filename_base}_grafico.png"
+                            self.fig.savefig(img_path, format='png', dpi=150, bbox_inches='tight')
+
+                            # Agregar imagen al HTML
+                            html_string += f"""
+                                <div class="graph-container text-center">
+                                    <img src="{os.path.basename(img_path)}" class="img-fluid" alt="Gráfico">
+                                </div>
+                            """
+
+                        # Agregar tabla de datos
+                        html_string += """
+                                <div class="table-container">
+                                    <h2>Datos del Reporte</h2>
+                                    <table class="table table-striped table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                        """
+
+                        # Encabezados
+                        for col in columnas:
+                            html_string += f"<th>{col}</th>"
+
+                        html_string += """
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                        """
+
+                        # Filas de datos
+                        for row in datos:
+                            html_string += "<tr>"
+                            for cell in row:
+                                html_string += f"<td>{cell}</td>"
+                            html_string += "</tr>"
+
+                        # Cierre de tabla y documento
+                        html_string += """
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </body>
+                        </html>
+                        """
+
+                        # Guardar HTML
+                        with open(html_file, 'w', encoding='utf-8') as f:
+                            f.write(html_string)
+
+                    except Exception as e:
+                        messagebox.showerror("Error HTML", f"Error al exportar a HTML: {str(e)}")
+
+                # Mostrar mensaje de éxito
+                formatos_exportados = []
+                if excel: formatos_exportados.append("Excel")
+                if csv: formatos_exportados.append("CSV")
+                if pdf: formatos_exportados.append("PDF")
+                if html: formatos_exportados.append("HTML")
+
+                if formatos_exportados:
+                    messagebox.showinfo(
+                        "Exportación exitosa",
+                        f"Reporte exportado en los siguientes formatos: {', '.join(formatos_exportados)}"
+                    )
+
+                    # Preguntar si desea abrir alguno de los archivos generados
+                    if messagebox.askyesno("Abrir archivo", "¿Desea abrir alguno de los archivos generados?"):
+                        if excel:
+                            webbrowser.open(f"{filename_base}.xlsx")
+                        elif pdf:
+                            webbrowser.open(f"{filename_base}.pdf")
+                        elif html:
+                            webbrowser.open(f"{filename_base}.html")
+
+            except Exception as e:
+                messagebox.showerror("Error de exportación", f"Error general: {str(e)}")
+
+            finally:
+                # Cerrar ventana de exportación
+                ventana.destroy()
+
+    def exportar_reporte(self):
+        """Exporta el reporte actual a diferentes formatos"""
+        # Verificar si hay datos para exportar
+        if not hasattr(self, 'ultimo_resultado_consulta') or not self.ultimo_resultado_consulta:
+            messagebox.showwarning("Sin datos", "No hay datos para exportar. Genere un reporte primero.")
+            return
+
+        # Mostrar opciones de exportación (código que ya teníamos en realizar_exportacion)
+        ventana_exportar = tk.Toplevel(self.ventana)
+        ventana_exportar.title("Exportar Reporte")
+        ventana_exportar.geometry("400x300")
+        ventana_exportar.config(bg="#f5f5f5")
+        ventana_exportar.transient(self.ventana)
+        ventana_exportar.grab_set()
+
+        utl.centrar_ventana(ventana_exportar, 400, 300)
+
+        tk.Label(
+            ventana_exportar,
+            text="Seleccione formato de exportación:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5",
+            pady=10
+        ).pack()
+
+        # Variables para las opciones
+        var_excel = tk.IntVar(value=1)
+        var_csv = tk.IntVar(value=0)
+        var_pdf = tk.IntVar(value=0)
+        var_html = tk.IntVar(value=0)
+
+        # Frame para checkboxes
+        frame_opciones = tk.Frame(ventana_exportar, bg="#f5f5f5", pady=10)
+        frame_opciones.pack(fill=tk.X, padx=20)
+
+        # Checkboxes para formatos
+        cb_excel = tk.Checkbutton(
+            frame_opciones,
+            text="Excel (.xlsx)",
+            variable=var_excel,
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        cb_excel.grid(row=0, column=0, sticky=tk.W, pady=5)
+
+        cb_csv = tk.Checkbutton(
+            frame_opciones,
+            text="CSV (.csv)",
+            variable=var_csv,
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        cb_csv.grid(row=1, column=0, sticky=tk.W, pady=5)
+
+        cb_pdf = tk.Checkbutton(
+            frame_opciones,
+            text="PDF (.pdf)",
+            variable=var_pdf,
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        cb_pdf.grid(row=2, column=0, sticky=tk.W, pady=5)
+
+        cb_html = tk.Checkbutton(
+            frame_opciones,
+            text="HTML (.html)",
+            variable=var_html,
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        cb_html.grid(row=3, column=0, sticky=tk.W, pady=5)
+
+        # Opciones adicionales
+        tk.Label(
+            ventana_exportar,
+            text="Opciones:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5",
+            pady=5
+        ).pack(anchor=tk.W, padx=20)
+
+        var_incluir_grafico = tk.IntVar(value=1)
+        cb_grafico = tk.Checkbutton(
+            ventana_exportar,
+            text="Incluir gráfico en la exportación",
+            variable=var_incluir_grafico,
+            font=("Helvetica", 11),
+            bg="#f5f5f5"
+        )
+        cb_grafico.pack(anchor=tk.W, padx=20, pady=5)
+
+        # Botones de acción
+        frame_botones = tk.Frame(ventana_exportar, bg="#f5f5f5", pady=10)
+        frame_botones.pack(fill=tk.X, padx=20, pady=10)
+
+        btn_exportar = tk.Button(
+            frame_botones,
+            text="Exportar",
+            bg="#4CAF50",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=lambda: self.realizar_exportacion(
+                var_excel.get(), var_csv.get(), var_pdf.get(), var_html.get(),
+                var_incluir_grafico.get(), ventana_exportar
+            )
+        )
+        btn_exportar.pack(side=tk.LEFT, padx=10)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            bg="#F44336",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=ventana_exportar.destroy
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+    def personalizar_colores(self):
+        """Permite al usuario personalizar los colores del gráfico"""
+        # Esta función abrirá diálogos para seleccionar colores
+        colors = []
+
+        # Determinar cuántos colores necesitamos según el tipo de gráfico
+        num_colors = 1
+
+        if hasattr(self, 'datos_grafico'):
+            tipo_datos = self.datos_grafico.get('tipo', '')
+
+            if tipo_datos == 'ventas':
+                num_colors = 2  # Ventas y métodos de pago
+            elif tipo_datos in ['productos', 'servicios']:
+                num_colors = 3  # Productos/servicios, cantidades, ingresos
+            elif tipo_datos == 'clientes':
+                num_colors = len(self.datos_grafico.get('categorias', {}).keys())
+            elif tipo_datos == 'pedidos_estado':
+                num_colors = len(self.datos_grafico.get('pedidos_por_estado', []))
+            else:
+                num_colors = 4  # Predeterminado para otros tipos
+
+        # Solicitar colores al usuario
+        for i in range(min(num_colors, 5)):  # Limitar a máximo 5 colores para no ser tedioso
+            color = colorchooser.askcolor(title=f"Seleccione color {i + 1}")[1]
+            if color:
+                colors.append(color)
+            else:
+                break
+
+        # Si se seleccionaron colores, actualizar paleta y gráfico
+        if colors:
+            sns.set_palette(colors)
+            self.actualizar_grafico()
+
+    def guardar_plantilla(self):
+        """Guarda la configuración actual como una plantilla reutilizable"""
+        # Solicitar nombre para la plantilla
+        nombre = simpledialog.askstring(
+            "Guardar plantilla",
+            "Nombre para la plantilla:",
+            parent=self.ventana
+        )
+
+        if not nombre:
+            return
+
+        # Crear directorio para plantillas si no existe
+        plantillas_dir = os.path.join(self.directorio_reportes, "plantillas")
+        if not os.path.exists(plantillas_dir):
+            os.makedirs(plantillas_dir)
+
+        # Obtener la configuración actual
+        configuracion = {
+            "tipo_reporte": self.tipo_reporte.get(),
+            "periodo": self.periodo.get(),
+            "fecha_inicio": self.fecha_inicio.get(),
+            "fecha_fin": self.fecha_fin.get(),
+            "filtros": {
+                "cliente": self.filtro_cliente.get(),
+                "vendedor": self.filtro_vendedor.get(),
+                "pago": self.filtro_pago.get(),
+                "estado": self.filtro_estado.get()
+            },
+            "tipo_grafico": self.tipo_grafico.get(),
+            "estilo_grafico": self.estilo_grafico.get()
+        }
+
+        # Guardar configuración como JSON
+        try:
+            filename = os.path.join(plantillas_dir, f"{nombre}.json")
+            with open(filename, 'w') as f:
+                json.dump(configuracion, f, indent=4)
+
+            messagebox.showinfo(
+                "Éxito",
+                f"Plantilla '{nombre}' guardada correctamente.\nPuede cargarla en futuras sesiones."
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo guardar la plantilla: {str(e)}")
+
+    def cargar_plantilla(self):
+        """Carga una plantilla de configuración guardada"""
+        # Crear directorio para plantillas si no existe
+        plantillas_dir = os.path.join(self.directorio_reportes, "plantillas")
+        if not os.path.exists(plantillas_dir):
+            os.makedirs(plantillas_dir)
+            messagebox.showinfo("Sin plantillas", "No hay plantillas guardadas.")
+            return
+
+        # Buscar archivos de plantilla
+        plantillas = [f for f in os.listdir(plantillas_dir) if f.endswith('.json')]
+
+        if not plantillas:
+            messagebox.showinfo("Sin plantillas", "No hay plantillas guardadas.")
+            return
+
+        # Crear ventana para seleccionar plantilla
+        ventana_plantillas = tk.Toplevel(self.ventana)
+        ventana_plantillas.title("Cargar Plantilla")
+        ventana_plantillas.geometry("400x300")
+        ventana_plantillas.config(bg="#f5f5f5")
+        ventana_plantillas.transient(self.ventana)
+        ventana_plantillas.grab_set()
+
+        utl.centrar_ventana(ventana_plantillas, 400, 300)
+
+        tk.Label(
+            ventana_plantillas,
+            text="Seleccione una plantilla:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5",
+            pady=10
+        ).pack()
+
+        # Lista de plantillas
+        frame_lista = tk.Frame(ventana_plantillas, bg="#f5f5f5")
+        frame_lista.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        listbox = tk.Listbox(
+            frame_lista,
+            font=("Helvetica", 11),
+            width=40,
+            height=10
+        )
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = tk.Scrollbar(frame_lista, orient=tk.VERTICAL, command=listbox.yview)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Llenar listbox con nombres de plantillas
+        for plantilla in plantillas:
+            nombre = os.path.splitext(plantilla)[0]
+            listbox.insert(tk.END, nombre)
+
+        # Botones de acción
+        frame_botones = tk.Frame(ventana_plantillas, bg="#f5f5f5", pady=10)
+        frame_botones.pack(fill=tk.X, padx=20, pady=10)
+
+        def cargar_seleccionada():
+            if listbox.curselection():
+                nombre = listbox.get(listbox.curselection())
+                archivo = os.path.join(plantillas_dir, f"{nombre}.json")
+                self.aplicar_plantilla(archivo)
+                ventana_plantillas.destroy()
+            else:
+                messagebox.showwarning("Selección requerida", "Por favor, seleccione una plantilla.")
+
+        btn_cargar = tk.Button(
+            frame_botones,
+            text="Cargar",
+            bg="#4CAF50",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=cargar_seleccionada
+        )
+        btn_cargar.pack(side=tk.LEFT, padx=10)
+
+        btn_eliminar = tk.Button(
+            frame_botones,
+            text="Eliminar",
+            bg="#F44336",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=lambda: self.eliminar_plantilla(listbox, plantillas_dir)
+        )
+        btn_eliminar.pack(side=tk.LEFT, padx=10)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            bg="#9E9E9E",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=ventana_plantillas.destroy
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        # Doble clic para seleccionar
+        listbox.bind("<Double-Button-1>", lambda e: cargar_seleccionada())
+
+    def eliminar_plantilla(self, listbox, directorio):
+        """Elimina una plantilla seleccionada"""
+        if not listbox.curselection():
+            messagebox.showwarning("Selección requerida", "Por favor, seleccione una plantilla.")
+            return
+
+        nombre = listbox.get(listbox.curselection())
+        archivo = os.path.join(directorio, f"{nombre}.json")
+
+        confirmar = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Está seguro de eliminar la plantilla '{nombre}'?\nEsta acción no se puede deshacer."
+        )
+
+        if confirmar:
+            try:
+                os.remove(archivo)
+                listbox.delete(listbox.curselection())
+                messagebox.showinfo("Éxito", f"Plantilla '{nombre}' eliminada correctamente.")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo eliminar la plantilla: {str(e)}")
+
+    def aplicar_plantilla(self, archivo):
+        """Aplica la configuración de una plantilla cargada"""
+        try:
+            with open(archivo, 'r') as f:
+                config = json.load(f)
+
+            # Aplicar configuración
+            self.tipo_reporte.set(config.get("tipo_reporte", "Ventas por Periodo"))
+            self.periodo.set(config.get("periodo", "Este Mes"))
+            self.fecha_inicio.set(config.get("fecha_inicio", ""))
+            self.fecha_fin.set(config.get("fecha_fin", ""))
+
+            # Aplicar filtros
+            filtros = config.get("filtros", {})
+            self.filtro_cliente.set(filtros.get("cliente", ""))
+            self.filtro_vendedor.set(filtros.get("vendedor", ""))
+            self.filtro_pago.set(filtros.get("pago", "Todos"))
+            self.filtro_estado.set(filtros.get("estado", "Todos"))
+
+            # Configurar gráficos
+            self.tipo_grafico.set(config.get("tipo_grafico", "Barras"))
+            self.estilo_grafico.set(config.get("estilo_grafico", "predeterminado"))
+
+            # Actualizar interfaz para el tipo de reporte
+            self.cambiar_tipo_reporte()
+
+            # Forzar la visibilidad correcta del frame de fechas
+            if self.periodo.get() == "Personalizado":
+                self.frame_fechas_personalizadas.pack(side=tk.LEFT, padx=10)
+            else:
+                self.frame_fechas_personalizadas.pack_forget()
+
+            messagebox.showinfo("Plantilla cargada", "La plantilla se ha aplicado correctamente.")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar la plantilla: {str(e)}")
+
+    def filtrar_tabla(self, event=None):
+        """Filtra los datos de la tabla según el texto de búsqueda"""
+        texto_busqueda = self.busqueda_tabla.get().lower()
+
+        # Si no hay texto de búsqueda, mostrar todos los items
+        if not texto_busqueda:
+            for item in self.tabla_reporte.get_children():
+                self.tabla_reporte.item(item, tags=self.tabla_reporte.item(item)['tags'])
+                self.tabla_reporte.detach(item)
+                self.tabla_reporte.reattach(item, '', 'end')
+            return
+
+        # Recorrer todos los items
+        for item in self.tabla_reporte.get_children():
+            values = [str(v).lower() for v in self.tabla_reporte.item(item)['values']]
+
+            # Si el texto de búsqueda está en alguno de los valores
+            if any(texto_busqueda in value for value in values):
+                # Mantener el item visible y marcarlo con color
+                self.tabla_reporte.item(item, tags=(*self.tabla_reporte.item(item)['tags'], 'encontrado'))
+                self.tabla_reporte.detach(item)
+                self.tabla_reporte.reattach(item, '', 'end')
+            else:
+                # Ocultar el item temporalmente
+                self.tabla_reporte.detach(item)
+
+        # Configurar color para coincidencias
+        self.tabla_reporte.tag_configure('encontrado', background='#e3f2fd')
+
+    def limpiar_filtros_tabla(self):
+        """Limpia los filtros de búsqueda de la tabla"""
+        self.busqueda_tabla.set("")
+
+        # Restaurar todos los items
+        for item in self.tabla_reporte.get_children():
+            self.tabla_reporte.item(item, tags=())
+
+        # Mostrar también los items ocultos
+        for item in self.tabla_reporte.get_children("hidden"):
+            self.tabla_reporte.reattach(item, '', 'end')
+
+    def mostrar_ayuda(self):
+        """Muestra información de ayuda sobre el módulo de reportes"""
+        ventana_ayuda = tk.Toplevel(self.ventana)
+        ventana_ayuda.title("Ayuda - Reportes y Estadísticas")
+        ventana_ayuda.geometry("600x500")
+        ventana_ayuda.config(bg="#f5f5f5")
+
+        utl.centrar_ventana(ventana_ayuda, 600, 500)
+
+        # Crear notebook para organizar la ayuda
+        notebook = ttk.Notebook(ventana_ayuda)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Función para crear pestañas de ayuda
+        def crear_tab_ayuda(titulo, contenido):
+            tab = tk.Frame(notebook, bg="#f5f5f5")
+            notebook.add(tab, text=titulo)
+
+            # Frame con scroll
+            frame_canvas = tk.Frame(tab)
+            frame_canvas.pack(fill=tk.BOTH, expand=True)
+
+            canvas = tk.Canvas(frame_canvas, bg="#f5f5f5")
+            scrollbar = ttk.Scrollbar(frame_canvas, orient="vertical", command=canvas.yview)
+
+            # Frame donde pondremos el contenido
+            frame_contenido = tk.Frame(canvas, bg="#f5f5f5")
+
+            # Configurar scrolling
+            frame_contenido.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+
+            # Crear ventana en el canvas
+            canvas.create_window((0, 0), window=frame_contenido, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            # Empaquetar elementos
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            # Mostrar contenido
+            for i, (titulo_seccion, texto) in enumerate(contenido):
+                if titulo_seccion:
+                    tk.Label(
+                        frame_contenido,
+                        text=titulo_seccion,
+                        font=("Helvetica", 12, "bold"),
+                        bg="#f5f5f5",
+                        fg="#3a7ff6"
+                    ).grid(row=i*2, column=0, sticky=tk.W, padx=10, pady=(10, 5))
+
+                tk.Label(
+                    frame_contenido,
+                    text=texto,
+                    font=("Helvetica", 11),
+                    bg="#f5f5f5",
+                    justify=tk.LEFT,
+                    wraplength=550
+                ).grid(row=i*2+1, column=0, sticky=tk.W, padx=10, pady=(0, 10))
+
+            return tab
+
+        # Contenido de la pestaña general
+        contenido_general = [
+            ("¿Qué es el módulo de reportes?",
+             "El módulo de reportes proporciona visualizaciones y análisis detallados de los datos del sistema de lavandería. "
+             "Permite generar informes sobre ventas, productos, servicios, clientes y más, con opciones de filtrado, visualización "
+             "y exportación."),
+
+            ("Tipos de reportes disponibles",
+             "• Ventas por Periodo: Analiza las ventas realizadas en un período específico.\n"
+             "• Productos Más Vendidos: Muestra los productos con mayor demanda.\n"
+             "• Servicios Más Solicitados: Identifica los servicios más populares.\n"
+             "• Clientes Frecuentes: Analiza los patrones de visita de los clientes.\n"
+             "• Ingresos Mensuales: Visualiza los ingresos agrupados por mes.\n"
+             "• Pedidos por Estado: Muestra la distribución de pedidos según su estado.\n"
+             "• Rentabilidad de Servicios: Analiza márgenes y rentabilidad de cada servicio.\n"
+             "• Comportamiento de Clientes: Utiliza análisis RFM para segmentar clientes.\n"
+             "• Dashboard General: Presenta un resumen visual de las métricas clave."),
+
+            ("¿Cómo usar el módulo?",
+             "1. Seleccione el tipo de reporte que desea generar.\n"
+             "2. Elija el período que desea analizar (o fechas personalizadas).\n"
+             "3. Configure los filtros adicionales si es necesario.\n"
+             "4. Haga clic en 'Generar Reporte'.\n"
+             "5. Explore los datos en la pestaña 'Datos' o visualizaciones en 'Gráficos'.\n"
+             "6. Personalice las visualizaciones con diferentes tipos de gráficos.\n"
+             "7. Exporte los resultados en varios formatos según sus necesidades.")
+        ]
+
+        # Contenido de la pestaña de gráficos
+        contenido_graficos = [
+            ("Tipos de gráficos disponibles",
+             "• Barras: Ideal para comparar valores entre categorías.\n"
+             "• Líneas: Perfecto para mostrar tendencias a lo largo del tiempo.\n"
+             "• Pastel: Muestra la proporción de cada categoría respecto al total.\n"
+             "• Área: Similar a líneas, pero rellena el área bajo la curva.\n"
+             "• Barras Horizontales: Útil cuando hay muchas categorías o nombres largos.\n"
+             "• Dispersión: Muestra relaciones entre dos variables numéricas.\n"
+             "• Calor: Visualiza matrices de datos con colores según intensidad."),
+
+            ("Personalización de gráficos",
+             "• Estilos: Cambie la apariencia general del gráfico con diferentes paletas de colores.\n"
+             "• Colores personalizados: Defina sus propios colores para elementos específicos.\n"
+             "• Exportación de imágenes: Guarde el gráfico como imagen en varios formatos (PNG, JPG, PDF, SVG)."),
+
+            ("Consejos para visualizaciones efectivas",
+             "• Use barras para comparaciones directas entre categorías.\n"
+             "• Use líneas para mostrar tendencias temporales.\n"
+             "• Utilice gráficos de pastel solo cuando tenga pocas categorías (máximo 5-7).\n"
+             "• Los gráficos de calor son ideales para mostrar correlaciones y patrones complejos.\n"
+             "• Para datos con muchas categorías, utilice barras horizontales.")
+        ]
+
+        # Contenido de la pestaña de exportación
+        contenido_exportacion = [
+            ("Formatos de exportación disponibles",
+             "• Excel (.xlsx): Incluye múltiples hojas con datos, resumen y gráficos.\n"
+             "• CSV (.csv): Formato simple para importar en otras aplicaciones.\n"
+             "• PDF (.pdf): Informe profesional con datos y gráficos.\n"
+             "• HTML (.html): Página web interactiva que puede abrirse en cualquier navegador."),
+
+            ("Exportación de gráficos",
+             "Los gráficos se pueden exportar como imágenes independientes o incluirse en los informes "
+             "Excel, PDF y HTML. Para guardar un gráfico como imagen, utilice el botón 'Guardar como Imagen' "
+             "en la pestaña de gráficos."),
+
+            ("Plantillas de reportes",
+             "Las plantillas le permiten guardar configuraciones de reportes para uso futuro:\n"
+             "• Guardar plantilla: Almacena la configuración actual (tipo, filtros, período, etc.).\n"
+             "• Cargar plantilla: Aplica una configuración guardada anteriormente.\n"
+             "• Eliminar plantilla: Borra plantillas que ya no necesita.")
+        ]
+
+        # Crear pestañas
+        crear_tab_ayuda("General", contenido_general)
+        crear_tab_ayuda("Gráficos", contenido_graficos)
+        crear_tab_ayuda("Exportación", contenido_exportacion)
+
+        # Botón para cerrar
+        btn_cerrar = tk.Button(
+            ventana_ayuda,
+            text="Cerrar",
+            bg="#3a7ff6",
+            fg="white",
+            font=("Helvetica", 11),
+            width=10,
+            command=ventana_ayuda.destroy
+        )
+        btn_cerrar.pack(pady=10)
+
+
+# Función para abrir el módulo desde otras partes del sistema
+def abrir_reportes(ventana_padre=None):
+    return Reportes(ventana_padre)
+
+
+# Para pruebas independientes
+if __name__ == "__main__":
+    Reportes()
