@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 import mysql.connector
 from decimal import Decimal
 import sys
-import os
 
 # Configuración de la base de datos (ajusta según tu configuración)
 DB_CONFIG = {
@@ -81,18 +80,30 @@ def obtener_id_caja(cursor, fecha):
 
     admin_id = admin_id[0] if admin_id else 1
 
-    # Insertar nueva caja - utilizando la estructura correcta según tu SQL
+    # Insertar nueva caja con la estructura correcta según tu SQL
+    # Según tu archivo lavanderia_estructura.sql, la estructura de caja es:
+    # CREATE TABLE caja (
+    #    id_caja INT AUTO_INCREMENT PRIMARY KEY,
+    #    fecha DATE NOT NULL,
+    #    hora_apertura TIME,
+    #    hora_cierre TIME,
+    #    total_ingresos DECIMAL(10,2) DEFAULT 0,
+    #    total_egresos DECIMAL(10,2) DEFAULT 0,
+    #    saldo_final DECIMAL(10,2) DEFAULT 0,
+    #    responsable INT,
+    #    FOREIGN KEY (responsable) REFERENCES usuarios(id_usuario)
+    # );
+
     cursor.execute("""
-        INSERT INTO caja (fecha, hora_apertura, responsable, monto_inicial, total_ingresos, total_egresos, saldo_final)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO caja (fecha, hora_apertura, total_ingresos, total_egresos, saldo_final, responsable)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """, (
         fecha_str,
-        fecha.strftime('%H:%M:%S'),
-        admin_id,
-        1000.00,  # monto_inicial (según tu estructura)
+        fecha.strftime('%H:%M:%S'), # hora_apertura es TIME
         0.00,     # Total ingresos
         0.00,     # Total egresos
-        1000.00   # Saldo final
+        1000.00,  # Saldo final
+        admin_id  # responsable
     ))
 
     # Obtener ID de la caja recién creada
@@ -151,17 +162,27 @@ def generar_ventas():
                 # Método de pago aleatorio
                 metodo_pago = random.choice(METODOS_PAGO)
 
-                # Crear venta - según la estructura de tu SQL
+                # Crear venta
+                # Según tu SQL, la estructura de ventas es:
+                # CREATE TABLE ventas (
+                #    id_venta INT AUTO_INCREMENT PRIMARY KEY,
+                #    id_usuario INT,
+                #    id_cliente INT,
+                #    total DECIMAL(10,2),
+                #    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                #    metodo_pago VARCHAR(50),
+                #    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+                #    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
+                # );
                 cursor.execute("""
-                    INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago, fecha, registrado_en_caja)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO ventas (id_usuario, id_cliente, total, fecha, metodo_pago)
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (
                     id_usuario,
                     id_cliente,
                     0,  # Total inicial, se actualizará después
-                    metodo_pago,
                     fecha_hora_venta.strftime('%Y-%m-%d %H:%M:%S'),
-                    True
+                    metodo_pago
                 ))
 
                 id_venta = cursor.lastrowid
@@ -227,6 +248,18 @@ def generar_ventas():
                 ))
 
                 # Registrar movimiento en caja
+                # Según tu SQL, la estructura de movimientos_caja es:
+                # CREATE TABLE movimientos_caja (
+                #    id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
+                #    id_caja INT NOT NULL,
+                #    tipo ENUM('ingreso', 'egreso') NOT NULL,
+                #    concepto VARCHAR(100) NOT NULL,
+                #    monto DECIMAL(10,2) NOT NULL,
+                #    hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+                #    id_usuario INT,
+                #    FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
+                #    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+                # );
                 cursor.execute("""
                     INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
                     VALUES (%s, %s, %s, %s, %s, %s)
@@ -235,7 +268,7 @@ def generar_ventas():
                     'ingreso',
                     f'Venta #{id_venta}',
                     total_venta,
-                    fecha_hora_venta.strftime('%H:%M:%S'),
+                    fecha_hora_venta.strftime('%Y-%m-%d %H:%M:%S'),  # hora es DATETIME
                     id_usuario
                 ))
 
@@ -252,6 +285,16 @@ def generar_ventas():
                 ))
 
                 # Registrar pago
+                # Según tu SQL, la estructura de pagos es:
+                # CREATE TABLE pagos (
+                #    id_pago INT AUTO_INCREMENT PRIMARY KEY,
+                #    id_venta INT,
+                #    monto DECIMAL(10,2) NOT NULL,
+                #    metodo_pago ENUM('Efectivo', 'Tarjeta', 'Transferencia', 'Otro') NOT NULL,
+                #    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+                #    referencia VARCHAR(100),
+                #    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
+                # );
                 cursor.execute("""
                     INSERT INTO pagos (id_venta, monto, metodo_pago, fecha_hora)
                     VALUES (%s, %s, %s, %s)
@@ -270,90 +313,6 @@ def generar_ventas():
                     puntos_ganados,
                     id_cliente
                 ))
-
-                # Crear también un pedido para algunas ventas (60% de probabilidad)
-                if random.random() < 0.6:
-                    # Estados posibles para el pedido
-                    estados = ["Recibido", "En proceso", "Listo para entrega", "Entregado"]
-                    # Fecha de pedido es un poco anterior a la venta
-                    fecha_pedido = fecha_hora_venta - timedelta(days=random.randint(1, 3))
-
-                    # Estado aleatorio
-                    estado = random.choice(estados)
-
-                    # Crear pedido
-                    cursor.execute("""
-                        INSERT INTO pedidos 
-                        (id_cliente, fecha_pedido, estado, observaciones, prioridad, fecha_entrega_estimada, convertido_a_venta)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        id_cliente,
-                        fecha_pedido.strftime('%Y-%m-%d %H:%M:%S'),
-                        estado,
-                        "Pedido generado automáticamente para pruebas",
-                        random.choice(["Normal", "Alta", "Urgente"]),
-                        (fecha_pedido + timedelta(days=random.randint(2, 5))).strftime('%Y-%m-%d'),
-                        True if estado == "Entregado" else False
-                    ))
-
-                    id_pedido = cursor.lastrowid
-
-                    # Copia los mismos detalles de la venta al pedido (solo servicios)
-                    cursor.execute("""
-                        INSERT INTO detalle_pedido (id_pedido, tipo_item, id_item, cantidad, precio_unitario)
-                        SELECT %s, dv.tipo_item, dv.id_item, dv.cantidad, dv.subtotal / dv.cantidad
-                        FROM detalle_venta dv
-                        WHERE dv.id_venta = %s AND dv.tipo_item = 'servicio'
-                    """, (
-                        id_pedido,
-                        id_venta
-                    ))
-
-                    # Verificar si existe la tabla historial_estados_pedido
-                    cursor.execute("""
-                        SELECT COUNT(*) 
-                        FROM information_schema.tables 
-                        WHERE table_schema = DATABASE() 
-                        AND table_name = 'historial_estados_pedido'
-                    """)
-
-                    if cursor.fetchone()[0] > 0:
-                        # La tabla existe, podemos usarla
-                        # Registrar historial de estados
-                        if random.random() < 0.7 and id_pedido:  # 70% de probabilidad
-                            # Determinar cuántos cambios de estado ha habido
-                            if estado == "Recibido":
-                                estados_previos = []
-                            elif estado == "En proceso":
-                                estados_previos = ["Recibido"]
-                            elif estado == "Listo para entrega":
-                                estados_previos = ["Recibido", "En proceso"]
-                            else:  # Entregado
-                                estados_previos = ["Recibido", "En proceso", "Listo para entrega"]
-
-                            estado_anterior = None
-                            # Para cada cambio de estado, registrar entrada en historial
-                            for i, estado_nuevo in enumerate(estados_previos + [estado]):
-                                if i > 0:  # Saltamos el primer estado que no tiene anterior
-                                    # Fecha del cambio de estado (entre fecha_pedido y fecha_actual)
-                                    dias_desde_pedido = random.randint(1, 3) * i
-                                    fecha_cambio = fecha_pedido + timedelta(days=dias_desde_pedido)
-                                    if fecha_cambio > fecha_actual:
-                                        fecha_cambio = fecha_actual
-
-                                    # Insertar registro en historial
-                                    cursor.execute("""
-                                        INSERT INTO historial_estados_pedido 
-                                        (id_pedido, estado_anterior, estado_nuevo, observacion, id_usuario, fecha_cambio)
-                                        VALUES (%s, %s, %s, %s, %s, %s)
-                                    """, (
-                                        id_pedido,
-                                        estados_previos[i-1],  # Estado anterior
-                                        estado_nuevo,
-                                        f"Cambio de estado automático para pruebas",
-                                        id_usuario,
-                                        fecha_cambio.strftime('%Y-%m-%d %H:%M:%S')
-                                    ))
 
                 total_ventas += 1
 

@@ -18,6 +18,10 @@ import io
 from PIL import Image, ImageTk
 import webbrowser
 import json
+import io
+import os
+import webbrowser
+from tkinter import filedialog, messagebox
 
 # Intentar configurar locale para fechas en español
 try:
@@ -2553,6 +2557,330 @@ class Reportes:
         self.dashboard_figs[3].tight_layout()
         self.dashboard_canvas[3].draw()
 
+    def graficar_servicios(self, ax, tipo_grafico):
+        """Genera gráfico de servicios más solicitados"""
+        servicios = self.datos_grafico['servicios']
+
+        # Limitar a los 10 servicios más solicitados para mejor visualización
+        top_servicios = servicios[:10] if len(servicios) > 10 else servicios
+
+        nombres = [servicio[1] for servicio in top_servicios]
+        cantidades = [int(servicio[2]) for servicio in top_servicios]
+        ingresos = [float(servicio[3]) for servicio in top_servicios]
+
+        # Acortar nombres largos
+        nombres_cortos = [nombre[:20] + "..." if len(nombre) > 20 else nombre for nombre in nombres]
+
+        # La implementación de la visualización según el tipo de gráfico
+        if tipo_grafico == "Barras":
+            ax2 = ax.twinx()
+            bars1 = ax.bar([i - 0.2 for i in range(len(nombres_cortos))], cantidades, width=0.4,
+                           color='lightgreen', label='Cantidad')
+            bars2 = ax2.bar([i + 0.2 for i in range(len(nombres_cortos))], ingresos, width=0.4,
+                            color='orange', label='Ingresos ($)')
+
+            ax.set_xticks(range(len(nombres_cortos)))
+            ax.set_xticklabels(nombres_cortos, rotation=45, ha='right')
+
+            lines1, labels1 = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+            ax.set_ylabel('Cantidad')
+            ax2.set_ylabel('Ingresos ($)')
+            ax.set_title('Top Servicios por Cantidad y Ventas')
+
+        elif tipo_grafico == "Líneas":
+            ax.plot(nombres_cortos, cantidades, marker='o', linestyle='-', color='green', label='Cantidad')
+
+            ax2 = ax.twinx()
+            ax2.plot(nombres_cortos, ingresos, marker='s', linestyle='--', color='orange', label='Ingresos ($)')
+
+            plt.xticks(rotation=45, ha='right')
+
+            lines1, labels1 = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+            ax.set_ylabel('Cantidad')
+            ax2.set_ylabel('Ingresos ($)')
+            ax.set_title('Servicios por Cantidad e Ingresos')
+
+        elif tipo_grafico == "Pastel":
+            plt.rcParams.update({'font.size': 9})
+            wedges, texts, autotexts = ax.pie(cantidades, labels=nombres_cortos, autopct='%1.1f%%',
+                                              startangle=90, colors=plt.cm.Set3.colors,
+                                              wedgeprops={'edgecolor': 'white', 'linewidth': 1})
+
+            plt.setp(texts, size=8)
+            plt.setp(autotexts, size=8, weight='bold')
+
+            ax.axis('equal')
+            ax.set_title('Distribución de Servicios Solicitados')
+
+        elif tipo_grafico == "Barras Horizontales":
+            nombres_cortos = nombres_cortos[::-1]
+            cantidades = cantidades[::-1]
+            ingresos = ingresos[::-1]
+
+            ax.barh(nombres_cortos, cantidades, color='lightgreen', alpha=0.7, label='Cantidad')
+            ax2 = ax.twiny()
+            ax2.barh(nombres_cortos, ingresos, color='orange', alpha=0.5, label='Ingresos ($)')
+
+            for i, v in enumerate(cantidades):
+                ax.text(v + 0.5, i, f'{v}', va='center', fontsize=8)
+
+            ax.legend(loc='lower right')
+            ax2.legend(loc='upper right')
+
+            ax.set_title('Servicios por Cantidad y Ventas')
+            ax.set_xlabel('Cantidad')
+            ax2.set_xlabel('Ingresos ($)')
+
+        elif tipo_grafico == "Área":
+            ax.fill_between(nombres_cortos, cantidades, alpha=0.5, color='lightgreen', label='Cantidad')
+            ax.plot(nombres_cortos, cantidades, 'o-', color='green')
+
+            ax2 = ax.twinx()
+            ax2.plot(nombres_cortos, ingresos, 's--', color='orange', label='Ingresos ($)')
+
+            plt.xticks(rotation=45, ha='right')
+
+            lines1, labels1 = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+            ax.set_ylabel('Cantidad')
+            ax2.set_ylabel('Ingresos ($)')
+            ax.set_title('Servicios por Cantidad e Ingresos')
+
+        elif tipo_grafico == "Dispersión":
+            ax.scatter(cantidades, ingresos, c=range(len(cantidades)), cmap='Greens',
+                       s=100, alpha=0.7, edgecolors='black')
+
+            for i, txt in enumerate(nombres_cortos):
+                ax.annotate(txt, (cantidades[i], ingresos[i]),
+                            xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+            ax.set_xlabel('Cantidad Solicitada')
+            ax.set_ylabel('Ingresos ($)')
+            ax.set_title('Relación entre Cantidad e Ingresos por Servicio')
+            ax.grid(True, linestyle='--', alpha=0.7)
+
+        elif tipo_grafico == "Calor":
+            # Crear matriz para mapa de calor
+            data = []
+            for i, nombre in enumerate(nombres_cortos):
+                fila = [nombre, cantidades[i], ingresos[i], ingresos[i] / cantidades[i]]
+                data.append(fila)
+
+            import pandas as pd
+            df = pd.DataFrame(data, columns=['Servicio', 'Cantidad', 'Ingresos', 'Precio Unitario'])
+            matriz = df.iloc[:, 1:].apply(lambda x: (x - x.min()) / (x.max() - x.min()), axis=0)
+
+            sns.heatmap(matriz.T, ax=ax, annot=True, fmt=".2f", cmap="YlGnBu",
+                        xticklabels=nombres_cortos,
+                        yticklabels=['Cantidad', 'Ingresos', 'Precio Unit.'])
+
+            ax.set_title('Análisis de Servicios (Valores Normalizados)')
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+
+    def realizar_exportacion(self, excel, csv, pdf, incluir_grafico, ventana):
+        """Realiza la exportación en los formatos seleccionados"""
+        # Obtener nombre de archivo base
+        filename = filedialog.asksaveasfilename(
+            title="Guardar reporte como",
+            defaultextension=".xlsx"
+        )
+
+        if not filename:
+            return
+
+        # Quitar extensión para usar como base
+        filename_base = os.path.splitext(filename)[0]
+
+        # Convertir datos a DataFrame
+        try:
+            import pandas as pd
+            from datetime import datetime
+
+            # Obtener títulos de columnas
+            columnas = []
+            for col_id in self.tabla_reporte['columns']:
+                try:
+                    columnas.append(self.tabla_reporte.heading(col_id, 'text'))
+                except:
+                    columnas.append(col_id)  # Usar el ID como fallback
+
+            # Crear DataFrame con los datos
+            datos = []
+            for item in self.tabla_reporte.get_children():
+                valores = self.tabla_reporte.item(item, 'values')
+                datos.append(valores)
+
+            df = pd.DataFrame(datos, columns=columnas)
+
+            # Exportar según formatos seleccionados
+            if excel:
+                try:
+                    # Crear un archivo Excel simple
+                    excel_file = f"{filename_base}.xlsx"
+                    df.to_excel(excel_file, index=False, sheet_name='Datos')
+
+                    # Mostrar mensaje de éxito para Excel
+                    messagebox.showinfo(
+                        "Exportación Excel",
+                        f"Datos exportados a Excel: {excel_file}"
+                    )
+
+                except Exception as e:
+                    # Intentar con otro engine si está disponible
+                    try:
+                        # Intentar con openpyxl
+                        df.to_excel(excel_file, index=False, sheet_name='Datos', engine='openpyxl')
+                        messagebox.showinfo(
+                            "Exportación Excel",
+                            f"Datos exportados a Excel: {excel_file}"
+                        )
+                    except Exception as inner_e:
+                        messagebox.showerror("Error Excel",
+                                             f"Error al exportar a Excel: {str(e)}\n\n"
+                                             f"Intento alternativo: {str(inner_e)}\n\n"
+                                             "Sugerencia: Instala xlsxwriter o openpyxl con pip install xlsxwriter openpyxl")
+
+            if csv:
+                try:
+                    csv_file = f"{filename_base}.csv"
+                    df.to_csv(csv_file, index=False)
+
+                    # Mostrar mensaje de éxito para CSV
+                    messagebox.showinfo(
+                        "Exportación CSV",
+                        f"Datos exportados a CSV: {csv_file}"
+                    )
+
+                except Exception as e:
+                    messagebox.showerror("Error CSV", f"Error al exportar a CSV: {str(e)}")
+
+            if pdf:
+                try:
+                    from reportlab.lib import colors
+                    from reportlab.lib.pagesizes import letter
+                    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+                    from reportlab.lib.styles import getSampleStyleSheet
+
+                    pdf_file = f"{filename_base}.pdf"
+                    doc = SimpleDocTemplate(pdf_file, pagesize=letter)
+
+                    # Lista de elementos para el PDF
+                    elements = []
+
+                    # Estilos
+                    styles = getSampleStyleSheet()
+
+                    # Título del reporte
+                    title_style = styles['Heading1']
+                    title = Paragraph(f"Reporte: {self.tipo_reporte.get()}", title_style)
+                    elements.append(title)
+                    elements.append(Spacer(1, 10))
+
+                    # Información del reporte
+                    info_style = styles['Normal']
+                    fecha_gen = Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                                          info_style)
+                    periodo = Paragraph(f"Periodo: {self.fecha_inicio.get()} a {self.fecha_fin.get()}", info_style)
+                    elements.append(fecha_gen)
+                    elements.append(periodo)
+                    elements.append(Spacer(1, 20))
+
+                    # Si se solicitó incluir gráfico
+                    if incluir_grafico and hasattr(self, 'fig'):
+                        # Guardar gráfico como imagen temporal
+                        img_temp = f"{filename_base}_temp.png"
+                        self.fig.savefig(img_temp, format='png', dpi=150, bbox_inches='tight')
+
+                        # Agregar imagen al PDF
+                        img = Image(img_temp)
+                        img.drawHeight = 300
+                        img.drawWidth = 500
+                        elements.append(img)
+                        elements.append(Spacer(1, 20))
+
+                    # Tabla de datos
+                    data = [columnas]  # Encabezados
+                    for row in datos:
+                        # Convertir cualquier none a string vacío
+                        data.append([str(cell) if cell is not None else '' for cell in row])
+
+                    # Crear tabla
+                    table = Table(data)
+
+                    # Estilo de tabla
+                    style = TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 12),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -1), 9),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ])
+
+                    # Aplicar estilo a la tabla
+                    table.setStyle(style)
+
+                    # Agregar tabla al PDF
+                    elements.append(table)
+
+                    # Generar PDF
+                    doc.build(elements)
+
+                    # Eliminar imagen temporal si existe
+                    if incluir_grafico and os.path.exists(img_temp):
+                        os.remove(img_temp)
+
+                    # Mostrar mensaje de éxito para PDF
+                    messagebox.showinfo(
+                        "Exportación PDF",
+                        f"Datos exportados a PDF: {pdf_file}"
+                    )
+
+                except Exception as e:
+                    messagebox.showerror("Error PDF", f"Error al exportar a PDF: {str(e)}")
+
+            # Mostrar mensaje de éxito general si se exportó algún formato
+            formatos_exportados = []
+            if excel: formatos_exportados.append("Excel")
+            if csv: formatos_exportados.append("CSV")
+            if pdf: formatos_exportados.append("PDF")
+
+            if len(formatos_exportados) > 1:
+                messagebox.showinfo(
+                    "Exportación exitosa",
+                    f"Reporte exportado en los siguientes formatos: {', '.join(formatos_exportados)}"
+                )
+
+                # Preguntar si desea abrir alguno de los archivos generados
+                if messagebox.askyesno("Abrir archivo", "¿Desea abrir alguno de los archivos generados?"):
+                    if excel:
+                        webbrowser.open(f"{filename_base}.xlsx")
+                    elif pdf:
+                        webbrowser.open(f"{filename_base}.pdf")
+
+        except Exception as e:
+            messagebox.showerror("Error de exportación", f"Error general: {str(e)}")
+            import traceback
+            traceback.print_exc()  # Imprimir stack trace para depuración
+
+        finally:
+            # Cerrar ventana de exportación
+            ventana.destroy()
+
     def actualizar_grafico(self):
         """Actualiza el gráfico según los datos y tipo seleccionado"""
         # Verificar si hay datos para graficar
@@ -4217,7 +4545,7 @@ class Reportes:
 
                     messagebox.showerror("Error", f"No se pudo guardar la imagen: {str(e)}")
 
-        def exportar_reporte(self):
+
 
             """Exporta el reporte actual en varios formatos"""
 
@@ -4426,286 +4754,6 @@ class Reportes:
 
             btn_cancelar.pack(side=tk.LEFT, padx=10)
 
-        def realizar_exportacion(self, excel, csv, pdf, html, incluir_grafico, ventana):
-            """Realiza la exportación en los formatos seleccionados"""
-            # Obtener nombre de archivo base
-            filename = filedialog.asksaveasfilename(
-                title="Guardar reporte como",
-                defaultextension=".xlsx"
-            )
-
-            if not filename:
-                return
-
-            # Quitar extensión para usar como base
-            filename_base = os.path.splitext(filename)[0]
-
-            # Convertir datos a DataFrame
-            try:
-                import pandas as pd
-                from datetime import datetime
-
-                # Obtener títulos de columnas
-                columnas = [col['text'] for col in self.tabla_reporte['columns']]
-
-                # Crear DataFrame con los datos
-                datos = []
-                for item in self.tabla_reporte.get_children():
-                    valores = self.tabla_reporte.item(item, 'values')
-                    datos.append(valores)
-
-                df = pd.DataFrame(datos, columns=columnas)
-
-                # Exportar según formatos seleccionados
-                if excel:
-                    try:
-                        # Crear un ExcelWriter
-                        excel_file = f"{filename_base}.xlsx"
-                        writer = pd.ExcelWriter(excel_file, engine='xlsxwriter')
-
-                        # Escribir los datos en la primera hoja
-                        df.to_excel(writer, sheet_name='Datos', index=False)
-
-                        # Añadir hoja con resumen
-                        resumen = pd.DataFrame({
-                            'Métrica': ['Fecha de Generación', 'Tipo de Reporte', 'Periodo', 'Total de Registros'],
-                            'Valor': [
-                                datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                                self.tipo_reporte.get(),
-                                f"{self.fecha_inicio.get()} a {self.fecha_fin.get()}",
-                                len(datos)
-                            ]
-                        })
-                        resumen.to_excel(writer, sheet_name='Resumen', index=False)
-
-                        # Si se solicitó incluir gráfico
-                        if incluir_grafico:
-                            # Guardar gráfico como imagen en memoria
-                            img_buf = io.BytesIO()
-                            self.fig.savefig(img_buf, format='png', dpi=150)
-                            img_buf.seek(0)
-
-                            # Insertar imagen en hoja de Excel
-                            worksheet = writer.sheets['Resumen']
-                            worksheet.insert_image('D5', 'grafico.png', {'image_data': img_buf})
-
-                        # Guardar archivo Excel
-                        writer.close()
-
-                    except Exception as e:
-                        messagebox.showerror("Error Excel", f"Error al exportar a Excel: {str(e)}")
-
-                if csv:
-                    try:
-                        csv_file = f"{filename_base}.csv"
-                        df.to_csv(csv_file, index=False)
-                    except Exception as e:
-                        messagebox.showerror("Error CSV", f"Error al exportar a CSV: {str(e)}")
-
-                if pdf:
-                    try:
-                        from reportlab.lib import colors
-                        from reportlab.lib.pagesizes import letter
-                        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-                        from reportlab.lib.styles import getSampleStyleSheet
-
-                        pdf_file = f"{filename_base}.pdf"
-                        doc = SimpleDocTemplate(pdf_file, pagesize=letter)
-
-                        # Lista de elementos para el PDF
-                        elements = []
-
-                        # Estilos
-                        styles = getSampleStyleSheet()
-
-                        # Título del reporte
-                        title_style = styles['Heading1']
-                        title = Paragraph(f"Reporte: {self.tipo_reporte.get()}", title_style)
-                        elements.append(title)
-                        elements.append(Spacer(1, 10))
-
-                        # Información del reporte
-                        info_style = styles['Normal']
-                        fecha_gen = Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-                                              info_style)
-                        periodo = Paragraph(f"Periodo: {self.fecha_inicio.get()} a {self.fecha_fin.get()}", info_style)
-                        elements.append(fecha_gen)
-                        elements.append(periodo)
-                        elements.append(Spacer(1, 20))
-
-                        # Si se solicitó incluir gráfico
-                        if incluir_grafico:
-                            # Guardar gráfico como imagen temporal
-                            img_temp = f"{filename_base}_temp.png"
-                            self.fig.savefig(img_temp, format='png', dpi=150, bbox_inches='tight')
-
-                            # Agregar imagen al PDF
-                            img = Image(img_temp)
-                            img.drawHeight = 300
-                            img.drawWidth = 500
-                            elements.append(img)
-                            elements.append(Spacer(1, 20))
-
-                        # Tabla de datos
-                        data = [columnas]  # Encabezados
-                        for row in datos:
-                            # Convertir cualquier none a string vacío
-                            data.append([str(cell) if cell is not None else '' for cell in row])
-
-                        # Crear tabla
-                        table = Table(data)
-
-                        # Estilo de tabla
-                        style = TableStyle([
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (-1, 0), 12),
-                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                            ('FONTSIZE', (0, 1), (-1, -1), 9),
-                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                        ])
-
-                        # Aplicar estilo a la tabla
-                        table.setStyle(style)
-
-                        # Agregar tabla al PDF
-                        elements.append(table)
-
-                        # Generar PDF
-                        doc.build(elements)
-
-                        # Eliminar imagen temporal si existe
-                        if incluir_grafico and os.path.exists(img_temp):
-                            os.remove(img_temp)
-
-                    except Exception as e:
-                        messagebox.showerror("Error PDF", f"Error al exportar a PDF: {str(e)}")
-
-                if html:
-                    try:
-                        html_file = f"{filename_base}.html"
-
-                        # Crear contenido HTML con Bootstrap para estilo
-                        html_string = """
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <title>Reporte de Lavandería</title>
-                            <meta charset="UTF-8">
-                            <meta name="viewport" content="width=device-width, initial-scale=1">
-                            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-                            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-                            <style>
-                                body { padding: 20px; }
-                                .report-header { margin-bottom: 30px; }
-                                .table-container { margin-top: 20px; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="container">
-                                <div class="report-header">
-                                    <h1>Reporte: {}</h1>
-                                    <p><strong>Fecha:</strong> {}</p>
-                                    <p><strong>Periodo:</strong> {} a {}</p>
-                                </div>
-                        """.format(
-                            self.tipo_reporte.get(),
-                            datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                            self.fecha_inicio.get(),
-                            self.fecha_fin.get()
-                        )
-
-                        # Agregar gráfico si se solicitó
-                        if incluir_grafico:
-                            # Guardar gráfico como imagen
-                            img_path = f"{filename_base}_grafico.png"
-                            self.fig.savefig(img_path, format='png', dpi=150, bbox_inches='tight')
-
-                            # Agregar imagen al HTML
-                            html_string += f"""
-                                <div class="graph-container text-center">
-                                    <img src="{os.path.basename(img_path)}" class="img-fluid" alt="Gráfico">
-                                </div>
-                            """
-
-                        # Agregar tabla de datos
-                        html_string += """
-                                <div class="table-container">
-                                    <h2>Datos del Reporte</h2>
-                                    <table class="table table-striped table-hover">
-                                        <thead class="table-dark">
-                                            <tr>
-                        """
-
-                        # Encabezados
-                        for col in columnas:
-                            html_string += f"<th>{col}</th>"
-
-                        html_string += """
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                        """
-
-                        # Filas de datos
-                        for row in datos:
-                            html_string += "<tr>"
-                            for cell in row:
-                                html_string += f"<td>{cell}</td>"
-                            html_string += "</tr>"
-
-                        # Cierre de tabla y documento
-                        html_string += """
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </body>
-                        </html>
-                        """
-
-                        # Guardar HTML
-                        with open(html_file, 'w', encoding='utf-8') as f:
-                            f.write(html_string)
-
-                    except Exception as e:
-                        messagebox.showerror("Error HTML", f"Error al exportar a HTML: {str(e)}")
-
-                # Mostrar mensaje de éxito
-                formatos_exportados = []
-                if excel: formatos_exportados.append("Excel")
-                if csv: formatos_exportados.append("CSV")
-                if pdf: formatos_exportados.append("PDF")
-                if html: formatos_exportados.append("HTML")
-
-                if formatos_exportados:
-                    messagebox.showinfo(
-                        "Exportación exitosa",
-                        f"Reporte exportado en los siguientes formatos: {', '.join(formatos_exportados)}"
-                    )
-
-                    # Preguntar si desea abrir alguno de los archivos generados
-                    if messagebox.askyesno("Abrir archivo", "¿Desea abrir alguno de los archivos generados?"):
-                        if excel:
-                            webbrowser.open(f"{filename_base}.xlsx")
-                        elif pdf:
-                            webbrowser.open(f"{filename_base}.pdf")
-                        elif html:
-                            webbrowser.open(f"{filename_base}.html")
-
-            except Exception as e:
-                messagebox.showerror("Error de exportación", f"Error general: {str(e)}")
-
-            finally:
-                # Cerrar ventana de exportación
-                ventana.destroy()
-
     def exportar_reporte(self):
         """Exporta el reporte actual a diferentes formatos"""
         # Verificar si hay datos para exportar
@@ -4713,15 +4761,15 @@ class Reportes:
             messagebox.showwarning("Sin datos", "No hay datos para exportar. Genere un reporte primero.")
             return
 
-        # Mostrar opciones de exportación (código que ya teníamos en realizar_exportacion)
+        # Mostrar opciones de exportación
         ventana_exportar = tk.Toplevel(self.ventana)
         ventana_exportar.title("Exportar Reporte")
-        ventana_exportar.geometry("400x300")
+        ventana_exportar.geometry("400x250")  # Reducido el tamaño ya que quitamos una opción
         ventana_exportar.config(bg="#f5f5f5")
         ventana_exportar.transient(self.ventana)
         ventana_exportar.grab_set()
 
-        utl.centrar_ventana(ventana_exportar, 400, 300)
+        utl.centrar_ventana(ventana_exportar, 400, 250)
 
         tk.Label(
             ventana_exportar,
@@ -4735,7 +4783,6 @@ class Reportes:
         var_excel = tk.IntVar(value=1)
         var_csv = tk.IntVar(value=0)
         var_pdf = tk.IntVar(value=0)
-        var_html = tk.IntVar(value=0)
 
         # Frame para checkboxes
         frame_opciones = tk.Frame(ventana_exportar, bg="#f5f5f5", pady=10)
@@ -4769,15 +4816,6 @@ class Reportes:
         )
         cb_pdf.grid(row=2, column=0, sticky=tk.W, pady=5)
 
-        cb_html = tk.Checkbutton(
-            frame_opciones,
-            text="HTML (.html)",
-            variable=var_html,
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        cb_html.grid(row=3, column=0, sticky=tk.W, pady=5)
-
         # Opciones adicionales
         tk.Label(
             ventana_exportar,
@@ -4809,7 +4847,7 @@ class Reportes:
             font=("Helvetica", 11),
             width=10,
             command=lambda: self.realizar_exportacion(
-                var_excel.get(), var_csv.get(), var_pdf.get(), var_html.get(),
+                var_excel.get(), var_csv.get(), var_pdf.get(),
                 var_incluir_grafico.get(), ventana_exportar
             )
         )
