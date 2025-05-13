@@ -696,7 +696,7 @@ class Reportes:
         )
         combo_metodo.pack(side=tk.LEFT, padx=5)
 
-        # Frame para cliente
+        # Frame para cliente con selector avanzado
         frame_cliente = tk.Frame(self.frame_fila2, bg="#f5f5f5")
         frame_cliente.pack(side=tk.LEFT, padx=10)
 
@@ -707,15 +707,55 @@ class Reportes:
             bg="#f5f5f5"
         ).pack(side=tk.LEFT, padx=5)
 
+        # Campo de búsqueda de cliente y botón de búsqueda integrados
+        frame_cliente_entrada = tk.Frame(frame_cliente, bg="#f5f5f5", relief="solid", bd=1)
+        frame_cliente_entrada.pack(side=tk.LEFT, padx=5)
+
+        # Entry para ID o nombre cliente
         entry_cliente = tk.Entry(
-            frame_cliente,
+            frame_cliente_entrada,
             textvariable=self.filtro_cliente,
             font=("Helvetica", 11),
-            width=15
+            width=15,
+            bd=0,
+            highlightthickness=0
         )
-        entry_cliente.pack(side=tk.LEFT, padx=5)
+        entry_cliente.pack(side=tk.LEFT, padx=(5, 0), pady=2)
 
-        # Frame para vendedor
+        # Separador visual
+        tk.Frame(
+            frame_cliente_entrada,
+            width=1,
+            bg="#cccccc"
+        ).pack(side=tk.LEFT, fill=tk.Y, padx=2, pady=2)
+
+        # Botón para selector avanzado integrado en el mismo frame
+        btn_buscar_cliente = tk.Button(
+            frame_cliente_entrada,
+            text="🔍",
+            font=("Helvetica", 11),
+            bg="#f0f0f0",
+            activebackground="#e0e0e0",
+            bd=0,
+            highlightthickness=0,
+            padx=5,
+            command=lambda: self._abrir_selector_clientes(self.filtro_cliente)
+        )
+        btn_buscar_cliente.pack(side=tk.LEFT, pady=2)
+
+        # Etiqueta para mostrar el cliente seleccionado
+        self.lbl_cliente_seleccionado = tk.Label(
+            frame_cliente,
+            text="",
+            font=("Helvetica", 10, "italic"),
+            bg="#f5f5f5",
+            fg="#666666",
+            width=25,  # Ancho fijo para evitar desplazamientos
+            anchor="w"  # Alineación a la izquierda
+        )
+        self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=5)
+
+        # Frame para vendedor con selector avanzado
         frame_vendedor = tk.Frame(self.frame_fila2, bg="#f5f5f5")
         frame_vendedor.pack(side=tk.LEFT, padx=10)
 
@@ -726,13 +766,304 @@ class Reportes:
             bg="#f5f5f5"
         ).pack(side=tk.LEFT, padx=5)
 
+        # Campo de búsqueda de vendedor y botón integrados
+        frame_vendedor_entrada = tk.Frame(frame_vendedor, bg="#f5f5f5", relief="solid", bd=1)
+        frame_vendedor_entrada.pack(side=tk.LEFT, padx=5)
+
+        # Entry para nombre del vendedor
         entry_vendedor = tk.Entry(
-            frame_vendedor,
+            frame_vendedor_entrada,
             textvariable=self.filtro_vendedor,
             font=("Helvetica", 11),
-            width=15
+            width=15,
+            bd=0,
+            highlightthickness=0
         )
-        entry_vendedor.pack(side=tk.LEFT, padx=5)
+        entry_vendedor.pack(side=tk.LEFT, padx=(5, 0), pady=2)
+
+        # Separador visual
+        tk.Frame(
+            frame_vendedor_entrada,
+            width=1,
+            bg="#cccccc"
+        ).pack(side=tk.LEFT, fill=tk.Y, padx=2, pady=2)
+
+        # Botón para selector avanzado integrado
+        btn_buscar_vendedor = tk.Button(
+            frame_vendedor_entrada,
+            text="🔍",
+            font=("Helvetica", 11),
+            bg="#f0f0f0",
+            activebackground="#e0e0e0",
+            bd=0,
+            highlightthickness=0,
+            padx=5,
+            command=lambda: self._abrir_selector_vendedores(self.filtro_vendedor)
+        )
+        btn_buscar_vendedor.pack(side=tk.LEFT, pady=2)
+
+        # Etiqueta para mostrar el vendedor seleccionado
+        self.lbl_vendedor_seleccionado = tk.Label(
+            frame_vendedor,
+            text="",
+            font=("Helvetica", 10, "italic"),
+            bg="#f5f5f5",
+            fg="#666666",
+            width=20,  # Ancho fijo para evitar desplazamientos
+            anchor="w"  # Alineación a la izquierda
+        )
+        self.lbl_vendedor_seleccionado.pack(side=tk.LEFT, padx=5)
+
+    def _abrir_selector_vendedores(self, variable):
+        """Abre un selector completo de vendedores en una ventana independiente"""
+        ventana = tk.Toplevel(self.ventana)
+        ventana.title("Seleccionar Vendedor")
+        ventana.geometry("650x450")  # Tamaño adecuado para vendedores
+        ventana.transient(self.ventana)
+        ventana.grab_set()  # Hace la ventana modal
+
+        utl.centrar_ventana(ventana, 650, 450)
+
+        # Frame de búsqueda
+        frame_busqueda = tk.Frame(ventana, bg="#f5f5f5", padx=15, pady=15)
+        frame_busqueda.pack(fill=tk.X)
+
+        tk.Label(
+            frame_busqueda,
+            text="Buscar vendedor:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5"
+        ).pack(side=tk.LEFT, padx=10)
+
+        var_busqueda = tk.StringVar()
+        entry_busqueda = tk.Entry(
+            frame_busqueda,
+            textvariable=var_busqueda,
+            font=("Helvetica", 12),
+            width=35
+        )
+        entry_busqueda.pack(side=tk.LEFT, padx=10)
+
+        # Marco de la tabla con borde
+        frame_tabla_exterior = tk.LabelFrame(ventana, text="Lista de Vendedores", font=("Helvetica", 11), padx=10,
+                                             pady=10)
+        frame_tabla_exterior.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+
+        # Frame interno para la tabla y scrollbar
+        frame_tabla = tk.Frame(frame_tabla_exterior)
+        frame_tabla.pack(fill=tk.BOTH, expand=True)
+
+        # Crear tabla con Treeview
+        columnas = ('id_usuario', 'nombre', 'correo', 'rol')
+        tabla = ttk.Treeview(
+            frame_tabla,
+            columns=columnas,
+            show='headings',
+            height=15
+        )
+
+        # Estilo para la tabla
+        estilo = ttk.Style()
+        estilo.configure("Treeview",
+                         font=("Helvetica", 11),
+                         rowheight=25)
+        estilo.configure("Treeview.Heading",
+                         font=("Helvetica", 11, "bold"))
+
+        # Configurar columnas
+        tabla.heading('id_usuario', text='ID')
+        tabla.heading('nombre', text='Nombre Completo')
+        tabla.heading('correo', text='Correo')
+        tabla.heading('rol', text='Rol')
+
+        tabla.column('id_usuario', width=50, anchor=tk.CENTER)
+        tabla.column('nombre', width=250)
+        tabla.column('correo', width=200)
+        tabla.column('rol', width=100, anchor=tk.CENTER)
+
+        # Scrollbars
+        scrollbar_y = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla.yview)
+        scrollbar_x = ttk.Scrollbar(frame_tabla, orient=tk.HORIZONTAL, command=tabla.xview)
+        tabla.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+        # Colocar tabla y scrollbars
+        tabla.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Variable para controlar el retraso en la búsqueda
+        ultima_busqueda = [""]
+
+        # Cargar datos en la tabla
+        def cargar_datos_tabla():
+            # Limpiar tabla
+            for i in tabla.get_children():
+                tabla.delete(i)
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                filtro = var_busqueda.get().strip().lower()
+
+                if filtro:
+                    consulta = """
+                        SELECT id_usuario, nombre, correo, rol
+                        FROM usuarios
+                        WHERE LOWER(nombre) LIKE %s
+                        OR id_usuario LIKE %s
+                        OR LOWER(correo) LIKE %s
+                        ORDER BY nombre
+                        LIMIT 100
+                    """
+                    cursor.execute(consulta, (f'%{filtro}%', f'%{filtro}%', f'%{filtro}%'))
+                else:
+                    consulta = """
+                        SELECT id_usuario, nombre, correo, rol
+                        FROM usuarios
+                        ORDER BY nombre
+                        LIMIT 100
+                    """
+                    cursor.execute(consulta)
+
+                vendedores = cursor.fetchall()
+                conexion.close()
+
+                # Etiqueta para mostrar cantidad de resultados
+                num_resultados = len(vendedores)
+                lbl_resultados.config(text=f"Mostrando {num_resultados} vendedores")
+
+                # Aplicar colores alternados en las filas
+                for i, vendedor in enumerate(vendedores):
+                    # Alternar colores de fila
+                    if i % 2 == 0:
+                        tabla.insert('', tk.END, values=vendedor, tags=('par',))
+                    else:
+                        tabla.insert('', tk.END, values=vendedor, tags=('impar',))
+
+                # Configurar colores de filas
+                tabla.tag_configure('par', background='#f0f0f0')
+                tabla.tag_configure('impar', background='#ffffff')
+
+                # Guardar último filtro aplicado
+                ultima_busqueda[0] = filtro
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al cargar vendedores: {str(e)}")
+                print(f"Error detallado: {e}")
+
+        # Función para búsqueda en tiempo real con retraso
+        def actualizar_busqueda(event=None):
+            # Obtener texto actual
+            filtro_actual = var_busqueda.get().strip().lower()
+
+            # Solo buscar si el texto ha cambiado
+            if filtro_actual != ultima_busqueda[0]:
+                # Cancelar búsqueda pendiente si existe
+                if hasattr(actualizar_busqueda, 'after_id') and actualizar_busqueda.after_id:
+                    ventana.after_cancel(actualizar_busqueda.after_id)
+
+                # Programar nueva búsqueda con un pequeño retraso para no sobrecargar la BD
+                actualizar_busqueda.after_id = ventana.after(300, cargar_datos_tabla)
+
+        # Asignar atributo para controlar el temporizador
+        actualizar_busqueda.after_id = None
+
+        # Botones para búsqueda
+        btn_buscar = tk.Button(
+            frame_busqueda,
+            text="Buscar",
+            font=("Helvetica", 11),
+            bg="#3a7ff6",
+            fg="white",
+            padx=15,
+            command=cargar_datos_tabla
+        )
+        btn_buscar.pack(side=tk.LEFT, padx=10)
+
+        btn_limpiar = tk.Button(
+            frame_busqueda,
+            text="Limpiar",
+            font=("Helvetica", 11),
+            bg="#e0e0e0",
+            padx=10,
+            command=lambda: [var_busqueda.set(""), cargar_datos_tabla()]
+        )
+        btn_limpiar.pack(side=tk.LEFT, padx=5)
+
+        # Etiqueta para mostrar cantidad de resultados
+        lbl_resultados = tk.Label(
+            frame_tabla_exterior,
+            text="Cargando vendedores...",
+            font=("Helvetica", 10, "italic"),
+            anchor='e'
+        )
+        lbl_resultados.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 0))
+
+        # Botones de acción
+        frame_botones = tk.Frame(ventana, bg="#f5f5f5", padx=15, pady=15)
+        frame_botones.pack(fill=tk.X)
+
+        def seleccionar_vendedor():
+            if not tabla.selection():
+                messagebox.showwarning("Selección requerida", "Por favor, seleccione un vendedor de la lista.")
+                return
+
+            # Obtener valores del vendedor seleccionado
+            valores = tabla.item(tabla.selection()[0], 'values')
+            id_usuario = valores[0]
+            nombre = valores[1]
+
+            # Actualizar variable de destino con el nombre (para filtro de reportes)
+            variable.set(nombre)
+
+            # Actualizar etiqueta si existe
+            if hasattr(self, 'lbl_vendedor_seleccionado'):
+                self.lbl_vendedor_seleccionado.config(text=f"✓ {nombre}")
+
+            # Cerrar ventana
+            ventana.destroy()
+
+        btn_seleccionar = tk.Button(
+            frame_botones,
+            text="Seleccionar Vendedor",
+            font=("Helvetica", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            padx=20,
+            pady=5,
+            command=seleccionar_vendedor
+        )
+        btn_seleccionar.pack(side=tk.LEFT, padx=15)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            font=("Helvetica", 12),
+            bg="#F44336",
+            fg="white",
+            padx=20,
+            pady=5,
+            command=ventana.destroy
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        # Vincular la entrada de texto con la búsqueda en tiempo real
+        entry_busqueda.bind("<KeyRelease>", actualizar_busqueda)
+
+        # Procesar teclado: Enter busca, Escape cierra
+        entry_busqueda.bind("<Return>", lambda e: cargar_datos_tabla())
+        ventana.bind("<Escape>", lambda e: ventana.destroy())
+
+        # Doble clic para seleccionar
+        tabla.bind("<Double-Button-1>", lambda e: seleccionar_vendedor())
+
+        # Selección con Enter
+        tabla.bind("<Return>", lambda e: seleccionar_vendedor())
+
+        # Dar foco al campo de búsqueda y cargar datos iniciales
+        cargar_datos_tabla()
+        entry_busqueda.focus_set()
 
     def crear_filtros_pedidos(self):
         """Crea filtros específicos para el reporte de pedidos"""
@@ -2699,6 +3030,29 @@ class Reportes:
         # Quitar extensión para usar como base
         filename_base = os.path.splitext(filename)[0]
 
+        # Manejo especial para Dashboard General
+        if self.tipo_reporte.get() == "Dashboard General":
+            if pdf:
+                self._exportar_dashboard_pdf(filename_base, incluir_grafico)
+            if excel:
+                self._exportar_dashboard_excel(filename_base, incluir_grafico)
+            if csv:
+                # Para CSV sólo exportamos la tabla de resumen
+                try:
+                    import pandas as pd
+                    df_resumen = pd.DataFrame(
+                        [self.tabla_reporte.item(item, 'values') for item in self.tabla_reporte.get_children()],
+                        columns=['Métrica', 'Valor', 'Variación'])
+                    df_resumen.to_csv(f"{filename_base}.csv", index=False)
+                    messagebox.showinfo("Exportación CSV", f"Resumen exportado a CSV: {filename_base}.csv")
+                except Exception as e:
+                    messagebox.showerror("Error CSV", f"Error al exportar a CSV: {str(e)}")
+
+            # Cerrar ventana de exportación
+            ventana.destroy()
+            return
+
+        # Código existente para otros tipos de reportes
         # Convertir datos a DataFrame
         try:
             import pandas as pd
@@ -4863,6 +5217,574 @@ class Reportes:
             command=ventana_exportar.destroy
         )
         btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+    def _exportar_dashboard_pdf(self, filename_base, incluir_grafico=True):
+        """Exportación específica del dashboard a PDF"""
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+
+            # Crear documento PDF
+            pdf_file = f"{filename_base}.pdf"
+            doc = SimpleDocTemplate(pdf_file, pagesize=landscape(letter))
+
+            # Lista de elementos para el PDF
+            elements = []
+
+            # Estilos
+            styles = getSampleStyleSheet()
+            title_style = styles['Heading1']
+            heading2_style = styles['Heading2']
+            normal_style = styles['Normal']
+
+            # Título del reporte
+            title = Paragraph("Dashboard General - Sistema de Lavandería", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 0.2 * inch))
+
+            # Información del reporte
+            fecha_gen = Paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", normal_style)
+            periodo = Paragraph(f"Periodo: {self.fecha_inicio.get()} a {self.fecha_fin.get()}", normal_style)
+            elements.append(fecha_gen)
+            elements.append(periodo)
+            elements.append(Spacer(1, 0.3 * inch))
+
+            # Resumen general
+            elements.append(Paragraph("Resumen General", heading2_style))
+            elements.append(Spacer(1, 0.1 * inch))
+
+            # Obtener datos de la tabla de resumen
+            resumen_data = []
+            columnas = ['Métrica', 'Valor', 'Variación']
+            resumen_data.append(columnas)
+
+            for item in self.tabla_reporte.get_children():
+                valores = self.tabla_reporte.item(item, 'values')
+                resumen_data.append(valores)
+
+            # Crear tabla de resumen
+            if resumen_data and len(resumen_data) > 1:
+                table = Table(resumen_data, colWidths=[3 * inch, 2 * inch, 2 * inch])
+
+                # Estilo de tabla
+                style = TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                    ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                    ('ALIGN', (1, 1), (2, -1), 'CENTER'),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 10),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ])
+
+                table.setStyle(style)
+                elements.append(table)
+            else:
+                elements.append(Paragraph("No hay datos de resumen disponibles", normal_style))
+
+            elements.append(Spacer(1, 0.3 * inch))
+
+            # Exportar gráficos si se solicita
+            if incluir_grafico and hasattr(self, 'dashboard_figs'):
+                elements.append(Paragraph("Visualizaciones", heading2_style))
+                elements.append(Spacer(1, 0.1 * inch))
+
+                # Guardar cada gráfico como imagen temporal
+                img_temp_files = []
+
+                for i, fig in enumerate(self.dashboard_figs):
+                    # Determinar título del gráfico según el índice
+                    if i == 0:
+                        titulo = "Ventas Diarias"
+                    elif i == 1:
+                        titulo = "Top 5 Servicios"
+                    elif i == 2:
+                        titulo = "Pedidos por Estado"
+                    elif i == 3:
+                        titulo = "Top 5 Clientes"
+                    else:
+                        titulo = f"Gráfico {i + 1}"
+
+                    # Añadir título del gráfico
+                    elements.append(Paragraph(titulo, styles['Heading3']))
+                    elements.append(Spacer(1, 0.1 * inch))
+
+                    # Guardar gráfico como imagen temporal
+                    img_temp = f"{filename_base}_temp_graph_{i}.png"
+                    fig.savefig(img_temp, format='png', dpi=150, bbox_inches='tight')
+                    img_temp_files.append(img_temp)
+
+                    # Añadir imagen al PDF
+                    img = Image(img_temp)
+                    img.drawHeight = 3 * inch
+                    img.drawWidth = 6 * inch
+                    elements.append(img)
+                    elements.append(Spacer(1, 0.2 * inch))
+
+                # Construir el PDF
+                doc.build(elements)
+
+                # Eliminar archivos temporales
+                for temp_file in img_temp_files:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+            else:
+                # Construir el PDF sin gráficos
+                doc.build(elements)
+
+            messagebox.showinfo("Exportación PDF", f"Dashboard exportado a PDF: {pdf_file}")
+
+        except Exception as e:
+            messagebox.showerror("Error PDF", f"Error al exportar dashboard a PDF: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _exportar_dashboard_excel(self, filename_base, incluir_grafico=True):
+        """Exportación específica del dashboard a Excel"""
+        try:
+            import pandas as pd
+            from io import BytesIO
+
+            # Crear un escritor de Excel
+            excel_file = f"{filename_base}.xlsx"
+            writer = pd.ExcelWriter(excel_file, engine='xlsxwriter')
+
+            # Obtener libro de trabajo y hojas
+            workbook = writer.book
+
+            # Crear hoja para resumen
+            resumen_data = []
+
+            # Extraer datos de la tabla de resumen
+            for item in self.tabla_reporte.get_children():
+                valores = self.tabla_reporte.item(item, 'values')
+                resumen_data.append(valores)
+
+            # Crear dataframe con los datos
+            if resumen_data:
+                df_resumen = pd.DataFrame(resumen_data, columns=['Métrica', 'Valor', 'Variación'])
+
+                # Escribir dataframe en Excel
+                df_resumen.to_excel(writer, sheet_name='Resumen', index=False)
+
+                # Obtener objeto de hoja
+                worksheet = writer.sheets['Resumen']
+
+                # Formato para títulos
+                header_format = workbook.add_format({
+                    'bold': True,
+                    'bg_color': '#4F81BD',
+                    'font_color': 'white',
+                    'border': 1
+                })
+
+                # Aplicar formato a encabezados
+                for col_num, value in enumerate(df_resumen.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+
+                # Ajustar anchos de columna
+                worksheet.set_column(0, 0, 30)  # Métrica
+                worksheet.set_column(1, 1, 20)  # Valor
+                worksheet.set_column(2, 2, 20)  # Variación
+
+            # Exportar gráficos si se solicita
+            if incluir_grafico and hasattr(self, 'dashboard_figs'):
+                # Crear hoja para gráficos
+                worksheet_graphs = workbook.add_worksheet('Gráficos')
+
+                # Posición inicial
+                row = 1
+
+                # Títulos para cada gráfico
+                titulos = ["Ventas Diarias", "Top 5 Servicios", "Pedidos por Estado", "Top 5 Clientes"]
+
+                for i, fig in enumerate(self.dashboard_figs):
+                    titulo = titulos[i] if i < len(titulos) else f"Gráfico {i + 1}"
+
+                    # Escribir título
+                    title_format = workbook.add_format({'bold': True, 'font_size': 14})
+                    worksheet_graphs.write(row, 1, titulo, title_format)
+                    row += 1
+
+                    # Guardar gráfico como imagen temporal
+                    img_temp = f"{filename_base}_temp_graph_{i}.png"
+                    fig.savefig(img_temp, format='png', dpi=150, bbox_inches='tight')
+
+                    # Insertar imagen en Excel
+                    worksheet_graphs.insert_image(row, 1, img_temp)
+
+                    # Espacio para el siguiente gráfico
+                    row += 20
+
+                # Ajustar ancho de columnas en hoja de gráficos
+                worksheet_graphs.set_column(1, 1, 80)
+
+            # Guardar archivo Excel
+            writer.close()
+
+            # Eliminar imágenes temporales
+            if incluir_grafico and hasattr(self, 'dashboard_figs'):
+                for i in range(len(self.dashboard_figs)):
+                    img_temp = f"{filename_base}_temp_graph_{i}.png"
+                    if os.path.exists(img_temp):
+                        os.remove(img_temp)
+
+            messagebox.showinfo("Exportación Excel", f"Dashboard exportado a Excel: {excel_file}")
+
+        except Exception as e:
+            messagebox.showerror("Error Excel", f"Error al exportar dashboard a Excel: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+
+
+    def _autocompletar_cliente(self, entry, variable):
+        """Proporciona autocompletado mientras el usuario escribe"""
+        texto = entry.get().strip().lower()
+        if not texto:
+            return
+
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT id_cliente, nombre 
+                FROM clientes 
+                WHERE LOWER(nombre) LIKE %s OR id_cliente LIKE %s 
+                LIMIT 10
+            """, (f'%{texto}%', f'%{texto}%'))
+
+            resultados = cursor.fetchall()
+            conexion.close()
+
+            if resultados:
+                # Eliminar ventana existente si hay
+                for widget in self.ventana.winfo_children():
+                    if isinstance(widget, tk.Toplevel) and widget.winfo_name().startswith('cliente_autocomplete'):
+                        widget.destroy()
+
+                # Mostrar ventana emergente con sugerencias
+                x = entry.winfo_rootx()
+                y = entry.winfo_rooty() + entry.winfo_height()
+
+                top = tk.Toplevel(self.ventana)
+                top.wm_geometry(f"300x200+{x}+{y}")
+                top.wm_overrideredirect(True)
+                top.wm_name('cliente_autocomplete')
+
+                # Crear listbox con scrollbar
+                frame_lista = tk.Frame(top)
+                frame_lista.pack(fill=tk.BOTH, expand=True)
+
+                scrollbar = tk.Scrollbar(frame_lista)
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+                listbox = tk.Listbox(
+                    frame_lista,
+                    font=("Helvetica", 11),
+                    yscrollcommand=scrollbar.set
+                )
+                listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+                scrollbar.config(command=listbox.yview)
+
+                # Llenar la lista
+                for cliente in resultados:
+                    listbox.insert(tk.END, f"{cliente[0]} - {cliente[1]}")
+
+                # Seleccionar cliente
+                def seleccionar(event=None):
+                    if listbox.curselection():
+                        seleccion = listbox.get(listbox.curselection()[0])
+                        id_cliente = seleccion.split(' - ')[0]
+                        nombre_cliente = seleccion.split(' - ')[1]
+                        variable.set(id_cliente)
+                        if hasattr(self, 'lbl_cliente_seleccionado'):
+                            self.lbl_cliente_seleccionado.config(text=f"✓ {nombre_cliente}")
+                        top.destroy()
+
+                listbox.bind("<Double-Button-1>", seleccionar)
+                listbox.bind("<Return>", seleccionar)
+
+                # Cerrar al perder foco
+                def check_focus_out(event=None):
+                    if not top.focus_displayof():
+                        top.destroy()
+                    else:
+                        # Programar nueva verificación después de 100ms
+                        top.after(100, check_focus_out)
+
+                top.after(100, check_focus_out)
+
+                # Dar foco a la lista
+                listbox.focus_set()
+
+        except Exception as e:
+            print(f"Error en autocompletado: {e}")
+
+    def _abrir_selector_clientes(self, variable):
+        """Abre un selector completo de clientes en una ventana independiente"""
+        ventana = tk.Toplevel(self.ventana)
+        ventana.title("Seleccionar Cliente")
+        ventana.geometry("700x500")  # Ventana más grande para mejor visibilidad
+        ventana.transient(self.ventana)
+        ventana.grab_set()  # Hace la ventana modal
+
+        utl.centrar_ventana(ventana, 700, 500)
+
+        # Frame de búsqueda
+        frame_busqueda = tk.Frame(ventana, bg="#f5f5f5", padx=15, pady=15)
+        frame_busqueda.pack(fill=tk.X)
+
+        tk.Label(
+            frame_busqueda,
+            text="Buscar cliente:",
+            font=("Helvetica", 12, "bold"),
+            bg="#f5f5f5"
+        ).pack(side=tk.LEFT, padx=10)
+
+        var_busqueda = tk.StringVar()
+        entry_busqueda = tk.Entry(
+            frame_busqueda,
+            textvariable=var_busqueda,
+            font=("Helvetica", 12),
+            width=35
+        )
+        entry_busqueda.pack(side=tk.LEFT, padx=10)
+
+        # Marco de la tabla con borde
+        frame_tabla_exterior = tk.LabelFrame(ventana, text="Lista de Clientes", font=("Helvetica", 11), padx=10,
+                                             pady=10)
+        frame_tabla_exterior.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+
+        # Frame interno para la tabla y scrollbar
+        frame_tabla = tk.Frame(frame_tabla_exterior)
+        frame_tabla.pack(fill=tk.BOTH, expand=True)
+
+        # Crear tabla con Treeview
+        columnas = ('id_cliente', 'nombre', 'telefono', 'correo', 'puntos')
+        tabla = ttk.Treeview(
+            frame_tabla,
+            columns=columnas,
+            show='headings',
+            height=15
+        )
+
+        # Estilo para la tabla
+        estilo = ttk.Style()
+        estilo.configure("Treeview",
+                         font=("Helvetica", 11),
+                         rowheight=25)
+        estilo.configure("Treeview.Heading",
+                         font=("Helvetica", 11, "bold"))
+
+        # Configurar columnas
+        tabla.heading('id_cliente', text='ID')
+        tabla.heading('nombre', text='Nombre Completo')
+        tabla.heading('telefono', text='Teléfono')
+        tabla.heading('correo', text='Correo')
+        tabla.heading('puntos', text='Puntos')
+
+        tabla.column('id_cliente', width=60, anchor=tk.CENTER)
+        tabla.column('nombre', width=250)
+        tabla.column('telefono', width=120, anchor=tk.CENTER)
+        tabla.column('correo', width=180)
+        tabla.column('puntos', width=80, anchor=tk.CENTER)
+
+        # Scrollbars
+        scrollbar_y = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla.yview)
+        scrollbar_x = ttk.Scrollbar(frame_tabla, orient=tk.HORIZONTAL, command=tabla.xview)
+        tabla.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+
+        # Colocar tabla y scrollbars
+        tabla.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Variable para controlar el retraso en la búsqueda
+        ultima_busqueda = [""]
+
+        # Cargar datos en la tabla
+        def cargar_datos_tabla():
+            # Limpiar tabla
+            for i in tabla.get_children():
+                tabla.delete(i)
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+
+                filtro = var_busqueda.get().strip().lower()
+
+                if filtro:
+                    consulta = """
+                        SELECT id_cliente, nombre, telefono, correo, puntos
+                        FROM clientes
+                        WHERE LOWER(nombre) LIKE %s
+                        OR id_cliente LIKE %s
+                        OR LOWER(telefono) LIKE %s
+                        OR LOWER(correo) LIKE %s
+                        ORDER BY nombre
+                        LIMIT 200
+                    """
+                    cursor.execute(consulta, (f'%{filtro}%', f'%{filtro}%', f'%{filtro}%', f'%{filtro}%'))
+                else:
+                    consulta = """
+                        SELECT id_cliente, nombre, telefono, correo, puntos
+                        FROM clientes
+                        ORDER BY nombre
+                        LIMIT 200
+                    """
+                    cursor.execute(consulta)
+
+                clientes = cursor.fetchall()
+                conexion.close()
+
+                # Etiqueta para mostrar cantidad de resultados
+                num_resultados = len(clientes)
+                lbl_resultados.config(text=f"Mostrando {num_resultados} clientes")
+
+                # Aplicar colores alternados en las filas
+                for i, cliente in enumerate(clientes):
+                    # Alternar colores de fila
+                    if i % 2 == 0:
+                        tabla.insert('', tk.END, values=cliente, tags=('par',))
+                    else:
+                        tabla.insert('', tk.END, values=cliente, tags=('impar',))
+
+                # Configurar colores de filas
+                tabla.tag_configure('par', background='#f0f0f0')
+                tabla.tag_configure('impar', background='#ffffff')
+
+                # Guardar último filtro aplicado
+                ultima_busqueda[0] = filtro
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al cargar clientes: {str(e)}")
+                print(f"Error detallado: {e}")
+
+        # Función para búsqueda en tiempo real con retraso
+        def actualizar_busqueda(event=None):
+            # Obtener texto actual
+            filtro_actual = var_busqueda.get().strip().lower()
+
+            # Solo buscar si el texto ha cambiado
+            if filtro_actual != ultima_busqueda[0]:
+                # Cancelar búsqueda pendiente si existe
+                if hasattr(actualizar_busqueda, 'after_id') and actualizar_busqueda.after_id:
+                    ventana.after_cancel(actualizar_busqueda.after_id)
+
+                # Programar nueva búsqueda con un pequeño retraso para no sobrecargar la BD
+                actualizar_busqueda.after_id = ventana.after(300, cargar_datos_tabla)
+
+        # Asignar atributo para controlar el temporizador
+        actualizar_busqueda.after_id = None
+
+        # Botones para búsqueda
+        btn_buscar = tk.Button(
+            frame_busqueda,
+            text="Buscar",
+            font=("Helvetica", 11),
+            bg="#3a7ff6",
+            fg="white",
+            padx=15,
+            command=cargar_datos_tabla
+        )
+        btn_buscar.pack(side=tk.LEFT, padx=10)
+
+        btn_limpiar = tk.Button(
+            frame_busqueda,
+            text="Limpiar",
+            font=("Helvetica", 11),
+            bg="#e0e0e0",
+            padx=10,
+            command=lambda: [var_busqueda.set(""), cargar_datos_tabla()]
+        )
+        btn_limpiar.pack(side=tk.LEFT, padx=5)
+
+        # Etiqueta para mostrar cantidad de resultados
+        lbl_resultados = tk.Label(
+            frame_tabla_exterior,
+            text="Cargando clientes...",
+            font=("Helvetica", 10, "italic"),
+            anchor='e'
+        )
+        lbl_resultados.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 0))
+
+        # Botones de acción
+        frame_botones = tk.Frame(ventana, bg="#f5f5f5", padx=15, pady=15)
+        frame_botones.pack(fill=tk.X)
+
+        def seleccionar_cliente():
+            if not tabla.selection():
+                messagebox.showwarning("Selección requerida", "Por favor, seleccione un cliente de la lista.")
+                return
+
+            # Obtener valores del cliente seleccionado
+            valores = tabla.item(tabla.selection()[0], 'values')
+            id_cliente = valores[0]
+            nombre = valores[1]
+
+            # Actualizar variable de destino con el ID
+            variable.set(id_cliente)
+
+            # Actualizar etiqueta si existe
+            if hasattr(self, 'lbl_cliente_seleccionado'):
+                self.lbl_cliente_seleccionado.config(text=f"✓ {nombre}")
+
+            # Cerrar ventana
+            ventana.destroy()
+
+        btn_seleccionar = tk.Button(
+            frame_botones,
+            text="Seleccionar Cliente",
+            font=("Helvetica", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            padx=20,
+            pady=5,
+            command=seleccionar_cliente
+        )
+        btn_seleccionar.pack(side=tk.LEFT, padx=15)
+
+        btn_cancelar = tk.Button(
+            frame_botones,
+            text="Cancelar",
+            font=("Helvetica", 12),
+            bg="#F44336",
+            fg="white",
+            padx=20,
+            pady=5,
+            command=ventana.destroy
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+        # Vincular la entrada de texto con la búsqueda en tiempo real
+        entry_busqueda.bind("<KeyRelease>", actualizar_busqueda)
+
+        # Procesar teclado: Enter busca, Escape cierra
+        entry_busqueda.bind("<Return>", lambda e: cargar_datos_tabla())
+        ventana.bind("<Escape>", lambda e: ventana.destroy())
+
+        # Doble clic para seleccionar
+        tabla.bind("<Double-Button-1>", lambda e: seleccionar_cliente())
+
+        # Selección con Enter
+        tabla.bind("<Return>", lambda e: seleccionar_cliente())
+
+        # Dar foco al campo de búsqueda y cargar datos iniciales
+        cargar_datos_tabla()
+        entry_busqueda.focus_set()
 
     def personalizar_colores(self):
         """Permite al usuario personalizar los colores del gráfico"""
