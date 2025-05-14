@@ -17,7 +17,6 @@ sys.path.append(script_dir)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
 
-# Intentar importar el login
 try:
     print("Intentando importar loginP...")  
     from loginP import App
