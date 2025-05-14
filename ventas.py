@@ -72,9 +72,10 @@ class Ventas:
         self.lbl_cliente_seleccionado = tk.Label(frame_cliente, text="No seleccionado", font=("Helvetica", 12), bg="#e0f7fa", fg="#777777")
         self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=5)
 
+
         btn_seleccionar_cliente = tk.Button(
-            frame_cliente, text="Seleccionar Cliente", font=("Helvetica", 10),
-            bg="#00796b", fg="white", command=self.seleccionar_cliente
+            frame_cliente, text="Seleccionar Cliente", font=("Helvetica", 11),
+            bg="#00796b", fg="black", command=self.seleccionar_cliente
         )
         btn_seleccionar_cliente.pack(side=tk.LEFT, padx=10)
 
@@ -969,21 +970,16 @@ class Ventas:
 
     def seleccionar_cliente(self):
         """Abre ventana para seleccionar un cliente"""
-        # Crear ventana para seleccionar cliente
         ventana_clientes = tk.Toplevel(self.ventana)
         ventana_clientes.title("Seleccionar Cliente")
-        ventana_clientes.geometry("700x550")  # Aumentar altura
+        ventana_clientes.geometry("700x550")
         ventana_clientes.config(bg="#f5f5f5")
-        ventana_clientes.minsize(700, 550)  # Establecer tamaño mínimo
-        ventana_clientes.resizable(True, True)  # Permitir redimensionar
+        ventana_clientes.minsize(700, 550)
+        ventana_clientes.resizable(True, True)
 
-        # Centrar ventana
-        utl.centrar_ventana(ventana_clientes, 700, 550)
-        # Frame principal
         frame_principal = tk.Frame(ventana_clientes, bg="#f5f5f5")
         frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-        # Título
         tk.Label(
             frame_principal,
             text="SELECCIONAR CLIENTE",
@@ -992,116 +988,74 @@ class Ventas:
             fg="#303f9f"
         ).pack(pady=(0, 20))
 
-        # Frame para búsqueda
         frame_busqueda = tk.Frame(frame_principal, bg="#f5f5f5")
         frame_busqueda.pack(fill=tk.X, pady=10)
 
-        tk.Label(
-            frame_busqueda,
-            text="Buscar cliente:",
-            font=("Helvetica", 12),
-            bg="#f5f5f5"
-        ).pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_busqueda, text="Buscar cliente:", font=("Helvetica", 12), bg="#f5f5f5").pack(side=tk.LEFT, padx=5)
 
         entry_buscar = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 12))
         entry_buscar.pack(side=tk.LEFT, padx=5)
 
-        # Función para buscar clientes
-        def buscar_clientes(texto_busqueda):
-            # Limpiar tabla
-            for item in tabla_clientes.get_children():
-                tabla_clientes.delete(item)
-
-            if not texto_busqueda:
-                cargar_clientes()
-                return
-
-            try:
-                conexion = conectar_bd()
-                cursor = conexion.cursor()
-
-                # Búsqueda por nombre o teléfono
-                consulta = """
-                SELECT id_cliente, nombre, telefono, puntos FROM clientes 
-                WHERE nombre LIKE %s OR telefono LIKE %s
-                ORDER BY nombre
-                """
-
-                cursor.execute(consulta, (f"%{texto_busqueda}%", f"%{texto_busqueda}%"))
-
-                for cliente in cursor.fetchall():
-                    tabla_clientes.insert('', tk.END, values=cliente)
-
-                conexion.close()
-            except Exception as e:
-                messagebox.showerror("Error", f"Error al buscar clientes: {str(e)}")
-
-
-        # Vincular tecla Enter al buscador
-        entry_buscar.bind("<Return>", lambda event: buscar_clientes(entry_buscar.get().strip()))
-
-        btn_buscar = tk.Button(
-            frame_busqueda,
-            text="🔍 Buscar",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            padx=10,
-            cursor="hand2",
-            command=lambda: buscar_clientes(entry_buscar.get().strip())
-        )
-        btn_buscar.pack(side=tk.LEFT, padx=5)
-
-        # Frame para la tabla
-        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
-
         # Tabla de clientes
         columnas = ('id', 'nombre', 'telefono', 'puntos')
-
-        tabla_clientes = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
-
-        # Aplicar estilo a la tabla
-        utl.aplicar_estilo_tabla(tabla_clientes)
-
-        # Configurar encabezados
+        tabla_clientes = ttk.Treeview(frame_principal, columns=columnas, show='headings', height=15)
         tabla_clientes.heading('id', text='ID')
         tabla_clientes.heading('nombre', text='Nombre')
         tabla_clientes.heading('telefono', text='Teléfono')
         tabla_clientes.heading('puntos', text='Puntos')
-
-        # Configurar anchos
         tabla_clientes.column('id', width=50, anchor=tk.CENTER)
         tabla_clientes.column('nombre', width=300)
         tabla_clientes.column('telefono', width=150, anchor=tk.CENTER)
         tabla_clientes.column('puntos', width=100, anchor=tk.CENTER)
+        utl.aplicar_estilo_tabla(tabla_clientes)
 
-        # Scrollbar para la tabla
-        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_clientes.yview)
+        scrollbar = ttk.Scrollbar(frame_principal, orient=tk.VERTICAL, command=tabla_clientes.yview)
         tabla_clientes.configure(yscrollcommand=scrollbar.set)
 
-        # Empaquetar tabla y scrollbar
+        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
         tabla_clientes.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        def buscar_clientes(texto_busqueda):
+            for item in tabla_clientes.get_children():
+                tabla_clientes.delete(item)
 
-        # Frame para botones
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                if not texto_busqueda:
+                    cursor.execute("SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
+                else:
+                    cursor.execute("""
+                        SELECT id_cliente, nombre, telefono, puntos FROM clientes 
+                        WHERE nombre LIKE %s OR telefono LIKE %s
+                        ORDER BY nombre
+                    """, (f"%{texto_busqueda}%", f"%{texto_busqueda}%"))
+
+                for cliente in cursor.fetchall():
+                    tabla_clientes.insert('', tk.END, values=cliente)
+                conexion.close()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
+
+        entry_buscar.bind("<Return>", lambda event: buscar_clientes(entry_buscar.get().strip()))
+        tk.Button(
+            frame_busqueda, text="🔍 Buscar", font=("Helvetica", 10),
+            bg="#303f9f", fg="black", padx=10, cursor="hand2",
+            command=lambda: buscar_clientes(entry_buscar.get().strip())
+        ).pack(side=tk.LEFT, padx=5)
+
         frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
         frame_botones.pack(fill=tk.X, pady=10)
 
-        # Botones
         btn_seleccionar = tk.Button(
-        frame_botones,
-        text="Seleccionar",
-        font=("Helvetica", 11),
-        bg="#303f9f",
-        fg="white",
-        width=12,
-        cursor="hand2",
-        command=lambda: seleccionar_cliente_accion(tabla_clientes, ventana_clientes)
+            frame_botones, text="Seleccionar", font=("Helvetica", 11),
+            bg="#303f9f", fg="white", width=12, cursor="hand2",
+            command=lambda: self.seleccionar_cliente_accion(tabla_clientes, ventana_clientes)
         )
         btn_seleccionar.pack(side=tk.LEFT, padx=5)
-
+        
         btn_nuevo = tk.Button(
             frame_botones,
             text="Nuevo Cliente",
@@ -1115,16 +1069,15 @@ class Ventas:
         btn_nuevo.pack(side=tk.LEFT, padx=5)
 
         btn_cancelar = tk.Button(
-            frame_botones,
-            text="Cancelar",
-            font=("Helvetica", 11),
-            bg="#e53935",
-            fg="white",
-            width=10,
-            cursor="hand2",
+            frame_botones, text="Cancelar", font=("Helvetica", 11),
+            bg="#e53935", fg="white", width=10, cursor="hand2",
             command=ventana_clientes.destroy
         )
         btn_cancelar.pack(side=tk.RIGHT, padx=5)
+
+        buscar_clientes("")
+            
+
 
     # Función para cargar clientes
         def cargar_clientes():
@@ -1148,53 +1101,20 @@ class Ventas:
         cargar_clientes()
 
 
-        # Función para seleccionar cliente
-        def seleccionar_cliente_accion(tabla, ventana_clientes):
-
-            seleccion = tabla.selection()
-
-            if not seleccion:
-                messagebox.showwarning("Selección requerida", "Por favor, selecciona un cliente")
-                return
-
-            # Obtener datos del cliente seleccionado
-            valores = tabla.item(seleccion[0], 'values')
-            self.cliente_actual = {
-                'id': valores[0],
-                'nombre': valores[1]
-            }
-
-            # Actualizar etiqueta en la ventana principal
-            self.lbl_cliente_seleccionado.config(
-                text=f"{self.cliente_actual['nombre']}",
-                fg="#303f9f"
-            )
-
-            self.frame_principal.update_idletasks()
-
-
-            print("Cliente seleccionado:", self.cliente_actual)
-            ventana_clientes.destroy()
-            print("Ventana cliente cerrada")
-
 
         # Función para abrir formulario de nuevo cliente
         def abrir_nuevo_cliente(ventana_padre):
-            # Crear ventana para nuevo cliente
             ventana_nuevo = tk.Toplevel(ventana_padre)
             ventana_nuevo.title("Nuevo Cliente")
             ventana_nuevo.geometry("400x300")
             ventana_nuevo.config(bg="#f5f5f5")
             ventana_nuevo.grab_set()  # Hacer modal
 
-            # Centrar ventana
             utl.centrar_ventana(ventana_nuevo, 400, 300)
 
-            # Frame principal
             frame_principal = tk.Frame(ventana_nuevo, bg="#f5f5f5")
             frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-            # Título
             tk.Label(
                 frame_principal,
                 text="NUEVO CLIENTE",
@@ -1203,11 +1123,9 @@ class Ventas:
                 fg="#303f9f"
             ).pack(pady=(0, 20))
 
-            # Frame para formulario
             frame_form = tk.Frame(frame_principal, bg="#f5f5f5")
             frame_form.pack(fill=tk.X, pady=10)
 
-            # Campos del formulario
             tk.Label(frame_form, text="Nombre:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W, pady=5)
             entry_nombre = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
             entry_nombre.grid(row=0, column=1, sticky=tk.W, pady=5)
@@ -1220,10 +1138,87 @@ class Ventas:
             entry_correo = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
             entry_correo.grid(row=2, column=1, sticky=tk.W, pady=5)
 
-            # Frame para botones
+            # === BOTONES ===
             frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
-            frame_botones.pack(fill=tk.X, pady=20)
+            frame_botones.pack(pady=20)
 
+            def guardar_cliente():
+                nombre = entry_nombre.get().strip()
+                telefono = entry_telefono.get().strip()
+                correo = entry_correo.get().strip()
+
+                if not nombre:
+                    messagebox.showwarning("Campos vacíos", "El nombre del cliente es obligatorio.")
+                    return
+
+                try:
+                    conexion = conectar_bd()
+                    cursor = conexion.cursor()
+                    cursor.execute(
+                        "INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES (%s, %s, %s, 0)",
+                        (nombre, telefono, correo)
+                    )
+                    conexion.commit()
+                    conexion.close()
+
+                    messagebox.showinfo("Éxito", "Cliente registrado correctamente.")
+                    ventana_nuevo.destroy()
+                    # Recargar la tabla principal de clientes
+                    cargar_clientes()
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo guardar el cliente: {e}")
+
+            # Botón Guardar
+            btn_guardar = tk.Button(
+                frame_botones, text="Guardar",
+                font=("Helvetica", 11),
+                bg="#00796b", fg="white",
+                width=14, cursor="hand2",
+                command=guardar_cliente
+            )
+            btn_guardar.pack(side=tk.LEFT, padx=10)
+
+            # Botón Cancelar
+            btn_cancelar = tk.Button(
+                frame_botones, text="Cancelar",
+                font=("Helvetica", 11),
+                bg="#e53935", fg="white",
+                width=14, cursor="hand2",
+                command=ventana_nuevo.destroy
+            )
+            btn_cancelar.pack(side=tk.LEFT, padx=10)
+
+    
     # Hacer modal sin bloquear con wait_window
         ventana_clientes.transient(self.ventana)
         ventana_clientes.grab_set()
+        
+        ventana_clientes.update_idletasks()
+        ventana_clientes.geometry(f"{ventana_clientes.winfo_reqwidth()}x{ventana_clientes.winfo_reqheight()}")
+
+    # Función para seleccionar cliente
+    def seleccionar_cliente_accion(self, tabla, ventana_clientes):
+        seleccion = tabla.selection()
+
+        if not seleccion:
+            messagebox.showwarning("Selección requerida", "Por favor, selecciona un cliente")
+            return
+
+        # Obtener datos del cliente seleccionado
+        valores = tabla.item(seleccion[0], 'values')
+        self.cliente_actual = {
+            'id': valores[0],
+            'nombre': valores[1]
+        }
+
+        # Actualizar etiqueta en la ventana principal
+        self.lbl_cliente_seleccionado.config(
+            text=f"{self.cliente_actual['nombre']}",
+            fg="#303f9f"
+        )
+
+        self.frame_principal.update_idletasks()
+        print("Cliente seleccionado:", self.cliente_actual)
+        ventana_clientes.destroy()
+        print("Ventana cliente cerrada")

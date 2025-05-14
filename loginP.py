@@ -45,7 +45,7 @@ class App:
 
         # Cargar imagen del logo
         try:
-            self.logo = utl.leer_imagen("Img/lavadora.jpg", (200, 200))
+            self.logo = utl.leer_imagen("Img/logo_lavanderia.jpg")
         except Exception:
             # Si no se puede cargar la imagen, crear un canvas con colores
             self.logo = None
@@ -56,9 +56,11 @@ class App:
         # Iniciar bucle principal
         self.ventana.mainloop()
 
+    
     def construir_interfaz(self):
-        """Construye la interfaz gráfica del login"""
-        # Panel izquierdo (logo)
+        """Construye la interfaz gráfica del login con colores invertidos"""
+
+        # Panel izquierdo (blanco, con logo)
         frame_logo = tk.Frame(
             self.ventana,
             bd=0,
@@ -66,31 +68,31 @@ class App:
             relief=tk.SOLID,
             padx=10,
             pady=10,
-            bg='#3a7ff6'
+            bg='#ffffff'  # ← fondo blanco ahora
         )
         frame_logo.pack(side="left", expand=tk.YES, fill=tk.BOTH)
 
-        # Si hay logo, mostrarlo
+        # Mostrar logo (y mantener referencia para que no se borre)
         if self.logo:
-            label_logo = tk.Label(frame_logo, image=self.logo, bg='#3a7ff6')
-            label_logo.place(x=0, y=0, relwidth=1, relheight=1)
+            self.label_logo = tk.Label(frame_logo, image=self.logo, bg='#ffffff')
+            self.label_logo.image = self.logo  # <- ¡mantener referencia!
+            self.label_logo.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         else:
-            # Si no hay logo, mostrar un título
             label_titulo = tk.Label(
                 frame_logo,
                 text="SISTEMA DE\nLAVANDERÍA",
                 font=('Helvetica', 20, 'bold'),
-                bg='#3a7ff6',
-                fg='white'
+                bg='#ffffff',
+                fg='#3a7ff6'
             )
             label_titulo.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        # Panel derecho (formulario)
+        # Panel derecho (formulario - azul)
         frame_form = tk.Frame(
             self.ventana,
             bd=0,
             relief=tk.SOLID,
-            bg='#fcfcfc'
+            bg='#3a7ff6'  # ← azul
         )
         frame_form.pack(side="right", expand=tk.YES, fill=tk.BOTH)
 
@@ -100,7 +102,7 @@ class App:
             height=50,
             bd=0,
             relief=tk.SOLID,
-            bg='#fcfcfc'
+            bg='#3a7ff6'
         )
         frame_form_top.pack(side="top", fill=tk.X)
 
@@ -108,8 +110,8 @@ class App:
             frame_form_top,
             text="Inicio de sesión",
             font=('Times', 30),
-            fg="#666a88",
-            bg='#fcfcfc',
+            fg="#ffffff",  # ← texto blanco
+            bg='#3a7ff6',
             pady=50
         )
         title.pack(expand=tk.YES, fill=tk.BOTH)
@@ -120,7 +122,7 @@ class App:
             height=50,
             bd=0,
             relief=tk.SOLID,
-            bg='#fcfcfc'
+            bg='#3a7ff6'
         )
         frame_form_fill.pack(side="bottom", expand=tk.YES, fill=tk.BOTH)
 
@@ -129,8 +131,8 @@ class App:
             frame_form_fill,
             text="Usuario (Correo)",
             font=('Times', 14),
-            fg="#666a88",
-            bg='#fcfcfc',
+            fg="#ffffff",
+            bg='#3a7ff6',
             anchor="w"
         )
         etiqueta_usuario.pack(fill=tk.X, padx=20, pady=5)
@@ -143,8 +145,8 @@ class App:
             frame_form_fill,
             text="Contraseña",
             font=('Times', 14),
-            fg="#666a88",
-            bg='#fcfcfc',
+            fg="#ffffff",
+            bg='#3a7ff6',
             anchor="w"
         )
         etiqueta_password.pack(fill=tk.X, padx=20, pady=5)
@@ -157,9 +159,9 @@ class App:
             frame_form_fill,
             text="Iniciar sesión",
             font=('Times', 15, BOLD),
-            bg='#3a7ff6',
+            bg='#ffffff',
+            fg="#3a7ff6",
             bd=0,
-            fg="#fff",
             command=self.verificar
         )
         inicio.pack(fill=tk.X, padx=20, pady=20)
@@ -170,8 +172,8 @@ class App:
             frame_form_fill,
             text="¿Olvidaste tu contraseña?",
             font=('Times', 11),
-            bg='#fcfcfc',
-            fg="#3a7ff6",
+            bg='#3a7ff6',
+            fg="#ffffff",
             bd=0,
             cursor="hand2",
             command=self.recuperar_contrasena
