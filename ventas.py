@@ -976,7 +976,6 @@ class Ventas:
         ventana_clientes.config(bg="#f5f5f5")
         ventana_clientes.minsize(700, 550)
         ventana_clientes.resizable(True, True)
-        utl.centrar_ventana(ventana_clientes, 700, 550)
 
         frame_principal = tk.Frame(ventana_clientes, bg="#f5f5f5")
         frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -1190,32 +1189,12 @@ class Ventas:
             )
             btn_cancelar.pack(side=tk.LEFT, padx=10)
 
-        frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_botones.pack(fill=tk.X, pady=10)
-
-        btn_seleccionar = tk.Button(
-            frame_botones, text="Seleccionar", font=("Helvetica", 11),
-            bg="#303f9f", fg="white", width=14, cursor="hand2",
-            command=lambda: self.seleccionar_cliente_accion(tabla_clientes, ventana_clientes)
-        )
-        btn_seleccionar.pack(side=tk.LEFT, padx=10, expand=True)
-
-        btn_nuevo = tk.Button(
-            frame_botones, text="Nuevo Cliente", font=("Helvetica", 11),
-            bg="#303f9f", fg="white", width=14, cursor="hand2"
-        )
-        btn_nuevo.pack(side=tk.LEFT, padx=10, expand=True)
-
-        btn_cancelar = tk.Button(
-            frame_botones, text="Cancelar", font=("Helvetica", 11),
-            bg="#e53935", fg="white", width=14, cursor="hand2",
-            command=ventana_clientes.destroy
-        )
-        btn_cancelar.pack(side=tk.RIGHT, padx=10, expand=True)
 
     # Hacer modal sin bloquear con wait_window
         ventana_clientes.transient(self.ventana)
         ventana_clientes.grab_set()
+        ventana_clientes.update_idletasks()
+        ventana_clientes.geometry(f"{ventana_clientes.winfo_reqwidth()}x{ventana_clientes.winfo_reqheight()}")
 
     # Función para seleccionar cliente
     def seleccionar_cliente_accion(self, tabla, ventana_clientes):
