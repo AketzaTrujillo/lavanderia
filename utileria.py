@@ -10,6 +10,9 @@ from tkinter import ttk, messagebox, simpledialog
 from PIL import ImageTk, Image
 from datetime import datetime
 
+from resplado_automatico import RespaldoAutomatico
+respaldo_auto = RespaldoAutomatico()
+
 
 def leer_imagen(path, size):
     """

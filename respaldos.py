@@ -1,121 +1,15 @@
-
-lbl_instrucciones = tk.Label(
-    frame_instrucciones,
-    text="Seleccione un respaldo de la lista o utilice un archivo SQL externo para restaurar la base de datos.",
-    font=("Helvetica", 12),
-    bg="#f5f5f5",
-    justify=tk.LEFT,
-    wraplength=700
-)
-lbl_instrucciones.pack(anchor=tk.W, pady=5)
-
-lbl_advertencia = tk.Label(
-    frame_instrucciones,
-    text="⚠️ ADVERTENCIA: La restauración sobrescribirá TODOS los datos actuales. Asegúrese de crear un respaldo antes de continuar.",
-    font=("Helvetica", 12, "bold"),
-    bg="#ffecb3",
-    fg="#e65100",
-    padx=10,
-    pady=10,
-    wraplength=700
-)
-lbl_advertencia.pack(fill=tk.X, pady=10)
-
-# Frame para selección de respaldo
-frame_seleccion = tk.Frame(self.tab_restauracion, bg="#f5f5f5", padx=20)
-frame_seleccion.pack(fill=tk.BOTH, expand=True)
-
-# Opción 1: Restaurar desde respaldo interno
-lbl_opcion1 = tk.Label(
-    frame_seleccion,
-    text="Opción 1: Restaurar desde respaldo interno",
-    font=("Helvetica", 12, "bold"),
-    bg="#f5f5f5"
-)
-lbl_opcion1.pack(anchor=tk.W, pady=10)
-
-# Combobox con lista de respaldos
-frame_respaldos = tk.Frame(frame_seleccion, bg="#f5f5f5")
-frame_respaldos.pack(fill=tk.X, pady=5)
-
-lbl_respaldo = tk.Label(
-    frame_respaldos,
-    text="Seleccionar respaldo:",
-    font=("Helvetica", 11),
-    bg="#f5f5f5"
-)
-lbl_respaldo.pack(side=tk.LEFT, padx=5)
-
-self.var_respaldo = tk.StringVar()
-self.combo_respaldos = ttk.Combobox(
-    frame_respaldos,
-    textvariable=self.var_respaldo,
-    font=("Helvetica", 11),
-    width=40,
-    state="readonly"
-)
-self.combo_respaldos.pack(side=tk.LEFT, padx=5)
-
-btn_restaurar_interno = tk.Button(
-    frame_respaldos,
-    text="Restaurar",
-    font=("Helvetica", 11),
-    bg="#ff9800",
-    fg="white",
-    command=self.restaurar_desde_interno
-)
-btn_restaurar_interno.pack(side=tk.LEFT, padx=20)
-
-# Opción 2: Restaurar desde archivo externo
-lbl_opcion2 = tk.Label(
-    frame_seleccion,
-    text="Opción 2: Restaurar desde archivo SQL externo",
-    font=("Helvetica", 12, "bold"),
-    bg="#f5f5f5"
-)
-lbl_opcion2.pack(anchor=tk.W, pady=10)
-
-frame_archivo = tk.Frame(frame_seleccion, bg="#f5f5f5")
-frame_archivo.pack(fill=tk.X, pady=5)
-
-lbl_archivo = tk.Label(
-    frame_archivo,
-    text="Archivo SQL:",
-    font=("Helvetica", 11),
-    bg="#f5f5f5"
-)
-lbl_archivo.pack(side=tk.LEFT, padx=5)
-
-self.var_archivo = tk.StringVar()
-entry_archivo = tk.Entry(
-    frame_archivo,
-    textvariable=self.var_archivo,
-    font=("Helvetica", 11),
-    width=40
-)
-entry_archivo.pack(side=tk.LEFT, padx=5)
-
-btn_examinar = tk.Button(
-    frame_archivo,
-    text="Examinar",
-    font=("Helvetica", 11),
-    command=self.seleccionar_archivo_sql
-)
-btn_examinar.pack(side=tk.LEFT, padx=5)
-
-btn_restaurar_externo = tk.Button(
-    frame_archivo,
-    text="Restaurar",
-    font=("Helvetica", 11),
-    bg="#ff9800",
-    fg="white",
-    command=self.restaurar_desde_externo
-)
-btn_restaurar_externo.pack(side=tk.LEFT, padx=20)
-
-# Cargar lista de respaldos
-self.actualizar_lista_respaldos()
-
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import os
+import sys
+import utileria as utl
+from datetime import datetime, date, timedelta
+import subprocess
+import shutil
+import threading
+import time
+import schedule
+import json
 
 def cargar_historial_respaldos(self):
     """Carga el historial de respaldos en la tabla"""
@@ -176,12 +70,6 @@ def formatear_tamanio(self, tamanio):
 
 def crear_respaldo_manual(self):
     """Crea un respaldo manual de la base de datos"""
-    # Preguntar por descripción opcional
-    descripcion = simpledialog.askstring(
-        "Descripción del respaldo",
-        "Ingrese una descripción para este respaldo (opcional):",
-        parent=self.ventana
-    )
 
     # Preguntar por ubicación personalizada
     guardar_en = messagebox.askyesno(
@@ -226,7 +114,7 @@ def crear_respaldo_manual(self):
 
     # Crear respaldo en un hilo aparte para no bloquear la interfaz
     def crear_respaldo_thread():
-        resultado = self.crear_respaldo(ruta_respaldo, descripcion)
+        resultado = self.crear_respaldo(ruta_respaldo)
 
         # Cerrar ventana de progreso
         ventana_progreso.destroy()
@@ -988,24 +876,11 @@ def abrir_respaldos(ventana_padre=None, id_usuario=None):
 if __name__ == "__main__":
     # Para pruebas, asignar un ID de usuario fijo
     id_usuario_prueba = 1
-    GestionRespaldos(id_usuario=id_usuario_prueba)
+    
     """
 Módulo de Respaldos para el Sistema de Gestión de Lavandería
 Permite crear, programar y restaurar copias de seguridad de la base de datos
 """
-
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import os
-import sys
-import utileria as utl
-from datetime import datetime, date, timedelta
-import subprocess
-import shutil
-import threading
-import time
-import schedule
-import json
 
 # Asegurar que podamos importar módulos del sistema
 script_dir = os.path.dirname(os.path.abspath(__file__))

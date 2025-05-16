@@ -33,6 +33,9 @@ except ImportError as e:
 def main():
     try:
         # Iniciar la aplicación con la pantalla de login
+        from resplado_automatico import RespaldoAutomatico
+        # Instancia global para gestionar el respaldo automático
+        respaldo_auto = RespaldoAutomatico()
         App()
     except Exception as e:
         messagebox.showerror(
@@ -44,4 +47,5 @@ def main():
 
 # Punto de entrada para la aplicación
 if __name__ == "__main__":
+
     main()

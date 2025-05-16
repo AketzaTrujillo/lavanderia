@@ -310,15 +310,14 @@ class MasterPanel:
     def gestionar_respaldos(self):
         """Abre la ventana de gestión de respaldos"""
         try:
-            # Importar el módulo de respaldos
-            from respaldos import abrir_respaldos
-            abrir_respaldos(self.ventana, self.id_usuario)
+            from respaldos2 import ModuloRespaldo
+            ModuloRespaldo(self.ventana, self.id_usuario)
         except ImportError:
             messagebox.showerror("Error de importación",
-                                 "No se pudo importar el módulo de respaldos.\n"
-                                 "Verifique que el archivo 'respaldos.py' existe.")
+                                "No se pudo importar el módulo 'ModuloRespaldo.py'.\n"
+                                "Verifica que el archivo existe y se llama correctamente.")
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos:\n{str(e)}")
 
 # Ventas
 
