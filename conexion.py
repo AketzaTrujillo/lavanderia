@@ -23,7 +23,7 @@ def cargar_configuracion():
     config_default = {
         "host": "localhost",
         "user": "root",
-        "password": "---", # contraseña BD
+        "password": "Chelsea1302*", # contraseña BD
         "database": "lavanderiadb"
     }
 

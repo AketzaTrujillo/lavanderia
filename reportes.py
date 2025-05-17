@@ -5684,7 +5684,7 @@ class Reportes:
             messagebox.showinfo("Sin plantillas", "No hay plantillas guardadas.")
             return
 
-        # Buscar archivos de plantilla
+        # Buscar archivos de plantill
         plantillas = [f for f in os.listdir(plantillas_dir) if f.endswith('.json')]
 
         if not plantillas:
