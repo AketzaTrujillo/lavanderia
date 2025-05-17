@@ -1,0 +1,14 @@
+{
+    "tipo_reporte": "Clientes Frecuentes",
+    "periodo": "Este Mes",
+    "fecha_inicio": "2025-05-01",
+    "fecha_fin": "2025-05-14",
+    "filtros": {
+        "cliente": "",
+        "vendedor": "",
+        "pago": "Todos",
+        "estado": "Todos"
+    },
+    "tipo_grafico": "Barras",
+    "estilo_grafico": "predeterminado"
+}
