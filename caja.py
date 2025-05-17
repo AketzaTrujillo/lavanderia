@@ -4276,7 +4276,7 @@ def abrir_caja(self):
             conexion.close()
             return
 
-        # 3. Preguntar por el monto inicial (código simplificado para claridad)
+        # 3. Preguntar por el monto inicial (código simplificado para claridad
         monto_inicial = simpledialog.askfloat(
             "Apertura de Caja",
             "Ingrese el monto inicial en caja:",
