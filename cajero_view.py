@@ -318,7 +318,7 @@ class CajeroPanel:
                 self.ventana.destroy()
 
 
-# Para probar de forma independiente
+# Para probar de forma independient
 if __name__ == "__main__":
     # Para pruebas, asignar un ID de usuario fijo
     id_usuario_prueba = 2  # Suponiendo que 2 es un cajero

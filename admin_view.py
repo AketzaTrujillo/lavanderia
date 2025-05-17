@@ -30,7 +30,7 @@ class MasterPanel:
             if os.path.exists("Img/lavadora.ico"):
                 self.ventana.iconbitmap("Img/lavadora.ico")
         except Exception:
-            pass  # Si no se puede cargar el ícono, continuar sin él
+            pass  # Si no se puede cargar el ícono, continuar sin é
 
         self.construir_interfaz()
 
