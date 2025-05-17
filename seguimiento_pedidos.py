@@ -10,6 +10,7 @@ import os
 import sys
 import utileria as utl
 from decimal import Decimal
+from tkinter import simpledialog
 
 # Asegurar que podamos importar módulos
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -535,17 +536,6 @@ class SeguimientoPedidos:
         fila1_btn = tk.Frame(self.frame_acciones, bg="#f5f5f5")
         fila1_btn.pack(fill=tk.X, pady=2)
 
-        self.btn_finalizar_venta = tk.Button(
-            fila2_btn,
-            text="Finalizar a Venta",
-            bg="#2196f3",
-            fg="white",
-            width=15,
-            command=self.finalizar_pedido_a_venta,
-            state=tk.DISABLED
-        )
-        self.btn_finalizar_venta.pack(side=tk.LEFT, padx=5)
-
         self.btn_cambiar_estado = tk.Button(
             fila1_btn,
             text="Cambiar Estado",
@@ -594,6 +584,8 @@ class SeguimientoPedidos:
         )
         self.btn_imprimir.pack(side=tk.LEFT, padx=5)
 
+
+
         self.btn_editar = tk.Button(
             fila2_btn,
             text="Editar Pedido",
@@ -603,6 +595,19 @@ class SeguimientoPedidos:
             command=self.editar_pedido,
             state=tk.DISABLED
         )
+
+        self.btn_finalizar_venta = tk.Button(
+            fila2_btn,
+            text="Finalizar a Venta",
+            bg="#2196f3",
+            fg="white",
+            width=15,
+            command=self.finalizar_pedido_a_venta,
+            state=tk.DISABLED
+        )
+        self.btn_finalizar_venta.pack(side=tk.LEFT, padx=5)
+
+
         self.btn_editar.pack(side=tk.LEFT, padx=5)
 
         self.btn_eliminar = tk.Button(
@@ -931,10 +936,21 @@ class SeguimientoPedidos:
                                            fill=text_color if i <= indice_actual else "#666666",
                                            font=("Helvetica", 10, font_weight))
 
+
+            #print("Método usado:", self.canvas_timeline.create_text)
+
             # Dibujar etiqueta
-            self.canvas_timeline.create_text(x, y_center + circle_radius + 20, text=estado,
-                                           fill="#333333", font=("Helvetica", 9),
-                                           wraplength=80, justify=tk.CENTER)
+            self.canvas_timeline.create_text(
+                x,
+                y_center + circle_radius + 20,
+                text=estado,
+                fill="#333333",
+                font=("Helvetica", 9),
+                width=80,  # ✅ reemplaza wraplength por width
+                justify=tk.CENTER
+            )
+
+
 
     def habilitar_botones(self):
         """Habilita los botones según el estado y permisos"""
