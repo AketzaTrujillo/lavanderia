@@ -5662,7 +5662,7 @@ class Reportes:
             "estilo_grafico": self.estilo_grafico.get()
         }
 
-        # Guardar configuración como JSON
+
         try:
             filename = os.path.join(plantillas_dir, f"{nombre}.json")
             with open(filename, 'w') as f:
