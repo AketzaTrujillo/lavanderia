@@ -1008,6 +1008,7 @@ class Ventas:
 
         return ruta
 
+
     def seleccionar_cliente(self):
         """Abre ventana para seleccionar un cliente"""
         ventana_clientes = tk.Toplevel(self.ventana)
@@ -1031,7 +1032,8 @@ class Ventas:
         frame_busqueda = tk.Frame(frame_principal, bg="#f5f5f5")
         frame_busqueda.pack(fill=tk.X, pady=10)
 
-        tk.Label(frame_busqueda, text="Buscar cliente:", font=("Helvetica", 12), bg="#f5f5f5").pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_busqueda, text="Buscar cliente:", font=("Helvetica", 12), bg="#f5f5f5").pack(side=tk.LEFT,
+                                                                                                    padx=5)
 
         entry_buscar = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 12))
         entry_buscar.pack(side=tk.LEFT, padx=5)
@@ -1079,10 +1081,28 @@ class Ventas:
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
 
+        # Función para cargar clientes
+        def cargar_clientes():
+            # Limpiar tabla
+            for item in tabla_clientes.get_children():
+                tabla_clientes.delete(item)
+
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute("SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
+
+                for cliente in cursor.fetchall():
+                    tabla_clientes.insert('', tk.END, values=cliente)
+
+                conexion.close()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
+
         entry_buscar.bind("<Return>", lambda event: buscar_clientes(entry_buscar.get().strip()))
         tk.Button(
             frame_busqueda, text="🔍 Buscar", font=("Helvetica", 10),
-            bg="#303f9f", fg="black", padx=10, cursor="hand2",
+            bg="#303f9f", fg="white", padx=10, cursor="hand2",
             command=lambda: buscar_clientes(entry_buscar.get().strip())
         ).pack(side=tk.LEFT, padx=5)
 
@@ -1096,17 +1116,18 @@ class Ventas:
         )
         btn_seleccionar.pack(side=tk.LEFT, padx=5)
 
-        btn_nuevo = tk.Button(
+        # BOTÓN MODIFICADO: Abre el módulo completo de gestión de clientes
+        btn_gestion = tk.Button(
             frame_botones,
-            text="Nuevo Cliente",
+            text="Gestión de Clientes",
             font=("Helvetica", 11),
-            bg="#303f9f",
+            bg="#4CAF50",  # Color verde para diferenciarlo
             fg="white",
-            width=12,
+            width=15,  # Aumentamos el ancho para que quepa el texto
             cursor="hand2",
-            command=lambda: abrir_nuevo_cliente(ventana_clientes)
+            command=lambda: self.abrir_gestion_clientes(ventana_clientes, cargar_clientes)
         )
-        btn_nuevo.pack(side=tk.LEFT, padx=5)
+        btn_gestion.pack(side=tk.LEFT, padx=5)
 
         btn_cancelar = tk.Button(
             frame_botones, text="Cancelar", font=("Helvetica", 11),
@@ -1115,128 +1136,57 @@ class Ventas:
         )
         btn_cancelar.pack(side=tk.RIGHT, padx=5)
 
-        buscar_clientes("")
-
-
-
-    # Función para cargar clientes
-        def cargar_clientes():
-            # Limpiar tabla
-            for item in tabla_clientes.get_children():
-                tabla_clientes.delete(item)
-
-            try:
-                conexion = conectar_bd()
-                cursor = conexion.cursor()
-                cursor.execute(
-                    "SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
-
-                for cliente in cursor.fetchall():
-                    tabla_clientes.insert('', tk.END, values=cliente)
-
-                conexion.close()
-            except Exception as e:
-                messagebox.showerror("Error", f"No se pudo cargar los clientes: {str(e)}")
         # Cargar clientes al iniciar
         cargar_clientes()
 
-
-
-        # Función para abrir formulario de nuevo cliente
-        def abrir_nuevo_cliente(ventana_padre):
-            ventana_nuevo = tk.Toplevel(ventana_padre)
-            ventana_nuevo.title("Nuevo Cliente")
-            ventana_nuevo.geometry("400x300")
-            ventana_nuevo.config(bg="#f5f5f5")
-            ventana_nuevo.grab_set()  # Hacer modal
-
-            utl.centrar_ventana(ventana_nuevo, 400, 300)
-
-            frame_principal = tk.Frame(ventana_nuevo, bg="#f5f5f5")
-            frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-            tk.Label(
-                frame_principal,
-                text="NUEVO CLIENTE",
-                font=("Helvetica", 14, "bold"),
-                bg="#f5f5f5",
-                fg="#303f9f"
-            ).pack(pady=(0, 20))
-
-            frame_form = tk.Frame(frame_principal, bg="#f5f5f5")
-            frame_form.pack(fill=tk.X, pady=10)
-
-            tk.Label(frame_form, text="Nombre:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W, pady=5)
-            entry_nombre = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
-            entry_nombre.grid(row=0, column=1, sticky=tk.W, pady=5)
-
-            tk.Label(frame_form, text="Teléfono:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=1, column=0, sticky=tk.W, pady=5)
-            entry_telefono = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
-            entry_telefono.grid(row=1, column=1, sticky=tk.W, pady=5)
-
-            tk.Label(frame_form, text="Correo:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=2, column=0, sticky=tk.W, pady=5)
-            entry_correo = tk.Entry(frame_form, font=("Helvetica", 12), width=25)
-            entry_correo.grid(row=2, column=1, sticky=tk.W, pady=5)
-
-            # === BOTONES ===
-            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
-            frame_botones.pack(pady=20)
-
-            def guardar_cliente():
-                nombre = entry_nombre.get().strip()
-                telefono = entry_telefono.get().strip()
-                correo = entry_correo.get().strip()
-
-                if not nombre:
-                    messagebox.showwarning("Campos vacíos", "El nombre del cliente es obligatorio.")
-                    return
-
-                try:
-                    conexion = conectar_bd()
-                    cursor = conexion.cursor()
-                    cursor.execute(
-                        "INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES (%s, %s, %s, 0)",
-                        (nombre, telefono, correo)
-                    )
-                    conexion.commit()
-                    conexion.close()
-
-                    messagebox.showinfo("Éxito", "Cliente registrado correctamente.")
-                    ventana_nuevo.destroy()
-                    # Recargar la tabla principal de clientes
-                    cargar_clientes()
-
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudo guardar el cliente: {e}")
-
-            # Botón Guardar
-            btn_guardar = tk.Button(
-                frame_botones, text="Guardar",
-                font=("Helvetica", 11),
-                bg="#00796b", fg="white",
-                width=14, cursor="hand2",
-                command=guardar_cliente
-            )
-            btn_guardar.pack(side=tk.LEFT, padx=10)
-
-            # Botón Cancelar
-            btn_cancelar = tk.Button(
-                frame_botones, text="Cancelar",
-                font=("Helvetica", 11),
-                bg="#e53935", fg="white",
-                width=14, cursor="hand2",
-                command=ventana_nuevo.destroy
-            )
-            btn_cancelar.pack(side=tk.LEFT, padx=10)
-
-
-    # Hacer modal sin bloquear con wait_window
+        # Hacer modal sin bloquear con wait_window
         ventana_clientes.transient(self.ventana)
         ventana_clientes.grab_set()
-        ventana_clientes.update_idletasks()
-        ventana_clientes.geometry(f"{ventana_clientes.winfo_reqwidth()}x{ventana_clientes.winfo_reqheight()}")
 
-    # Función para seleccionar cliente
+    def abrir_gestion_clientes(self, ventana_padre, callback_actualizar):
+        """Abre el módulo completo de gestión de clientes"""
+        try:
+            # Importar el módulo de gestión de clientes
+            from clientes import GestionClientes
+
+            # Crear una instancia del módulo de clientes
+            # Le pasamos ventana_padre para que sea modal
+            gestion_clientes = GestionClientes(ventana_padre)
+
+            # Función para actualizar la tabla cuando se cierre la ventana de clientes
+            def on_close():
+                # Recargar la tabla de clientes en la ventana de selección
+                callback_actualizar()
+
+            # Conectar el evento de cierre (si el módulo de clientes lo soporta)
+            # Nota: Esto dependería de cómo esté implementado el módulo de clientes
+
+            # También podemos usar un timer para actualizar periódicamente
+            def verificar_y_actualizar():
+                try:
+                    # Verificar si la ventana de gestión de clientes sigue abierta
+                    # Si se cerró, actualizar la tabla
+                    ventana_padre.after(1000, verificar_y_actualizar)  # Verificar cada segundo
+                    callback_actualizar()
+                except:
+                    pass
+
+            # Iniciar la verificación
+            ventana_padre.after(500, verificar_y_actualizar)
+
+        except ImportError:
+            messagebox.showerror(
+                "Error de importación",
+                "No se pudo importar el módulo de gestión de clientes.\n"
+                "Verifique que el archivo 'clientes.py' existe."
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"No se pudo abrir el módulo de gestión de clientes: {str(e)}"
+            )
+
+    # Función para seleccionar cliente (mantiene igual)
     def seleccionar_cliente_accion(self, tabla, ventana_clientes):
         seleccion = tabla.selection()
 

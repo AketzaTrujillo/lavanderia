@@ -34,8 +34,7 @@ class GestionCaja:
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(False, False)
 
-        # IMPORTANTE: Reemplaza la sección donde se pide el ID manualmente
-        # con este código que usa el ID proporcionado
+
         if id_usuario is None:
             # Establecer a un valor por defecto (administrador) si no hay ID proporcionado
             self.id_usuario = 1
@@ -3538,7 +3537,7 @@ class GestionCaja:
             print(f"Error al registrar ingreso: {e}")
 
     def realizar_arqueo_caja(self):
-        """Realiza un arqueo de caja - VERSIÓN CORREGIDA"""
+        """Realiza un arqueo de caja - VERSIÓN CORREGIDA CON ACTUALIZACIÓN DE SALDO"""
         try:
             if not self.caja_abierta:
                 messagebox.showinfo("Información", "Debe abrir la caja primero")
@@ -3788,50 +3787,109 @@ class GestionCaja:
                     diferencia = total_efectivo - saldo_sistema
                     observaciones = txt_observaciones.get("1.0", "end-1c").strip()
 
+                    # Confirmar que quiere actualizar el saldo
+                    if diferencia != 0:
+                        mensaje_confirmacion = f"""
+                        El efectivo contado (${total_efectivo:.2f}) no coincide con el saldo del sistema (${saldo_sistema:.2f}).
+
+                        Diferencia: {"Sobrante" if diferencia > 0 else "Faltante"} de ${abs(diferencia):.2f}
+
+                        ¿Desea proceder y actualizar el saldo de la caja al efectivo contado?
+                        El nuevo saldo será: ${total_efectivo:.2f}
+                        """
+
+                        if not messagebox.askyesno("Confirmar Actualización de Saldo", mensaje_confirmacion):
+                            return
+
                     # Guardar en la base de datos
                     conexion = conectar_bd()
                     cursor = conexion.cursor()
 
-                    # VERIFICAR si existe la tabla arqueos_caja
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM information_schema.tables 
-                        WHERE table_schema = DATABASE() 
-                        AND table_name = 'arqueos_caja'
-                    """)
+                    # Iniciar transacción
+                    cursor.execute("START TRANSACTION")
 
-                    existe_tabla = cursor.fetchone()[0] > 0
+                    try:
+                        # 1. Insertar arqueo
+                        cursor.execute("""
+                            INSERT INTO arqueos_caja 
+                            (id_caja, fecha, hora, saldo_sistema, efectivo_contado, diferencia, observaciones, id_usuario)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            self.id_caja_actual,
+                            date.today(),
+                            datetime.now().time(),
+                            saldo_sistema,
+                            total_efectivo,
+                            diferencia,
+                            observaciones,
+                            self.id_usuario
+                        ))
 
-                    if not existe_tabla:
-                        messagebox.showerror("Error", "La tabla arqueos_caja no existe en la base de datos")
+                        arqueo_id = cursor.lastrowid
+
+                        # 2. ACTUALIZAR EL SALDO DE LA CAJA AL EFECTIVO CONTADO
+                        cursor.execute("""
+                            UPDATE caja 
+                            SET saldo_final = %s
+                            WHERE id_caja = %s
+                        """, (total_efectivo, self.id_caja_actual))
+
+                        # 3. Si hay diferencia, registrar movimiento de ajuste
+                        if diferencia != 0:
+                            tipo_ajuste = "ingreso" if diferencia > 0 else "egreso"
+                            concepto_ajuste = f"Ajuste por arqueo #{arqueo_id} - {'Sobrante encontrado' if diferencia > 0 else 'Faltante detectado'}"
+
+                            cursor.execute("""
+                                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (
+                                self.id_caja_actual,
+                                tipo_ajuste,
+                                concepto_ajuste,
+                                abs(diferencia),
+                                datetime.now(),
+                                self.id_usuario
+                            ))
+
+                            # Actualizar totales de ingresos/egresos según corresponda
+                            if diferencia > 0:
+                                cursor.execute("""
+                                    UPDATE caja 
+                                    SET total_ingresos = total_ingresos + %s
+                                    WHERE id_caja = %s
+                                """, (diferencia, self.id_caja_actual))
+                            else:
+                                cursor.execute("""
+                                    UPDATE caja 
+                                    SET total_egresos = total_egresos + %s
+                                    WHERE id_caja = %s
+                                """, (abs(diferencia), self.id_caja_actual))
+
+                        # Confirmar transacción
+                        cursor.execute("COMMIT")
                         conexion.close()
-                        return
 
-                    cursor.execute("""
-                        INSERT INTO arqueos_caja 
-                        (id_caja, fecha, hora, saldo_sistema, efectivo_contado, diferencia, observaciones, id_usuario)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        self.id_caja_actual,
-                        date.today(),
-                        datetime.now().time(),
-                        saldo_sistema,
-                        total_efectivo,
-                        diferencia,
-                        observaciones,
-                        self.id_usuario
-                    ))
+                        # Mensaje de éxito
+                        mensaje_exito = f"Arqueo de caja guardado correctamente.\n"
+                        mensaje_exito += f"Saldo actualizado a: ${total_efectivo:.2f}"
+                        if diferencia != 0:
+                            mensaje_exito += f"\nSe registró un ajuste de ${abs(diferencia):.2f}"
 
-                    conexion.commit()
-                    arqueo_id = cursor.lastrowid
-                    conexion.close()
+                        messagebox.showinfo("Éxito", mensaje_exito)
 
-                    messagebox.showinfo("Éxito", "Arqueo de caja guardado correctamente")
+                        # Actualizar la interfaz de caja
+                        self.actualizar_estado_caja()
 
-                    # Preguntar si desea imprimir
-                    if messagebox.askyesno("Imprimir", "¿Desea imprimir el arqueo de caja?"):
-                        self.imprimir_arqueo_guardado(arqueo_id)
+                        # Preguntar si desea imprimir
+                        if messagebox.askyesno("Imprimir", "¿Desea imprimir el arqueo de caja?"):
+                            self.imprimir_arqueo_guardado(arqueo_id)
 
-                    ventana_arqueo.destroy()
+                        ventana_arqueo.destroy()
+
+                    except Exception as e:
+                        cursor.execute("ROLLBACK")
+                        conexion.close()
+                        raise e
 
                 except Exception as e:
                     messagebox.showerror("Error", f"No se pudo guardar el arqueo: {str(e)}")
@@ -3875,6 +3933,213 @@ class GestionCaja:
             print(f"Error detallado en realizar_arqueo_caja: {e}")
             import traceback
             traceback.print_exc()
+
+    def imprimir_arqueo_guardado(self, id_arqueo):
+        """Imprime un arqueo que ya fue guardado - VERSIÓN CORREGIDA"""
+        try:
+            # Obtener datos del arqueo
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT a.fecha, a.hora, a.saldo_sistema, a.efectivo_contado, 
+                       a.diferencia, a.observaciones, u.nombre
+                FROM arqueos_caja a
+                JOIN usuarios u ON a.id_usuario = u.id_usuario
+                WHERE a.id_arqueo = %s
+            """, (id_arqueo,))
+
+            arqueo = cursor.fetchone()
+            conexion.close()
+
+            if not arqueo:
+                messagebox.showerror("Error", "No se encontró el arqueo")
+                return
+
+            fecha, hora, saldo_sistema, efectivo, diferencia, observaciones, usuario = arqueo
+
+            # Crear ticket
+            try:
+                from ticket import Ticket
+                ticket = Ticket()
+
+                # Encabezado
+                ticket.agregar_encabezado()
+                ticket.agregar_titulo("ARQUEO DE CAJA")
+
+                # Formatear fecha de manera segura
+                fecha_str = "N/A"
+                if fecha:
+                    try:
+                        if hasattr(fecha, 'strftime'):
+                            fecha_str = fecha.strftime('%d/%m/%Y')
+                        else:
+                            fecha_str = str(fecha)
+                    except:
+                        fecha_str = str(fecha)
+
+                ticket.agregar_texto(f"Fecha: {fecha_str}")
+
+                # Formatear hora de manera segura
+                hora_str = "N/A"
+                if hora:
+                    try:
+                        if hasattr(hora, 'strftime'):
+                            hora_str = hora.strftime('%H:%M:%S')
+                        elif isinstance(hora, timedelta):
+                            # Convertir timedelta a horas:minutos:segundos
+                            total_seconds = int(hora.total_seconds())
+                            hours = total_seconds // 3600
+                            minutes = (total_seconds % 3600) // 60
+                            seconds = total_seconds % 60
+                            hora_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                        else:
+                            hora_str = str(hora)
+                    except:
+                        hora_str = str(hora)
+
+                ticket.agregar_texto(f"Hora: {hora_str}")
+                ticket.agregar_texto(f"Responsable: {usuario}")
+                ticket.agregar_linea()
+
+                # Detalles
+                ticket.agregar_texto(f"Saldo sistema: ${float(saldo_sistema):.2f}")
+                ticket.agregar_texto(f"Efectivo contado: ${float(efectivo):.2f}")
+
+                if float(diferencia) > 0:
+                    ticket.agregar_texto(f"Sobrante: ${float(diferencia):.2f}")
+                elif float(diferencia) < 0:
+                    ticket.agregar_texto(f"Faltante: ${abs(float(diferencia)):.2f}")
+                else:
+                    ticket.agregar_texto("Sin diferencia")
+
+                if observaciones:
+                    ticket.agregar_linea()
+                    ticket.agregar_texto("Observaciones:")
+                    ticket.agregar_texto(observaciones)
+
+                # Firmas
+                ticket.agregar_espacio()
+                ticket.agregar_texto_centrado("___________________")
+                ticket.agregar_texto_centrado("Firma del Responsable")
+
+                # Generar PDF
+                nombre_archivo = f"arqueo_{id_arqueo}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+                ruta_pdf = ticket.generar_pdf(nombre_archivo)
+                ticket.mostrar_vista_previa(ruta_pdf)
+
+                messagebox.showinfo("Éxito", "Arqueo impreso correctamente")
+
+            except ImportError:
+                # Si no está disponible el módulo ticket, crear HTML simple
+                self.crear_arqueo_html_simple(id_arqueo, arqueo)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
+            print(f"Error detallado: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def crear_arqueo_html_simple(self, id_arqueo, datos_arqueo):
+        """Crea un archivo HTML simple para imprimir el arqueo"""
+        try:
+            fecha, hora, saldo_sistema, efectivo, diferencia, observaciones, usuario = datos_arqueo
+
+            # Formatear datos de manera segura
+            fecha_str = "N/A"
+            if fecha:
+                try:
+                    fecha_str = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else str(fecha)
+                except:
+                    fecha_str = str(fecha)
+
+            hora_str = "N/A"
+            if hora:
+                try:
+                    if hasattr(hora, 'strftime'):
+                        hora_str = hora.strftime('%H:%M:%S')
+                    elif isinstance(hora, timedelta):
+                        total_seconds = int(hora.total_seconds())
+                        hours = total_seconds // 3600
+                        minutes = (total_seconds % 3600) // 60
+                        seconds = total_seconds % 60
+                        hora_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                    else:
+                        hora_str = str(hora)
+                except:
+                    hora_str = str(hora)
+
+            # Crear HTML
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Arqueo de Caja #{id_arqueo}</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; width: 300px; margin: 0 auto; }}
+                    .header {{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }}
+                    .content {{ margin: 20px 0; }}
+                    .line {{ border-top: 1px dashed #000; margin: 10px 0; }}
+                    .total {{ font-weight: bold; font-size: 14px; }}
+                    .footer {{ margin-top: 30px; text-align: center; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>ARQUEO DE CAJA</h2>
+                    <p>Arqueo #{id_arqueo}</p>
+                </div>
+
+                <div class="content">
+                    <p><strong>Fecha:</strong> {fecha_str}</p>
+                    <p><strong>Hora:</strong> {hora_str}</p>
+                    <p><strong>Responsable:</strong> {usuario}</p>
+
+                    <div class="line"></div>
+
+                    <p><strong>Saldo en Sistema:</strong> ${float(saldo_sistema):.2f}</p>
+                    <p><strong>Efectivo Contado:</strong> ${float(efectivo):.2f}</p>
+
+                    <div class="line"></div>
+
+                    <p class="total">
+                        <strong>Diferencia:</strong> 
+                        {
+            f"Sobrante: ${float(diferencia):.2f}" if float(diferencia) > 0
+            else f"Faltante: ${abs(float(diferencia)):.2f}" if float(diferencia) < 0
+            else "Sin diferencia"
+            }
+                    </p>
+
+                    {f'<div class="line"></div><p><strong>Observaciones:</strong><br>{observaciones}</p>' if observaciones else ''}
+
+                    <div class="footer">
+                        <div class="line"></div>
+                        <p>Firma del Responsable: ___________________</p>
+                        <p style="font-size: 10px; margin-top: 20px;">
+                            Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            nombre_archivo = f"arqueo_{id_arqueo}_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+
+            with open(nombre_archivo, 'w', encoding='utf-8') as f:
+                f.write(html)
+
+            # Abrir en navegador
+            import webbrowser
+            webbrowser.open(nombre_archivo)
+
+            messagebox.showinfo("Arqueo Generado", f"Archivo HTML creado: {nombre_archivo}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo crear el archivo HTML: {str(e)}")
+            print(f"Error al crear HTML: {e}")
 
     def imprimir_arqueo_guardado(self, id_arqueo):
         """Imprime un arqueo que ya fue guardado"""
