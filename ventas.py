@@ -1013,7 +1013,7 @@ class Ventas:
         """Abre ventana para seleccionar un cliente"""
         ventana_clientes = tk.Toplevel(self.ventana)
         ventana_clientes.title("Seleccionar Cliente")
-        ventana_clientes.geometry("700x550")
+        ventana_clientes.geometry("820x550")  # más ancho para los botones
         ventana_clientes.config(bg="#f5f5f5")
         ventana_clientes.minsize(700, 550)
         ventana_clientes.resizable(True, True)
@@ -1136,12 +1136,24 @@ class Ventas:
         )
         btn_cancelar.pack(side=tk.RIGHT, padx=5)
 
-        # Cargar clientes al iniciar
+                # Cargar clientes al iniciar
         cargar_clientes()
 
-        # Hacer modal sin bloquear con wait_window
+        # Forzar ajuste al contenido
+        ventana_clientes.update_idletasks()  # Asegura que todo esté renderizado
+        ventana_clientes.geometry("")        # Ajusta el tamaño al contenido visible
+
+        # Centrar la ventana (opcional si tienes la función)
+        utl.centrar_ventana(ventana_clientes, ventana_clientes.winfo_width(), ventana_clientes.winfo_height())
+
+        # Hacer modal sin bloquear
         ventana_clientes.transient(self.ventana)
         ventana_clientes.grab_set()
+        
+        ventana_clientes.update_idletasks()
+        ancho = ventana_clientes.winfo_reqwidth() + 50  # margen extra para scrollbar y botones
+        alto = ventana_clientes.winfo_reqheight() + 50
+        ventana_clientes.geometry(f"{ancho}x{alto}")
 
     def abrir_gestion_clientes(self, ventana_padre, callback_actualizar):
         """Abre el módulo completo de gestión de clientes"""
