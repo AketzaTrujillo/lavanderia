@@ -2044,9 +2044,8 @@ class GestionCaja:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar el resumen: {str(e)}")
 
-
     def cargar_movimientos(self):
-        """Carga los movimientos de caja según los filtros seleccionados"""
+        """Carga los movimientos de caja con información detallada de usuarios"""
         try:
             # Limpiar tabla
             for item in self.tabla_movimientos.get_children():
@@ -2056,23 +2055,25 @@ class GestionCaja:
             fecha = self.fecha_movimientos.get()
             tipo = self.tipo_movimiento.get()
 
-            print(f"Cargando movimientos para fecha: {fecha}, tipo: {tipo}")
+            print(f"🔍 DEBUG - Cargando movimientos para fecha: {fecha}, tipo: {tipo}")
 
             # Conectar a la BD
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Consulta ajustada según la estructura real de la base de datos
+            # Consulta mejorada que une con tabla usuarios para obtener el nombre
             consulta = """
-                SELECT 
+                SELECT DISTINCT 
                     m.id_movimiento, 
                     m.hora, 
                     m.tipo, 
                     m.concepto,
                     m.monto, 
-                    u.nombre as usuario
+                    u.nombre as usuario,
+                    u.rol,
+                    m.id_usuario
                 FROM movimientos_caja m
-                JOIN usuarios u ON m.id_usuario = u.id_usuario
+                LEFT JOIN usuarios u ON m.id_usuario = u.id_usuario
                 WHERE DATE(m.hora) = %s
             """
 
@@ -2081,18 +2082,18 @@ class GestionCaja:
             # Agregar condición de tipo si no es "Todos"
             if tipo != "Todos":
                 consulta += " AND m.tipo = %s"
-                tipo_bd = tipo.lower()  # Convertir a minúsculas para coincidir con BD
+                tipo_bd = tipo.lower()
                 parametros.append(tipo_bd)
 
             consulta += " ORDER BY m.hora DESC"
 
-            print(f"Consulta: {consulta}")
-            print(f"Parámetros: {parametros}")
+            print(f"🔍 DEBUG - Consulta SQL: {consulta}")
+            print(f"🔍 DEBUG - Parámetros: {parametros}")
 
             # Ejecutar consulta
             cursor.execute(consulta, parametros)
             movimientos = cursor.fetchall()
-            print(f"Movimientos encontrados: {len(movimientos)}")
+            print(f"🔍 DEBUG - Movimientos encontrados: {len(movimientos)}")
 
             # Calcular totales
             total_ing = 0
@@ -2100,7 +2101,10 @@ class GestionCaja:
 
             # Insertar datos en la tabla
             for mov in movimientos:
-                id_mov, hora, tipo_mov, concepto, monto, usuario = mov
+                id_mov, hora, tipo_mov, concepto, monto, usuario, rol, id_usuario_real = mov
+
+                # Debug para cada movimiento
+                print(f"🔍 DEBUG - Movimiento: {concepto}, Usuario: {usuario} (ID: {id_usuario_real}), Rol: {rol}")
 
                 # Formatear hora
                 hora_str = hora.strftime("%H:%M:%S") if hasattr(hora, 'strftime') else str(hora)
@@ -2117,9 +2121,15 @@ class GestionCaja:
                 # Formatear monto
                 monto_str = f"${float(monto):.2f}" if monto is not None else "$0.00"
 
+                # Formatear nombre de usuario con rol si está disponible
+                if usuario:
+                    usuario_display = f"{usuario} ({rol})" if rol else usuario
+                else:
+                    usuario_display = f"Usuario ID: {id_usuario_real}"
+
                 # Insertar en la tabla
                 self.tabla_movimientos.insert('', tk.END, values=(
-                    id_mov, hora_str, tipo_mov_display, concepto, monto_str, usuario
+                    id_mov, hora_str, tipo_mov_display, concepto, monto_str, usuario_display
                 ))
 
             # Actualizar variables de totales
@@ -2135,9 +2145,11 @@ class GestionCaja:
                     "", "", "", "No hay movimientos para esta fecha", "", ""
                 ))
 
+            print(f"🔍 DEBUG - Carga de movimientos completada")
+
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los movimientos: {str(e)}")
-            print(f"Error detallado al cargar movimientos: {e}")
+            print(f"🔍 DEBUG - Error detallado al cargar movimientos: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3526,7 +3538,7 @@ class GestionCaja:
             print(f"Error al registrar ingreso: {e}")
 
     def realizar_arqueo_caja(self):
-        """Realiza un arqueo de caja para contabilizar el efectivo y verificar contra el sistema"""
+        """Realiza un arqueo de caja - VERSIÓN CORREGIDA"""
         try:
             if not self.caja_abierta:
                 messagebox.showinfo("Información", "Debe abrir la caja primero")
@@ -3537,9 +3549,8 @@ class GestionCaja:
             ventana_arqueo.title("Arqueo de Caja")
             ventana_arqueo.geometry("650x550")
             ventana_arqueo.config(bg="#f5f5f5")
-            ventana_arqueo.grab_set()  # Hacer modal
+            ventana_arqueo.grab_set()
 
-            # Centrar ventana
             utl.centrar_ventana(ventana_arqueo, 650, 550)
 
             # Frame principal
@@ -3556,22 +3567,31 @@ class GestionCaja:
             ).pack(pady=(0, 20))
 
             # Obtener saldo actual según sistema
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-            cursor.execute("""
-                SELECT total_ingresos, total_egresos, saldo_final
-                FROM caja WHERE id_caja = %s
-            """, (self.id_caja_actual,))
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute("""
+                    SELECT total_ingresos, total_egresos, saldo_final
+                    FROM caja WHERE id_caja = %s
+                """, (self.id_caja_actual,))
 
-            caja_info = cursor.fetchone()
+                caja_info = cursor.fetchone()
+                conexion.close()
 
-            if not caja_info:
-                messagebox.showerror("Error", "No se pudo obtener información de la caja actual")
+                if not caja_info:
+                    messagebox.showerror("Error", "No se pudo obtener información de la caja actual")
+                    ventana_arqueo.destroy()
+                    return
+
+                # CONVERTIR A FLOAT para evitar problemas de tipos
+                ingresos = float(caja_info[0] or 0)
+                egresos = float(caja_info[1] or 0)
+                saldo_sistema = float(caja_info[2] or 0)
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al obtener datos de caja: {str(e)}")
                 ventana_arqueo.destroy()
                 return
-
-            ingresos, egresos, saldo_sistema = caja_info
-            conexion.close()
 
             # Frame para información del sistema
             frame_sistema = tk.Frame(frame_principal, bg="#e8f5e9", padx=15, pady=15, relief=tk.GROOVE, bd=1)
@@ -3616,17 +3636,17 @@ class GestionCaja:
                 bg="#f5f5f5"
             ).pack(anchor=tk.W, pady=(0, 10))
 
-            # Crear campos para denomincaciones de billetes y monedas
+            # Denominaciones de billetes y monedas
             denominaciones = [
-                ("Billetes $500:", 500),
-                ("Billetes $200:", 200),
-                ("Billetes $100:", 100),
-                ("Billetes $50:", 50),
-                ("Billetes $20:", 20),
-                ("Monedas $10:", 10),
-                ("Monedas $5:", 5),
-                ("Monedas $2:", 2),
-                ("Monedas $1:", 1),
+                ("Billetes $500:", 500.0),
+                ("Billetes $200:", 200.0),
+                ("Billetes $100:", 100.0),
+                ("Billetes $50:", 50.0),
+                ("Billetes $20:", 20.0),
+                ("Monedas $10:", 10.0),
+                ("Monedas $5:", 5.0),
+                ("Monedas $2:", 2.0),
+                ("Monedas $1:", 1.0),
                 ("Monedas $0.50:", 0.5),
                 ("Monedas $0.20:", 0.2),
                 ("Monedas $0.10:", 0.1)
@@ -3640,48 +3660,42 @@ class GestionCaja:
             cantidades = {}
             subtotales = {}
 
+            # Variable para el total
+            var_total = tk.StringVar(value="$0.00")
+            var_diferencia = tk.StringVar(value="---")
+
             # Función para calcular subtotal cuando cambia la cantidad
-            def calcular_subtotal(denominacion, indice):
-                try:
-                    cantidad = int(cantidades[denominacion].get()) if cantidades[denominacion].get() else 0
-                    valor = denominaciones[indice][1]
-                    subtotal = cantidad * valor
-                    subtotales[denominacion].set(f"${subtotal:.2f}")
-                    calcular_total()
-                except ValueError:
-                    subtotales[denominacion].set("$0.00")
-                    calcular_total()
-
-            # Función para calcular el total
-            def calcular_total():
+            def calcular_subtotal():
+                """Calcula el total y la diferencia"""
                 total = 0.0
-                for i, (etiqueta, valor) in enumerate(denominaciones):
-                    clave = f"denom_{i}"
-                    try:
-                        cantidad = int(cantidades[clave].get()) if cantidades[clave].get() else 0
-                        total += cantidad * valor
-                    except ValueError:
-                        pass
-
-                var_total.set(f"${total:.2f}")
-
-                # Calcular diferencia
                 try:
-                    total_efectivo = float(var_total.get().replace('$', ''))
-                    diferencia = total_efectivo - saldo_sistema
+                    for i, (etiqueta, valor) in enumerate(denominaciones):
+                        clave = f"denom_{i}"
+                        try:
+                            cantidad = int(cantidades[clave].get()) if cantidades[clave].get().strip() else 0
+                            subtotal = cantidad * valor
+                            subtotales[clave].set(f"${subtotal:.2f}")
+                            total += subtotal
+                        except (ValueError, AttributeError):
+                            subtotales[clave].set("$0.00")
+
+                    var_total.set(f"${total:.2f}")
+
+                    # Calcular diferencia
+                    diferencia = total - saldo_sistema
+
                     if diferencia > 0:
                         var_diferencia.set(f"Sobrante: ${diferencia:.2f}")
-                        lbl_diferencia.config(fg="#388e3c")
                     elif diferencia < 0:
                         var_diferencia.set(f"Faltante: ${abs(diferencia):.2f}")
-                        lbl_diferencia.config(fg="#d32f2f")
                     else:
                         var_diferencia.set("Sin diferencia")
-                        lbl_diferencia.config(fg="#000000")
-                except:
+
+                except Exception as e:
+                    print(f"Error en calcular_subtotal: {e}")
                     var_diferencia.set("Error en cálculo")
 
-            # Crear campos en grid (3 columnas x n filas)
+            # Crear campos en grid
             for i, (etiqueta, valor) in enumerate(denominaciones):
                 fila = i // 2
                 columna = (i % 2) * 3
@@ -3707,8 +3721,9 @@ class GestionCaja:
                 )
                 entry.grid(row=fila, column=columna + 1, padx=5, pady=5)
 
-                # Función lambda con argumentos fijos para esta denominación
-                entry.bind("<KeyRelease>", lambda event, d=clave, idx=i: calcular_subtotal(d, idx))
+                # Bind para actualizar cuando cambie el valor
+                entry.bind("<KeyRelease>", lambda event: calcular_subtotal())
+                entry.bind("<FocusOut>", lambda event: calcular_subtotal())
 
                 # Subtotal
                 subtotales[clave] = tk.StringVar(value="$0.00")
@@ -3723,8 +3738,6 @@ class GestionCaja:
             # Frame para total
             frame_total = tk.Frame(frame_principal, bg="#e3f2fd", padx=15, pady=15, relief=tk.GROOVE, bd=1)
             frame_total.pack(fill=tk.X, pady=(20, 10))
-
-            var_total = tk.StringVar(value="$0.00")
 
             tk.Label(
                 frame_total,
@@ -3742,8 +3755,6 @@ class GestionCaja:
             ).pack(side=tk.LEFT, padx=10)
 
             # Diferencia
-            var_diferencia = tk.StringVar(value="---")
-
             tk.Label(
                 frame_total,
                 text="Diferencia:",
@@ -3770,13 +3781,10 @@ class GestionCaja:
             txt_observaciones = tk.Text(frame_principal, height=3, width=50, font=("Helvetica", 11))
             txt_observaciones.pack(fill=tk.X, pady=(0, 15))
 
-            # Botones
-            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
-            frame_botones.pack(pady=10)
-
+            # Función para guardar arqueo
             def guardar_arqueo():
                 try:
-                    total_efectivo = float(var_total.get().replace('$', ''))
+                    total_efectivo = float(var_total.get().replace('$', '').replace(',', ''))
                     diferencia = total_efectivo - saldo_sistema
                     observaciones = txt_observaciones.get("1.0", "end-1c").strip()
 
@@ -3784,14 +3792,28 @@ class GestionCaja:
                     conexion = conectar_bd()
                     cursor = conexion.cursor()
 
+                    # VERIFICAR si existe la tabla arqueos_caja
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM information_schema.tables 
+                        WHERE table_schema = DATABASE() 
+                        AND table_name = 'arqueos_caja'
+                    """)
+
+                    existe_tabla = cursor.fetchone()[0] > 0
+
+                    if not existe_tabla:
+                        messagebox.showerror("Error", "La tabla arqueos_caja no existe en la base de datos")
+                        conexion.close()
+                        return
+
                     cursor.execute("""
                         INSERT INTO arqueos_caja 
                         (id_caja, fecha, hora, saldo_sistema, efectivo_contado, diferencia, observaciones, id_usuario)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         self.id_caja_actual,
-                        date.today().strftime("%Y-%m-%d"),
-                        datetime.now().strftime("%H:%M:%S"),
+                        date.today(),
+                        datetime.now().time(),
                         saldo_sistema,
                         total_efectivo,
                         diferencia,
@@ -3800,8 +3822,6 @@ class GestionCaja:
                     ))
 
                     conexion.commit()
-
-                    # Obtener el ID del arqueo para imprimirlo
                     arqueo_id = cursor.lastrowid
                     conexion.close()
 
@@ -3809,91 +3829,25 @@ class GestionCaja:
 
                     # Preguntar si desea imprimir
                     if messagebox.askyesno("Imprimir", "¿Desea imprimir el arqueo de caja?"):
-                        imprimir_arqueo(arqueo_id)
+                        self.imprimir_arqueo_guardado(arqueo_id)
 
                     ventana_arqueo.destroy()
 
                 except Exception as e:
                     messagebox.showerror("Error", f"No se pudo guardar el arqueo: {str(e)}")
+                    print(f"Error detallado: {e}")
+                    import traceback
+                    traceback.print_exc()
 
-            def imprimir_arqueo(id_arqueo):
-                try:
-                    # Crear ticket
-                    ticket = Ticket()
-
-                    # Encabezado
-                    ticket.agregar_encabezado()
-                    ticket.agregar_titulo("ARQUEO DE CAJA")
-                    ticket.agregar_texto(f"Fecha: {date.today().strftime('%d/%m/%Y')}")
-                    ticket.agregar_texto(f"Hora: {datetime.now().strftime('%H:%M:%S')}")
-                    ticket.agregar_linea()
-
-                    # Información del sistema
-                    ticket.agregar_texto_centrado("SEGÚN SISTEMA")
-                    ticket.agregar_texto(f"Total Ingresos: ${ingresos:.2f}")
-                    ticket.agregar_texto(f"Total Egresos: ${egresos:.2f}")
-                    ticket.agregar_texto(f"Saldo en Sistema: ${saldo_sistema:.2f}")
-                    ticket.agregar_linea()
-
-                    # Conteo de efectivo
-                    ticket.agregar_texto_centrado("CONTEO DE EFECTIVO")
-
-                    for i, (etiqueta, valor) in enumerate(denominaciones):
-                        clave = f"denom_{i}"
-                        cantidad = int(cantidades[clave].get() or 0)
-                        if cantidad > 0:
-                            subtotal = cantidad * valor
-                            ticket.agregar_texto(f"{etiqueta} {cantidad} = ${subtotal:.2f}")
-
-                    ticket.agregar_linea()
-
-                    # Total y diferencia
-                    total_efectivo = float(var_total.get().replace('$', ''))
-                    diferencia = total_efectivo - saldo_sistema
-
-                    ticket.agregar_texto(f"Total Efectivo: ${total_efectivo:.2f}")
-
-                    if diferencia > 0:
-                        ticket.agregar_texto(f"Sobrante: ${diferencia:.2f}")
-                    elif diferencia < 0:
-                        ticket.agregar_texto(f"Faltante: ${abs(diferencia):.2f}")
-                    else:
-                        ticket.agregar_texto("Sin diferencia")
-
-                    ticket.agregar_linea()
-
-                    # Observaciones
-                    observaciones = txt_observaciones.get("1.0", "end-1c").strip()
-                    if observaciones:
-                        ticket.agregar_texto("Observaciones:")
-                        ticket.agregar_texto(observaciones)
-                        ticket.agregar_linea()
-
-                    # Firmas
-                    ticket.agregar_espacio()
-                    ticket.agregar_texto_centrado("___________________")
-                    ticket.agregar_texto_centrado("Firma del Cajero")
-                    ticket.agregar_espacio()
-                    ticket.agregar_texto_centrado("___________________")
-                    ticket.agregar_texto_centrado("Supervisor")
-
-                    # Generar nombre del archivo
-                    nombre_archivo = f"arqueo_caja_{id_arqueo}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-
-                    # Generar PDF
-                    ruta_pdf = ticket.generar_pdf(nombre_archivo)
-
-                    # Mostrar vista previa
-                    ticket.mostrar_vista_previa(ruta_pdf)
-
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
+            # Botones
+            frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
+            frame_botones.pack(pady=10)
 
             btn_guardar = tk.Button(
                 frame_botones,
                 text="Guardar Arqueo",
                 font=("Helvetica", 11),
-                bg="#3a7ff6",
+                bg="#4caf50",
                 fg="white",
                 width=15,
                 cursor="hand2",
@@ -3913,9 +3867,74 @@ class GestionCaja:
             )
             btn_cancelar.pack(side=tk.LEFT, padx=10)
 
+            # Calcular totales iniciales
+            calcular_subtotal()
+
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo realizar el arqueo: {str(e)}")
-            print(f"Error en arqueo: {e}")
+            messagebox.showerror("Error", f"No se pudo abrir el arqueo: {str(e)}")
+            print(f"Error detallado en realizar_arqueo_caja: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def imprimir_arqueo_guardado(self, id_arqueo):
+        """Imprime un arqueo que ya fue guardado"""
+        try:
+            # Obtener datos del arqueo
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT a.fecha, a.hora, a.saldo_sistema, a.efectivo_contado, 
+                       a.diferencia, a.observaciones, u.nombre
+                FROM arqueos_caja a
+                JOIN usuarios u ON a.id_usuario = u.id_usuario
+                WHERE a.id_arqueo = %s
+            """, (id_arqueo,))
+
+            arqueo = cursor.fetchone()
+            conexion.close()
+
+            if not arqueo:
+                messagebox.showerror("Error", "No se encontró el arqueo")
+                return
+
+            fecha, hora, saldo_sistema, efectivo, diferencia, observaciones, usuario = arqueo
+
+            # Crear ticket
+            from ticket import Ticket
+            ticket = Ticket()
+
+            # Encabezado
+            ticket.agregar_encabezado()
+            ticket.agregar_titulo("ARQUEO DE CAJA")
+            ticket.agregar_texto(f"Fecha: {fecha.strftime('%d/%m/%Y')}")
+            ticket.agregar_texto(f"Hora: {hora.strftime('%H:%M:%S')}")
+            ticket.agregar_texto(f"Responsable: {usuario}")
+            ticket.agregar_linea()
+
+            # Detalles
+            ticket.agregar_texto(f"Saldo sistema: ${float(saldo_sistema):.2f}")
+            ticket.agregar_texto(f"Efectivo contado: ${float(efectivo):.2f}")
+
+            if diferencia > 0:
+                ticket.agregar_texto(f"Sobrante: ${float(diferencia):.2f}")
+            elif diferencia < 0:
+                ticket.agregar_texto(f"Faltante: ${abs(float(diferencia)):.2f}")
+            else:
+                ticket.agregar_texto("Sin diferencia")
+
+            if observaciones:
+                ticket.agregar_linea()
+                ticket.agregar_texto("Observaciones:")
+                ticket.agregar_texto(observaciones)
+
+            # Generar PDF
+            nombre_archivo = f"arqueo_{id_arqueo}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+            ruta_pdf = ticket.generar_pdf(nombre_archivo)
+            ticket.mostrar_vista_previa(ruta_pdf)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo imprimir el arqueo: {str(e)}")
     def actualizar_vista_tabla(self):
         """Forza la actualización visual de la tabla"""
         if hasattr(self, 'tabla_cortes'):

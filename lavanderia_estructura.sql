@@ -1,5 +1,28 @@
+-- =========================================================
+-- SCRIPT COMPLETO Y UNIFICADO - SISTEMA LAVANDERÍA
+-- =========================================================
+-- Versión: 2.0 - SIMPLIFICADA Y SIN DUPLICACIONES
+-- Fecha: 2024
+-- Descripción: Script completo que BORRA TODO Y RECREA desde cero
+-- IMPORTANTE: Este script ELIMINA toda la base de datos existente
+-- =========================================================
+
+-- =========================================================
+-- PASO 1: ELIMINAR TODO (SI EXISTE)
+-- =========================================================
+
+-- Eliminar base de datos completa si existe
+DROP DATABASE IF EXISTS lavanderiadb;
+
+-- Crear nueva base de datos
 CREATE DATABASE lavanderiadb;
 USE lavanderiadb;
+
+-- =========================================================
+-- PASO 2: CREAR TODAS LAS TABLAS
+-- =========================================================
+
+-- Tabla usuarios
 CREATE TABLE usuarios (
     id_usuario INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -9,6 +32,7 @@ CREATE TABLE usuarios (
     fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla clientes
 CREATE TABLE clientes (
     id_cliente INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -18,111 +42,16 @@ CREATE TABLE clientes (
     fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla productos
 CREATE TABLE productos (
     id_producto INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
     precio DECIMAL(10,2) NOT NULL,
     stock INT DEFAULT 0
 );
 
-CREATE TABLE pedidos (
-    id_pedido INT AUTO_INCREMENT PRIMARY KEY,
-    id_cliente INT,
-    fecha_pedido DATETIME DEFAULT CURRENT_TIMESTAMP,
-    estado ENUM('Recibido', 'En proceso', 'Listo para entrega', 'Entregado') DEFAULT 'Recibido',
-    observaciones TEXT,
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
-);
-
-
-CREATE TABLE detalle_pedido (
-    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
-    id_pedido INT NOT NULL,
-    tipo_item ENUM('producto', 'servicio') NOT NULL,
-    id_item INT NOT NULL,
-    cantidad INT NOT NULL,
-    precio_unitario DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido)
-);
-
-
-CREATE TABLE ventas (
-    id_venta INT AUTO_INCREMENT PRIMARY KEY,
-    id_usuario INT,
-    id_cliente INT,
-    total DECIMAL(10,2),
-    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-    metodo_pago VARCHAR(50),
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
-    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
-);
-
-
-CREATE TABLE detalle_venta (
-    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
-    id_venta INT NOT NULL,
-    tipo_item ENUM('producto', 'servicio') NOT NULL,
-    id_item INT NOT NULL,
-    cantidad INT NOT NULL,
-    subtotal DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
-);
-
-CREATE TABLE caja (
-    id_caja INT AUTO_INCREMENT PRIMARY KEY,
-    fecha DATE NOT NULL,
-    hora_apertura TIME,
-    hora_cierre TIME,
-    total_ingresos DECIMAL(10,2) DEFAULT 0,
-    total_egresos DECIMAL(10,2) DEFAULT 0,
-    saldo_final DECIMAL(10,2) DEFAULT 0,
-    responsable INT,
-    FOREIGN KEY (responsable) REFERENCES usuarios(id_usuario)
-);
-
+-- Tabla servicios
 CREATE TABLE servicios (
-    id_servicio INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    descripcion TEXT,
-    precio DECIMAL(10,2) NOT NULL,
-    tiempo_estimado INT, -- Estimated time in minutes
-    activo BOOLEAN DEFAULT TRUE
-);
-
-CREATE TABLE pagos (
-    id_pago INT AUTO_INCREMENT PRIMARY KEY,
-    id_venta INT,
-    monto DECIMAL(10,2) NOT NULL,
-    metodo_pago ENUM('Efectivo', 'Tarjeta', 'Transferencia', 'Otro') NOT NULL,
-    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-    referencia VARCHAR(100),
-    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
-);
-
-CREATE TABLE gastos (
-    id_gasto INT AUTO_INCREMENT PRIMARY KEY,
-    concepto VARCHAR(100) NOT NULL,
-    monto DECIMAL(10,2) NOT NULL,
-    fecha DATE NOT NULL,
-    id_usuario INT,
-    comprobante VARCHAR(255),
-    observaciones TEXT,
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
-);
-
-CREATE TABLE movimientos_caja (
-    id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
-    id_caja INT NOT NULL,
-    tipo ENUM('ingreso', 'egreso') NOT NULL,
-    concepto VARCHAR(100) NOT NULL,
-    monto DECIMAL(10,2) NOT NULL,
-    hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-    id_usuario INT,
-    FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
-);
-
-CREATE TABLE IF NOT EXISTS servicios (
     id_servicio INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
@@ -131,45 +60,125 @@ CREATE TABLE IF NOT EXISTS servicios (
     activo TINYINT(1) DEFAULT 1
 );
 
-CREATE TABLE IF NOT EXISTS caja (
+-- Tabla pedidos
+CREATE TABLE pedidos (
+    id_pedido INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT NOT NULL,
+    fecha_pedido DATETIME DEFAULT CURRENT_TIMESTAMP,
+    estado ENUM('Recibido', 'En proceso', 'Listo para entrega', 'Entregado') DEFAULT 'Recibido',
+    prioridad ENUM('Baja', 'Normal', 'Alta', 'Urgente') DEFAULT 'Normal',
+    observaciones TEXT,
+    fecha_entrega_estimada DATE,
+    convertido_a_venta BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE CASCADE
+);
+
+-- Tabla detalle_pedido
+CREATE TABLE detalle_pedido (
+    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    tipo_item ENUM('producto', 'servicio') NOT NULL,
+    id_item INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE
+);
+
+-- Tabla ventas (SIN campo registrado_en_caja - SIMPLIFICADA)
+CREATE TABLE ventas (
+    id_venta INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_cliente INT NOT NULL,
+    id_pedido INT DEFAULT NULL,
+    total DECIMAL(10,2) NOT NULL,
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    metodo_pago VARCHAR(50),
+    descuento_aplicado DECIMAL(10,2) DEFAULT 0,
+    puntos_ganados INT DEFAULT 0,
+    puntos_utilizados INT DEFAULT 0,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente),
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido)
+);
+
+-- Tabla detalle_venta
+CREATE TABLE detalle_venta (
+    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_venta INT NOT NULL,
+    tipo_item ENUM('producto', 'servicio') NOT NULL,
+    id_item INT NOT NULL,
+    cantidad INT NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta) ON DELETE CASCADE
+);
+
+-- Tabla caja
+CREATE TABLE caja (
     id_caja INT AUTO_INCREMENT PRIMARY KEY,
     fecha DATE NOT NULL,
     hora_apertura TIME,
     hora_cierre TIME,
+    monto_inicial DECIMAL(10,2) DEFAULT 0.00,
     total_ingresos DECIMAL(10,2) DEFAULT 0,
     total_egresos DECIMAL(10,2) DEFAULT 0,
     saldo_final DECIMAL(10,2) DEFAULT 0,
-    responsable INT,
+    responsable INT NOT NULL,
     FOREIGN KEY (responsable) REFERENCES usuarios(id_usuario)
 );
 
--- Tabla para los movimientos de caja
-CREATE TABLE IF NOT EXISTS movimientos_caja (
+-- Tabla movimientos_caja
+CREATE TABLE movimientos_caja (
     id_movimiento INT AUTO_INCREMENT PRIMARY KEY,
     id_caja INT NOT NULL,
     tipo ENUM('ingreso', 'egreso') NOT NULL,
     concepto VARCHAR(100) NOT NULL,
     monto DECIMAL(10,2) NOT NULL,
     hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-    id_usuario INT,
+    id_usuario INT NOT NULL,
     FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Tabla para gastos
-CREATE TABLE IF NOT EXISTS gastos (
+-- Tabla pagos
+CREATE TABLE pagos (
+    id_pago INT AUTO_INCREMENT PRIMARY KEY,
+    id_venta INT NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    metodo_pago ENUM('Efectivo', 'Tarjeta', 'Transferencia', 'Otro') NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    referencia VARCHAR(100),
+    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
+);
+
+-- Tabla gastos
+CREATE TABLE gastos (
     id_gasto INT AUTO_INCREMENT PRIMARY KEY,
     concepto VARCHAR(100) NOT NULL,
     monto DECIMAL(10,2) NOT NULL,
     fecha DATE NOT NULL,
-    id_usuario INT,
+    id_usuario INT NOT NULL,
     comprobante VARCHAR(255),
     observaciones TEXT,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Tabla para configuración del sistema
-CREATE TABLE IF NOT EXISTS configuracion (
+-- Tabla arqueos_caja
+CREATE TABLE arqueos_caja (
+    id_arqueo INT AUTO_INCREMENT PRIMARY KEY,
+    id_caja INT NOT NULL,
+    fecha DATE NOT NULL,
+    hora TIME NOT NULL,
+    saldo_sistema DECIMAL(10,2) NOT NULL,
+    efectivo_contado DECIMAL(10,2) NOT NULL,
+    diferencia DECIMAL(10,2) NOT NULL,
+    observaciones TEXT,
+    id_usuario INT NOT NULL,
+    FOREIGN KEY (id_caja) REFERENCES caja(id_caja),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- Tabla configuracion
+CREATE TABLE configuracion (
     id_configuracion INT AUTO_INCREMENT PRIMARY KEY,
     nombre_empresa VARCHAR(100) NOT NULL,
     direccion VARCHAR(200),
@@ -183,8 +192,8 @@ CREATE TABLE IF NOT EXISTS configuracion (
     valor_punto_en_dinero DECIMAL(10,2) DEFAULT 0.10
 );
 
--- Tabla para descuentos y promociones
-CREATE TABLE IF NOT EXISTS promociones (
+-- Tabla promociones
+CREATE TABLE promociones (
     id_promocion INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
@@ -197,19 +206,8 @@ CREATE TABLE IF NOT EXISTS promociones (
     FOREIGN KEY (id_usuario_creador) REFERENCES usuarios(id_usuario)
 );
 
--- Tabla para pagos, vinculada a ventas
-CREATE TABLE IF NOT EXISTS pagos (
-    id_pago INT AUTO_INCREMENT PRIMARY KEY,
-    id_venta INT,
-    monto DECIMAL(10,2) NOT NULL,
-    metodo_pago ENUM('Efectivo', 'Tarjeta', 'Transferencia', 'Otro') NOT NULL,
-    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-    referencia VARCHAR(100),
-    FOREIGN KEY (id_venta) REFERENCES ventas(id_venta)
-);
-
--- Tabla para respaldos del sistema
-CREATE TABLE IF NOT EXISTS respaldos (
+-- Tabla respaldos
+CREATE TABLE respaldos (
     id_respaldo INT AUTO_INCREMENT PRIMARY KEY,
     fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
     ruta VARCHAR(255) NOT NULL,
@@ -219,7 +217,8 @@ CREATE TABLE IF NOT EXISTS respaldos (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
-CREATE TABLE IF NOT EXISTS historial_estados_pedido (
+-- Tabla historial_estados_pedido
+CREATE TABLE historial_estados_pedido (
     id_historial INT AUTO_INCREMENT PRIMARY KEY,
     id_pedido INT NOT NULL,
     estado_anterior VARCHAR(50),
@@ -231,25 +230,46 @@ CREATE TABLE IF NOT EXISTS historial_estados_pedido (
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
 );
 
--- Agregar columna de fecha de entrega estimada si no existe
-ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS fecha_entrega_estimada DATE;
+-- =========================================================
+-- PASO 3: CREAR ÍNDICES (INCLUYENDO ÚNICOS PARA PREVENIR DUPLICADOS)
+-- =========================================================
 
--- Crear vista para resumen de pedidos por estado (útil para reportes)
-CREATE OR REPLACE VIEW resumen_pedidos_estado AS
+-- Índices básicos para rendimiento
+CREATE INDEX idx_pedidos_estado ON pedidos(estado);
+CREATE INDEX idx_pedidos_fecha ON pedidos(fecha_pedido);
+CREATE INDEX idx_pedidos_prioridad ON pedidos(prioridad);
+CREATE INDEX idx_ventas_fecha ON ventas(fecha);
+CREATE INDEX idx_ventas_pedido ON ventas(id_pedido);
+CREATE INDEX idx_caja_fecha ON caja(fecha);
+CREATE INDEX idx_movimientos_caja_id_caja ON movimientos_caja(id_caja);
+CREATE INDEX idx_movimientos_caja_tipo ON movimientos_caja(tipo);
+CREATE INDEX idx_clientes_nombre ON clientes(nombre);
+CREATE INDEX idx_historial_pedido ON historial_estados_pedido(id_pedido);
+
+-- Índices únicos para PREVENIR DUPLICADOS
+CREATE UNIQUE INDEX idx_productos_nombre_unico ON productos(nombre);
+CREATE UNIQUE INDEX idx_movimientos_venta_unico ON movimientos_caja(concepto, id_caja);
+
+-- =========================================================
+-- PASO 4: CREAR VISTAS
+-- =========================================================
+
+-- Vista para resumen de pedidos por estado
+CREATE VIEW resumen_pedidos_estado AS
 SELECT
     estado,
     COUNT(*) as cantidad,
     ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM pedidos), 2) as porcentaje,
-    SUM(
+    COALESCE(SUM(
         (SELECT SUM(dp.cantidad * dp.precio_unitario)
          FROM detalle_pedido dp
          WHERE dp.id_pedido = p.id_pedido)
-    ) as total_ventas
+    ), 0) as total_ventas
 FROM pedidos p
 GROUP BY estado;
 
--- Crear vista para pedidos con información completa
-CREATE OR REPLACE VIEW vista_pedidos_completos AS
+-- Vista para pedidos con información completa
+CREATE VIEW vista_pedidos_completos AS
 SELECT
     p.id_pedido,
     p.fecha_pedido,
@@ -263,84 +283,281 @@ SELECT
     c.correo as correo_cliente,
     u.id_usuario,
     u.nombre as usuario,
-    (SELECT SUM(dp.cantidad * dp.precio_unitario)
+    COALESCE((SELECT SUM(dp.cantidad * dp.precio_unitario)
      FROM detalle_pedido dp
-     WHERE dp.id_pedido = p.id_pedido) as total
+     WHERE dp.id_pedido = p.id_pedido), 0) as total
 FROM pedidos p
 INNER JOIN clientes c ON p.id_cliente = c.id_cliente
-LEFT JOIN ventas v ON v.id_venta = p.id_pedido
+LEFT JOIN ventas v ON v.id_pedido = p.id_pedido
 LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario;
 
--- Índices para mejorar el rendimiento
-CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos(estado);
-CREATE INDEX IF NOT EXISTS idx_pedidos_fecha ON pedidos(fecha_pedido);
-CREATE INDEX IF NOT EXISTS idx_pedidos_prioridad ON pedidos(prioridad);
-CREATE INDEX IF NOT EXISTS idx_historial_pedido ON historial_estados_pedido(id_pedido);
-
--- Datos de ejemplo (ejecutar solo en desarrollo)
--- NOTA: Comentar esta sección en producción
-/*
--- Actualizar algunos pedidos existentes con prioridad
-UPDATE pedidos SET prioridad = 'Alta' WHERE id_pedido IN (SELECT id_pedido FROM pedidos ORDER BY RAND() LIMIT 2);
-UPDATE pedidos SET prioridad = 'Urgente' WHERE id_pedido IN (SELECT id_pedido FROM pedidos ORDER BY RAND() LIMIT 1);
-
--- Agregar fechas de entrega estimadas
-UPDATE pedidos
-SET fecha_entrega_estimada = DATE_ADD(fecha_pedido, INTERVAL 2 DAY)
-WHERE fecha_entrega_estimada IS NULL;
-*/
-
--- Verificar que las columnas se hayan creado correctamente
+-- Vista para resumen de caja
+CREATE VIEW vista_resumen_caja AS
 SELECT
-    COLUMN_NAME,
-    DATA_TYPE,
-    IS_NULLABLE,
-    COLUMN_DEFAULT
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME = 'pedidos'
-  AND TABLE_SCHEMA = DATABASE()
-  AND COLUMN_NAME IN ('prioridad', 'fecha_entrega_estimada');
+    c.id_caja,
+    c.fecha,
+    c.hora_apertura,
+    c.hora_cierre,
+    c.total_ingresos,
+    c.total_egresos,
+    c.saldo_final,
+    u.nombre AS responsable,
+    (SELECT COUNT(*) FROM movimientos_caja m WHERE m.id_caja = c.id_caja AND m.tipo = 'ingreso') AS num_ingresos,
+    (SELECT COUNT(*) FROM movimientos_caja m WHERE m.id_caja = c.id_caja AND m.tipo = 'egreso') AS num_egresos,
+    (SELECT COUNT(DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(concepto, '#', -1), ' ', 1))
+     FROM movimientos_caja m WHERE m.id_caja = c.id_caja AND m.concepto LIKE 'Venta #%') AS num_ventas,
+    (c.hora_cierre IS NULL) AS caja_abierta
+FROM caja c
+JOIN usuarios u ON c.responsable = u.id_usuario;
 
--- Mostrar mensaje de finalización
-SELECT 'Base de datos actualizada correctamente para el módulo de seguimiento de pedidos' as mensaje;
--- Agregar columnas faltantes a tablas existentes si es necesario
+-- Vista para pedidos entregados pendientes de conversión a venta
+CREATE VIEW vista_pedidos_entregados AS
+SELECT
+    p.id_pedido,
+    p.fecha_pedido,
+    p.estado,
+    p.id_cliente,
+    c.nombre as cliente,
+    c.correo,
+    COALESCE((SELECT SUM(dp.cantidad * dp.precio_unitario)
+     FROM detalle_pedido dp
+     WHERE dp.id_pedido = p.id_pedido), 0) as total,
+    p.convertido_a_venta,
+    u.nombre as responsable
+FROM pedidos p
+INNER JOIN clientes c ON p.id_cliente = c.id_cliente
+LEFT JOIN ventas v ON v.id_pedido = p.id_pedido
+LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+WHERE p.estado = 'Entregado' AND p.convertido_a_venta = FALSE;
 
--- Verificar si la columna puntos existe en la tabla clientes
-ALTER TABLE clientes
-ADD COLUMN IF NOT EXISTS telefono VARCHAR(15),
-ADD COLUMN IF NOT EXISTS correo VARCHAR(100),
-ADD COLUMN IF NOT EXISTS puntos INT DEFAULT 0,
-ADD COLUMN IF NOT EXISTS fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP;
+-- Vista para rentabilidad de servicios
+CREATE VIEW vista_rentabilidad_servicios AS
+SELECT
+    dv.tipo_item,
+    dv.id_item,
+    CASE
+        WHEN dv.tipo_item = 'producto' THEN p.nombre
+        WHEN dv.tipo_item = 'servicio' THEN s.nombre
+        ELSE 'Desconocido'
+    END as nombre_item,
+    COUNT(*) as veces_vendido,
+    SUM(dv.cantidad) as cantidad_total,
+    SUM(dv.subtotal) as ingreso_total,
+    AVG(dv.subtotal) as promedio_por_venta,
+    DATE_FORMAT(v.fecha, '%Y-%m') as mes_anio
+FROM detalle_venta dv
+INNER JOIN ventas v ON dv.id_venta = v.id_venta
+LEFT JOIN productos p ON dv.tipo_item = 'producto' AND dv.id_item = p.id_producto
+LEFT JOIN servicios s ON dv.tipo_item = 'servicio' AND dv.id_item = s.id_servicio
+GROUP BY dv.tipo_item, dv.id_item, DATE_FORMAT(v.fecha, '%Y-%m')
+ORDER BY ingreso_total DESC;
 
--- Verificar si la columna metodo_pago existe en la tabla ventas
-ALTER TABLE ventas
-ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(50),
-ADD COLUMN IF NOT EXISTS descuento_aplicado DECIMAL(10,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS puntos_ganados INT DEFAULT 0,
-ADD COLUMN IF NOT EXISTS puntos_utilizados INT DEFAULT 0;
+-- Vista para verificar coherencia del sistema
+CREATE VIEW vista_coherencia_sistema AS
+SELECT
+    'Ventas sin movimiento en caja' as tipo_problema,
+    COUNT(*) as cantidad,
+    GROUP_CONCAT(v.id_venta SEPARATOR ', ') as ids_afectados
+FROM ventas v
+LEFT JOIN movimientos_caja mc ON mc.concepto LIKE CONCAT('Venta #', v.id_venta, '%')
+WHERE mc.id_movimiento IS NULL
 
--- Verificar si la columna observaciones existe en la tabla pedidos
-ALTER TABLE pedidos
-ADD COLUMN IF NOT EXISTS observaciones TEXT,
-ADD COLUMN IF NOT EXISTS fecha_entrega_estimada DATE,
-ADD COLUMN IF NOT EXISTS prioridad ENUM('Baja', 'Normal', 'Alta', 'Urgente') DEFAULT 'Normal';
+UNION ALL
 
--- Agregar datos iniciales a la tabla de configuración si está vacía
-INSERT INTO configuracion (nombre_empresa, direccion, telefono, rfc)
-SELECT 'Lavandería Exprés', 'Calle Principal #123, Colonia Centro', '555-123-4567', 'XAXX010101000'
-WHERE NOT EXISTS (SELECT 1 FROM configuracion LIMIT 1);
+SELECT
+    'Movimientos duplicados por venta' as tipo_problema,
+    COUNT(*) as cantidad,
+    GROUP_CONCAT(concepto SEPARATOR ', ') as ids_afectados
+FROM (
+    SELECT concepto
+    FROM movimientos_caja
+    WHERE concepto LIKE 'Venta #%'
+    GROUP BY concepto, id_caja
+    HAVING COUNT(*) > 1
+) duplicados
 
--- Crear índices para mejorar el rendimiento
-CREATE INDEX IF NOT EXISTS idx_caja_fecha ON caja (fecha);
-CREATE INDEX IF NOT EXISTS idx_movimientos_id_caja ON movimientos_caja (id_caja);
-CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas (fecha);
-CREATE INDEX IF NOT EXISTS idx_pedidos_fecha ON pedidos (fecha_pedido);
-CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes (nombre);
+UNION ALL
 
--- Mensaje de finalización
-SELECT 'La base de datos ha sido actualizada correctamente.' AS mensaje;
+SELECT
+    'Pedidos entregados sin venta' as tipo_problema,
+    COUNT(*) as cantidad,
+    GROUP_CONCAT(p.id_pedido SEPARATOR ', ') as ids_afectados
+FROM pedidos p
+WHERE p.estado = 'Entregado' AND p.convertido_a_venta = FALSE
 
--- Insertar algunos servicios por defecto (opcional)
+UNION ALL
+
+SELECT
+    'Ventas sin pago registrado' as tipo_problema,
+    COUNT(*) as cantidad,
+    GROUP_CONCAT(v.id_venta SEPARATOR ', ') as ids_afectados
+FROM ventas v
+LEFT JOIN pagos p ON v.id_venta = p.id_venta
+WHERE p.id_pago IS NULL
+
+UNION ALL
+
+SELECT
+    'Cajas con saldo inconsistente' as tipo_problema,
+    COUNT(*) as cantidad,
+    GROUP_CONCAT(c.id_caja SEPARATOR ', ') as ids_afectados
+FROM caja c
+WHERE ABS(c.saldo_final - (c.total_ingresos - c.total_egresos)) > 0.01;
+
+-- =========================================================
+-- PASO 5: CREAR PROCEDIMIENTOS ALMACENADOS
+-- =========================================================
+
+-- Procedimiento para convertir pedido a venta
+DELIMITER //
+CREATE PROCEDURE ConvertirPedidoAVenta(
+    IN p_id_pedido INT,
+    IN p_id_usuario INT,
+    IN p_metodo_pago VARCHAR(50),
+    OUT p_id_venta INT
+)
+BEGIN
+    DECLARE v_id_cliente INT;
+    DECLARE v_total DECIMAL(10,2);
+    DECLARE v_id_caja INT;
+    DECLARE v_error_msg VARCHAR(255);
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 v_error_msg = MESSAGE_TEXT;
+        ROLLBACK;
+        SET p_id_venta = -1;
+        SELECT CONCAT('Error al convertir pedido a venta: ', v_error_msg) AS mensaje_error;
+    END;
+
+    START TRANSACTION;
+
+    -- Verificar que el pedido existe y no ha sido convertido
+    SELECT id_cliente, convertido_a_venta INTO v_id_cliente, @convertido
+    FROM pedidos WHERE id_pedido = p_id_pedido;
+
+    IF v_id_cliente IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pedido no encontrado';
+    END IF;
+
+    IF @convertido = TRUE THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pedido ya fue convertido a venta';
+    END IF;
+
+    -- Calcular total del pedido
+    SELECT SUM(cantidad * precio_unitario) INTO v_total
+    FROM detalle_pedido WHERE id_pedido = p_id_pedido;
+
+    -- Crear la venta
+    INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago, id_pedido, fecha)
+    VALUES (p_id_usuario, v_id_cliente, v_total, p_metodo_pago, p_id_pedido, NOW());
+
+    SET p_id_venta = LAST_INSERT_ID();
+
+    -- Copiar detalles del pedido a detalle de venta
+    INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
+    SELECT p_id_venta, dp.tipo_item, dp.id_item, dp.cantidad,
+           (dp.cantidad * dp.precio_unitario)
+    FROM detalle_pedido dp WHERE dp.id_pedido = p_id_pedido;
+
+    -- Actualizar puntos del cliente
+    UPDATE clientes SET puntos = puntos + FLOOR(v_total / 10)
+    WHERE id_cliente = v_id_cliente;
+
+    -- Marcar el pedido como convertido
+    UPDATE pedidos SET convertido_a_venta = TRUE WHERE id_pedido = p_id_pedido;
+
+    COMMIT;
+END //
+DELIMITER ;
+
+-- =========================================================
+-- PASO 6: CREAR FUNCIONES
+-- =========================================================
+
+-- Función para calcular puntos
+DELIMITER //
+CREATE FUNCTION CalcularPuntos(p_total DECIMAL(10,2))
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_puntos_por_compra INT DEFAULT 1;
+
+    -- Obtener configuración de puntos si existe
+    SELECT COALESCE(puntos_por_compra, 1) INTO v_puntos_por_compra
+    FROM configuracion LIMIT 1;
+
+    RETURN FLOOR(p_total / 10) * v_puntos_por_compra;
+END //
+DELIMITER ;
+
+-- =========================================================
+-- PASO 7: CREAR TRIGGER AUTOMÁTICO (SIMPLE Y EFECTIVO)
+-- =========================================================
+
+DELIMITER //
+CREATE TRIGGER trigger_venta_a_caja
+AFTER INSERT ON ventas
+FOR EACH ROW
+BEGIN
+    DECLARE v_id_caja INT;
+
+    -- Buscar caja abierta para la fecha de la venta
+    SELECT id_caja INTO v_id_caja
+    FROM caja
+    WHERE fecha = DATE(NEW.fecha) AND hora_cierre IS NULL
+    LIMIT 1;
+
+    -- Si hay caja abierta, registrar el movimiento
+    IF v_id_caja IS NOT NULL THEN
+        -- Insertar movimiento de ingreso (con manejo de duplicados)
+        INSERT IGNORE INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
+        VALUES (v_id_caja, 'ingreso',
+                CONCAT('Venta #', NEW.id_venta, ' - ', COALESCE(NEW.metodo_pago, 'N/A')),
+                NEW.total, NEW.fecha, NEW.id_usuario);
+
+        -- Actualizar totales de caja
+        IF NEW.metodo_pago = 'Efectivo' THEN
+            -- Para efectivo: aumentar ingresos Y saldo físico
+            UPDATE caja
+            SET total_ingresos = total_ingresos + NEW.total,
+                saldo_final = saldo_final + NEW.total
+            WHERE id_caja = v_id_caja;
+        ELSE
+            -- Para pagos electrónicos: solo aumentar ingresos (contabilidad)
+            UPDATE caja
+            SET total_ingresos = total_ingresos + NEW.total
+            WHERE id_caja = v_id_caja;
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+-- =========================================================
+-- PASO 8: INSERTAR DATOS INICIALES
+-- =========================================================
+
+-- Usuario administrador por defecto
+INSERT INTO usuarios (nombre, correo, contraseña, rol)
+VALUES ('Aketzaly', 'admin@lavanderia.com', '1234', 'admin');
+
+-- Configuración inicial de la empresa
+INSERT INTO configuracion (
+    nombre_empresa, direccion, telefono, rfc, moneda, iva,
+    puntos_por_compra, valor_punto_en_dinero
+) VALUES (
+    'Lavandería Exprés',
+    'Calle Principal #123, Colonia Centro',
+    '555-123-4567',
+    'XAXX010101000',
+    'MXN',
+    16.00,
+    1,
+    0.10
+);
+
+-- Servicios por defecto
 INSERT INTO servicios (nombre, descripcion, precio, tiempo_estimado, activo) VALUES
 ('Lavado Normal', 'Lavado estándar de ropa', 10.00, 60, 1),
 ('Lavado Express', 'Lavado rápido', 15.00, 30, 1),
@@ -348,7 +565,73 @@ INSERT INTO servicios (nombre, descripcion, precio, tiempo_estimado, activo) VAL
 ('Lavado en Seco', 'Lavado especial para prendas delicadas', 20.00, 90, 1),
 ('Teñido', 'Servicio de teñido de prendas', 25.00, 120, 1);
 
+-- Productos de ejemplo
+INSERT INTO productos (nombre, precio, stock) VALUES
+('Detergente 1kg', 35.00, 50),
+('Suavizante 500ml', 25.00, 30),
+('Blanqueador 1L', 15.00, 25),
+('Perfume para ropa', 45.00, 20);
 
-INSERT INTO usuarios (nombre, correo, contraseña, rol)
-VALUES ('Aketzaly', 'admin@lavanderia.com', '1234', 'admin');
+-- Cliente de ejemplo
+INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES
+('Cliente General', '555-000-0001', 'cliente@ejemplo.com', 0);
 
+-- =========================================================
+-- PASO 9: VERIFICACIÓN FINAL
+-- =========================================================
+
+-- Verificar que todas las tablas se crearon
+SELECT
+    'TABLAS CREADAS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.tables
+WHERE table_schema = DATABASE();
+
+-- Verificar que todos los índices se crearon
+SELECT
+    'ÍNDICES CREADOS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.statistics
+WHERE table_schema = DATABASE();
+
+-- Verificar que las vistas se crearon
+SELECT
+    'VISTAS CREADAS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.views
+WHERE table_schema = DATABASE();
+
+-- Verificar que los triggers se crearon
+SELECT
+    'TRIGGERS CREADOS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.triggers
+WHERE trigger_schema = DATABASE();
+
+-- Verificar que los procedimientos se crearon
+SELECT
+    'PROCEDIMIENTOS CREADOS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.routines
+WHERE routine_schema = DATABASE() AND routine_type = 'PROCEDURE';
+
+-- Verificar que las funciones se crearon
+SELECT
+    'FUNCIONES CREADAS' as categoria,
+    COUNT(*) as cantidad
+FROM information_schema.routines
+WHERE routine_schema = DATABASE() AND routine_type = 'FUNCTION';
+
+-- =========================================================
+-- MENSAJE FINAL
+-- =========================================================
+
+SELECT '=====================================================' AS mensaje;
+SELECT '✅ BASE DE DATOS CREADA EXITOSAMENTE' AS mensaje;
+SELECT '=====================================================' AS mensaje;
+SELECT 'Sistema de Lavandería - Versión 2.0 Simplificada' AS mensaje;
+SELECT 'Sin duplicaciones - Lógica automática via triggers' AS mensaje;
+SELECT 'Todas las tablas, vistas, triggers y datos iniciales creados' AS mensaje;
+SELECT '=====================================================' AS mensaje;
+SELECT 'Usuario admin: admin@lavanderia.com / 1234' AS mensaje;
+SELECT '=====================================================' AS mensaje;

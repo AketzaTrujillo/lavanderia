@@ -729,84 +729,91 @@ class Ventas:
             messagebox.showerror("Error", f"Error al procesar el pago: {str(e)}")
 
     def guardar_venta(self, metodo_pago, cambio, monto_efectivo):
-        """Guarda la venta y registra todos los movimientos de caja"""
+        """Guarda la venta - VERSIÓN CON MANEJO ROBUSTO DE CONEXIONES"""
         try:
+            # MEJORAR: Crear conexión al inicio y mantenerla
             conexion = conectar_bd()
+            if not conexion:
+                messagebox.showerror("Error", "No se pudo conectar a la base de datos")
+                return
+
             cursor = conexion.cursor()
+
+            # Configurar conexión para que no se cierre automáticamente
+            cursor.execute("SET SESSION wait_timeout = 28800")  # 8 horas
+            cursor.execute("SET SESSION interactive_timeout = 28800")  # 8 horas
 
             # Verificar que hay una caja abierta
             fecha_actual = datetime.now().strftime("%Y-%m-%d")
-            cursor.execute("SELECT id_caja FROM caja WHERE fecha = %s AND hora_cierre IS NULL", (fecha_actual,))
-            caja_abierta = cursor.fetchone()
+            cursor.execute("""
+                SELECT id_caja, responsable 
+                FROM caja 
+                WHERE fecha = %s AND hora_cierre IS NULL
+            """, (fecha_actual,))
 
-            if not caja_abierta:
+            caja_info = cursor.fetchone()
+            if not caja_info:
                 messagebox.showerror("Error", "No hay una caja abierta para procesar la venta.")
+                cursor.close()
                 conexion.close()
                 return
 
-            id_caja_actual = caja_abierta[0]
+            id_caja_actual = caja_info[0]
+            responsable_caja = caja_info[1]
+
+            # Calcular puntos
+            puntos_ganados = int(float(self.total_venta) / 10)
+            print(f"🔍 DEBUG - Puntos calculados: {puntos_ganados}")
 
             # Iniciar transacción
             cursor.execute("START TRANSACTION")
 
-            # Insertar venta - Asegurando que se grabe el ID de usuario correcto
-            cursor.execute("""
-                INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago, registrado_en_caja)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                self.id_usuario_actual,  # ID del usuario actual, no hardcodeado
-                self.cliente_actual['id'],
-                self.total_venta,
-                metodo_pago,
-                True  # Marcar como ya registrado en caja
-            ))
-
-            id_venta = cursor.lastrowid
-
-            # Insertar detalles de venta
-            for item in self.items_venta:
+            try:
+                # 1. INSERTAR VENTA
                 cursor.execute("""
-                    INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago, fecha, puntos_ganados)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, (
-                    id_venta,
-                    item['tipo'],
-                    item['id'],
-                    item['cantidad'],
-                    item['subtotal']
+                    self.id_usuario_actual,
+                    self.cliente_actual['id'],
+                    self.total_venta,
+                    metodo_pago,
+                    datetime.now(),
+                    puntos_ganados
                 ))
 
-                # Descontar del stock si es producto
-                if item['tipo'] == 'producto':
-                    cursor.execute("UPDATE productos SET stock = stock - %s WHERE id_producto = %s", (
-                        item['cantidad'], item['id']
+                id_venta = cursor.lastrowid
+
+                # 2. INSERTAR DETALLES DE VENTA
+                for item in self.items_venta:
+                    cursor.execute("""
+                        INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        id_venta,
+                        item['tipo'],
+                        item['id'],
+                        item['cantidad'],
+                        item['subtotal']
                     ))
 
-            # Registrar pago
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                id_caja_actual,
-                'ingreso',
-                f'Venta #{id_venta} - {metodo_pago}',
-                monto_efectivo if metodo_pago == "Efectivo" else self.total_venta,
-                datetime.now(),
-                self.id_usuario_actual
-            ))
+                    # Descontar del stock si es producto
+                    if item['tipo'] == 'producto':
+                        cursor.execute("""
+                            UPDATE productos 
+                            SET stock = stock - %s 
+                            WHERE id_producto = %s
+                        """, (item['cantidad'], item['id']))
 
-            # Actualizar saldo según el método de pago
-            if metodo_pago == "Efectivo":
-                # Actualizar saldo
+                # 3. ACTUALIZAR PUNTOS DEL CLIENTE
                 cursor.execute("""
-                    UPDATE caja 
-                    SET total_ingresos = total_ingresos + %s,
-                        saldo_final = saldo_final + %s
-                    WHERE id_caja = %s
-                """, (monto_efectivo, monto_efectivo, id_caja_actual))
+                    UPDATE clientes 
+                    SET puntos = puntos + %s 
+                    WHERE id_cliente = %s
+                """, (puntos_ganados, self.cliente_actual['id']))
 
-                # Registrar egreso por el cambio si hay
-                if cambio > 0:
+                # 4. MANEJAR CAMBIO SI ES EFECTIVO
+                if metodo_pago == "Efectivo" and cambio > 0:
                     cursor.execute("""
                         INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
                         VALUES (%s, %s, %s, %s, %s, %s)
@@ -816,66 +823,99 @@ class Ventas:
                         f'Venta #{id_venta} - Cambio',
                         cambio,
                         datetime.now(),
-                        self.id_usuario_actual
+                        responsable_caja
                     ))
 
-                    # Actualizar saldo por el cambio
                     cursor.execute("""
                         UPDATE caja 
                         SET total_egresos = total_egresos + %s,
                             saldo_final = saldo_final - %s
                         WHERE id_caja = %s
                     """, (cambio, cambio, id_caja_actual))
-            else:
-                # Solo registrar ingreso contable para tarjeta/transferencia
+
+                # 5. REGISTRAR PAGO
                 cursor.execute("""
-                    UPDATE caja 
-                    SET total_ingresos = total_ingresos + %s
-                    WHERE id_caja = %s
-                """, (self.total_venta, id_caja_actual))
+                    INSERT INTO pagos (id_venta, monto, metodo_pago, fecha_hora)
+                    VALUES (%s, %s, %s, %s)
+                """, (id_venta, self.total_venta, metodo_pago, datetime.now()))
 
-                # No actualizar el saldo de caja para pagos electrónicos
-                # Solo agregar a total_ingresos para registro contable
-                cursor.execute("""
-                    UPDATE caja 
-                    SET total_ingresos = total_ingresos + %s
-                    WHERE id_caja = %s
-                """, (self.total_venta, id_caja_actual))
+                # Commit de la transacción
+                cursor.execute("COMMIT")
 
-            # Actualizar puntos del cliente (1 punto por cada 10 pesos)
-            puntos_ganados = int(float(self.total_venta) / 10)
-            cursor.execute("""
-                UPDATE clientes 
-                SET puntos = puntos + %s 
-                WHERE id_cliente = %s
-            """, (puntos_ganados, self.cliente_actual['id']))
+                # Obtener puntos finales del cliente
+                cursor.execute("SELECT puntos FROM clientes WHERE id_cliente = %s", (self.cliente_actual['id'],))
+                puntos_finales = cursor.fetchone()[0]
 
-            # Commit de la transacción
-            cursor.execute("COMMIT")
+                print(f"✅ Venta guardada exitosamente: ID {id_venta}")
+
+            except Exception as e:
+                # Rollback en caso de error dentro de la transacción
+                cursor.execute("ROLLBACK")
+                raise e
+
+            finally:
+                # SIEMPRE cerrar cursor y conexión
+                cursor.close()
+                conexion.close()
 
             # Generar ticket
             ruta_ticket = self.generar_ticket_html(id_venta)
 
-            conexion.close()
-
+            # Mensajes de confirmación
             mensajes = [
-                f"La venta (ID: {id_venta}) fue registrada exitosamente.",
-                f"Puntos ganados: {puntos_ganados}"
+                f"✅ Venta registrada exitosamente (ID: {id_venta})",
+                f"Cliente: {self.cliente_actual['nombre']}",
+                f"Total: ${self.total_venta:.2f}",
+                f"Método: {metodo_pago}",
+                f"🎁 Puntos ganados: {puntos_ganados}",
+                f"🎯 Puntos totales: {puntos_finales}"
             ]
 
             if cambio > 0:
-                mensajes.append(f"Cambio a entregar: ${cambio:.2f}")
+                mensajes.append(f"💵 Cambio a entregar: ${cambio:.2f}")
 
-            messagebox.showinfo("Venta registrada", "\n".join(mensajes))
+            messagebox.showinfo("Venta Registrada", "\n".join(mensajes))
 
+            # Limpiar venta y abrir ticket
             self.limpiar_venta()
-            webbrowser.open(ruta_ticket)
+
+            try:
+                webbrowser.open(ruta_ticket)
+            except Exception as e:
+                print(f"No se pudo abrir el ticket: {e}")
 
         except Exception as e:
-            if 'conexion' in locals():
-                cursor.execute("ROLLBACK")
-            messagebox.showerror("Error", f"No se pudo registrar la venta:\n{e}")
+            # Manejo de errores específicos de conexión
+            error_msg = str(e).lower()
 
+            if "lost connection" in error_msg or "mysql server has gone away" in error_msg:
+                messagebox.showerror("Error de Conexión",
+                                     "Se perdió la conexión con la base de datos.\n"
+                                     "Posibles causas:\n"
+                                     "• El servidor MySQL se reinició\n"
+                                     "• Timeout de conexión\n"
+                                     "• Problemas de red\n\n"
+                                     "Intente nuevamente.")
+            elif "lock wait timeout" in error_msg:
+                messagebox.showerror("Error de Base de Datos",
+                                     "La operación tardó demasiado.\n"
+                                     "La venta puede haberse guardado parcialmente.\n"
+                                     "Verifique en el sistema antes de intentar nuevamente.")
+            else:
+                messagebox.showerror("Error", f"No se pudo registrar la venta:\n{str(e)}")
+
+            print(f"Error detallado: {e}")
+            import traceback
+            traceback.print_exc()
+
+            # Intentar cerrar conexión si aún existe
+            try:
+                if 'cursor' in locals():
+                    cursor.close()
+                if 'conexion' in locals():
+                    conexion.close()
+            except:
+                pass
 
 
 
