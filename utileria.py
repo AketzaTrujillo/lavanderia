@@ -34,6 +34,58 @@ def leer_imagen(path, size):
         return ImageTk.PhotoImage(img)
 
 
+def habilitar_scroll(widget, canvas=None):
+    """
+    Habilita scroll con mouse y touchpad para cualquier widget
+
+    Args:
+        widget: El widget al que aplicar scroll
+        canvas: El canvas si existe (opcional)
+    """
+
+    def _on_mousewheel(event):
+        if canvas:
+            # Para canvas con scrollbar
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        else:
+            # Para widgets normales
+            try:
+                widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except:
+                pass
+
+    def _on_shift_mousewheel(event):
+        if canvas:
+            # Scroll horizontal
+            canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
+        else:
+            try:
+                widget.xview_scroll(int(-1 * (event.delta / 120)), "units")
+            except:
+                pass
+
+    # Vincular eventos de scroll
+    widget.bind("<MouseWheel>", _on_mousewheel)  # Windows
+    widget.bind("<Button-4>", lambda e: _on_mousewheel(type('', (), {'delta': 120})()))  # Linux
+    widget.bind("<Button-5>", lambda e: _on_mousewheel(type('', (), {'delta': -120})()))  # Linux
+
+    # Scroll horizontal con Shift
+    widget.bind("<Shift-MouseWheel>", _on_shift_mousewheel)
+
+    # Para todos los widgets hijos también
+    def bind_to_children(parent):
+        for child in parent.winfo_children():
+            try:
+                child.bind("<MouseWheel>", _on_mousewheel)
+                child.bind("<Button-4>", lambda e: _on_mousewheel(type('', (), {'delta': 120})()))
+                child.bind("<Button-5>", lambda e: _on_mousewheel(type('', (), {'delta': -120})()))
+                child.bind("<Shift-MouseWheel>", _on_shift_mousewheel)
+                bind_to_children(child)
+            except:
+                pass
+
+    bind_to_children(widget)
+
 def centrar_ventana(ventana, ancho, alto):
     """
     Centra una ventana en la pantalla
