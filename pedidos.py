@@ -19,12 +19,15 @@ from conexion import conectar_bd
 
 
 class Pedidos:
-    def __init__(self, ventana_padre=None):
+    def __init__(self, ventana_padre=None, id_usuario=None):
         # Si hay una ventana padre, crear Toplevel en lugar de Tk
         if ventana_padre:
             self.ventana = tk.Toplevel(ventana_padre)
         else:
             self.ventana = tk.Tk()
+
+        self.id_usuario_actual = id_usuario if id_usuario is not None else 1
+        print(f"DEBUG - ID usuario en pedidos: {self.id_usuario_actual}")
 
         self.ventana.title("Módulo de Pedidos - Lavandería")
         self.ventana.geometry("1000x700")
@@ -1128,22 +1131,27 @@ class Pedidos:
             conn = conectar_bd()
             cur = conn.cursor()
 
-            # 1) Insertar encabezado
+            # 1) Insertar encabezado (pedidos no tiene id_usuario)
             cur.execute(
-                "INSERT INTO pedidos (id_cliente, fecha_pedido, estado, observaciones) "
-                "VALUES (%s, NOW(), 'Recibido', %s)",
+                """
+                INSERT INTO pedidos
+                (id_cliente, fecha_pedido, estado, observaciones)
+                VALUES
+                (%s, NOW(), 'Recibido', %s)
+                """,
                 (self.cliente_actual['id'], observaciones)
             )
-            # 2) Obtener id_pedido
             cur.execute("SELECT LAST_INSERT_ID()")
             id_pedido = cur.fetchone()[0]
 
-            # 3) Insertar cada servicio en detalle_pedido
+            # 2) Insertar detalle_pedido
             for item in self.items_pedido:
                 cur.execute(
-                    "INSERT INTO detalle_pedido "
-                    "(id_pedido, tipo_item, id_item, cantidad, precio_unitario) "
-                    "VALUES (%s, 'servicio', %s, %s, %s)",
+                    """
+                    INSERT INTO detalle_pedido
+                    (id_pedido, tipo_item, id_item, cantidad, precio_unitario)
+                    VALUES (%s, 'servicio', %s, %s, %s)
+                    """,
                     (id_pedido, item['id'], item['cantidad'], item['precio_unitario'])
                 )
 
@@ -1158,14 +1166,15 @@ class Pedidos:
 
     def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_rec):
         """
-        Flujo completo:
+        Flujo completo de un pedido con actualización de caja:
         1) calcular cambio/monto
         2) guardar pedido → id_pedido
         3) insertar en ventas → id_venta
-        4) insertar en detalle_venta
-        5) insertar en pagos (usando id_venta)
-        6) marcar pedido entregado
-        7) limpiar UI + generar ticket
+        4) detalle_venta
+        5) pagos
+        6) registrar movimientos en caja
+        7) marcar pedido como entregado
+        8) limpiar UI + ticket
         """
         metodo = metodo_pago_var.get()
         try:
@@ -1180,60 +1189,150 @@ class Pedidos:
                 cambio = recibido - self.total_pedido
                 monto = self.total_pedido
             else:
+                recibido = 0.0
                 cambio = 0.0
                 monto = self.total_pedido
 
             # 2) Guardar pedido
             id_pedido = self.guardar_pedido()
             if id_pedido is None:
-                return  # abortar si algo falló
+                return
 
             conn = conectar_bd()
-            cur = conn.cursor()
+            cur  = conn.cursor()
 
-            # 3) Insertar en ventas
-            cur.execute(
-                "INSERT INTO ventas (id_cliente, total, fecha, metodo_pago) "
-                "VALUES (%s, %s, NOW(), %s)",
-                (self.cliente_actual['id'], self.total_pedido, metodo)
-            )
+            # 2.1) Calcular puntos de fidelidad para este pedido
+            puntos_ganados = int(self.total_pedido / 10)
+
+            # 3) Insertar en ventas, incluyendo id_pedido y puntos_ganados
+            cur.execute("""
+                INSERT INTO ventas
+                (id_usuario, id_cliente, id_pedido, total, fecha, metodo_pago, puntos_ganados)
+                VALUES (%s, %s, %s, %s, NOW(), %s, %s)
+            """, (
+                self.id_usuario_actual,
+                self.cliente_actual['id'],
+                id_pedido,
+                self.total_pedido,
+                metodo,
+                puntos_ganados
+            ))
             cur.execute("SELECT LAST_INSERT_ID()")
             id_venta = cur.fetchone()[0]
 
-            # 4) Insertar detalle_venta
+
+            # 4) Insertar detalle_venta 
             for item in self.items_pedido:
+                subtotal = item.get('subtotal', item['cantidad'] * item['precio_unitario'])
                 cur.execute(
-                    "INSERT INTO detalle_venta "
-                    "(id_venta, tipo_item, id_item, cantidad, subtotal) "
-                    "VALUES (%s, 'servicio', %s, %s, %s)",
-                    (id_venta,
-                    item['id'],
-                    item['cantidad'],
-                    item.get('subtotal', item['cantidad'] * item['precio_unitario']))
+                    """
+                    INSERT INTO detalle_venta
+                    (id_venta, tipo_item, id_item, cantidad, subtotal)
+                    VALUES (%s, 'servicio', %s, %s, %s)
+                    """,
+                    (id_venta, item['id'], item['cantidad'], subtotal)
                 )
 
-            # 5) Insertar en pagos (referenciando id_venta)
+            # 5) Insertar en pagos
             cur.execute(
-                "INSERT INTO pagos (id_venta, monto, metodo_pago, fecha_hora) "
-                "VALUES (%s, %s, %s, NOW())",
+                """
+                INSERT INTO pagos
+                (id_venta, monto, metodo_pago, fecha_hora)
+                VALUES (%s, %s, %s, NOW())
+                """,
                 (id_venta, monto, metodo)
             )
 
-            # 6) Marcar pedido como recibido
+            # 6) *** Aquí registramos los movimientos en caja ***
+            #    6.1) Obtener la caja abierta
+            cur.execute("""
+                SELECT id_caja, responsable
+                FROM caja
+                WHERE fecha = CURDATE()
+                AND hora_cierre IS NULL
+                LIMIT 1
+            """)
+            fila = cur.fetchone()
+            if fila:
+                id_caja_act, resp = fila
+
+                # 6.2) Ingreso (todo el efectivo recibido o total venta)
+                if metodo == "Efectivo":
+                    ingreso_monto = recibido
+                    concepto = f"Pedido #{id_pedido} – Efectivo"
+                else:
+                    ingreso_monto = monto
+                    concepto = f"Pedido #{id_pedido} – {metodo}"
+
+                cur.execute("""
+                    INSERT INTO movimientos_caja
+                    (id_caja, tipo, concepto, monto, hora, id_usuario)
+                    VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
+                """, (id_caja_act, concepto, ingreso_monto, resp))
+                cur.execute("""
+                    UPDATE caja
+                    SET total_ingresos = total_ingresos + %s,
+                        saldo_final    = saldo_final    + %s
+                    WHERE id_caja = %s
+                """, (ingreso_monto, ingreso_monto, id_caja_act))
+
+                # 6.3) Egreso por cambio si aplica
+                if metodo == "Efectivo" and cambio > 0:
+                    cur.execute("""
+                        INSERT INTO movimientos_caja
+                        (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'egreso', %s, %s, NOW(), %s)
+                    """, (id_caja_act,
+                        f"Pedido #{id_pedido} – Cambio",
+                        cambio,
+                        resp))
+                    cur.execute("""
+                        UPDATE caja
+                        SET total_egresos = total_egresos + %s,
+                            saldo_final   = saldo_final   - %s
+                        WHERE id_caja = %s
+                    """, (cambio, cambio, id_caja_act))
+
+            # 7) Marcar pedido como recibido
             cur.execute(
                 "UPDATE pedidos SET estado = 'Recibido' WHERE id_pedido = %s",
                 (id_pedido,)
             )
 
+            # 7.2) **Actualizar puntos totales del cliente**
+            cur.execute("""
+                UPDATE clientes
+                SET puntos = puntos + %s
+                WHERE id_cliente = %s
+            """, (puntos_ganados, self.cliente_actual['id']))
+
             conn.commit()
             conn.close()
 
-            # 7) Cerrar diálogo y notificar
+            # 8) Mensaje final con puntos
             ventana_pago.destroy()
-            messagebox.showinfo("Pago registrado",
-                                f"Pedido #{id_pedido} pagado correctamente.")
+            ruta_ticket = self.generar_ticket_pedido(
+                id_pedido,        # el pedido que se acaba de pagar
+                id_venta,         # la venta asociada
+                metodo,           # método de pago
+                recibido,         # efectivo recibido (0 si no aplica)
+                cambio            # cambio a devolver (0 si no aplica)
+            )
 
-            # Limpiar para nuevo pedido
+            mensajes = [
+                f"✅ Pedido #{id_pedido} pagado correctamente.",
+                f"Total: ${self.total_pedido:.2f}",
+                f"Método: {metodo}",
+                f"🎁 Puntos ganados: {puntos_ganados}"
+            ]
+            if metodo == "Efectivo":
+                mensajes.append(f"💵 Recibido: ${recibido:.2f}")
+                if cambio > 0:
+                    mensajes.append(f"💰 Cambio: ${cambio:.2f}")
+
+            messagebox.showinfo("Pago Registrado", "\n".join(mensajes), parent=self.ventana)
+
+            # 8) Limpiar la interfaz de Pedidos
             self.items_pedido.clear()
             self.actualizar_tabla_detalles()
             self.calcular_total()
@@ -1243,8 +1342,12 @@ class Pedidos:
             self.notebook.select(self.tab_lista)
             self.cargar_pedidos()
 
-            # Generar ticket final
-            self.generar_ticket(id_venta, metodo, cambio, monto)
+            # 9) Abrir el ticket generado
+            try:
+                import webbrowser, os
+                webbrowser.open(f"file://{os.path.abspath(ruta_ticket)}")
+            except Exception:
+                pass
 
         except ValueError:
             messagebox.showwarning("Error", "El monto ingresado no es un número válido.")
@@ -1252,7 +1355,169 @@ class Pedidos:
             messagebox.showerror("Error al procesar el pago", str(e))
 
 
+    def generar_ticket_pedido(self, id_pedido, id_venta, metodo_pago, recibido, cambio):
+        """
+        Genera un ticket HTML para un pedido y devuelve la ruta del archivo.
+        No abre el ticket; quien lo llame debe abrirlo con webbrowser.open().
+        """
+        # 1) Encabezado
+        ahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cliente = self.cliente_actual.get("nombre", "Cliente")
+        folio = f"LP{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
+        # 2) Cuerpo de los ítems
+        cuerpo_items = ""
+        for item in self.items_pedido:
+            subtotal = item.get('subtotal', item['cantidad'] * item['precio_unitario'])
+            cuerpo_items += f"""
+            <tr>
+                <td>{item.get('nombre', item.get('servicio',''))}</td>
+                <td class="precio">{item['cantidad']} x ${item['precio_unitario']:.2f}</td>
+                <td class="subtotal">${subtotal:.2f}</td>
+            </tr>"""
+
+        total_formateado = f"${self.total_pedido:.2f}"
+
+        # 3) Armar el HTML
+        html = f"""<!DOCTYPE html>
+    <html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <title>Ticket Pedido #{id_pedido}</title>
+    <style>
+        body {{ width:230px; font-family:'Courier New', monospace; font-size:12px; margin:0 auto; }}
+        h2, p {{ text-align:center; margin:4px 0; }}
+        .sep {{ border-top:1px dashed #000; margin:5px 0; }}
+        table {{ width:100%; border-collapse:collapse; }}
+        td {{ padding:2px; }}
+        td.precio, td.subtotal {{ text-align:right; }}
+    </style>
+    </head>
+    <body>
+    <h2>Lavandería Exprés</h2>
+    <p>Calle Principal #123</p>
+    <p>Colonia Centro</p>
+    <p>Tel: 555-123-4567</p>
+    <div class="sep"></div>
+    <p><strong>Fecha:</strong> {ahora}</p>
+    <p><strong>Pedido #:</strong> {id_pedido} &nbsp;&nbsp; <strong>Venta #:</strong> {id_venta}</p>
+    <p><strong>Cliente:</strong> {cliente}</p>
+    <div class="sep"></div>
+    <table>
+        {cuerpo_items}
+    </table>
+    <div class="sep"></div>
+    <p><strong>TOTAL:</strong> {total_formateado}</p>
+    <p><strong>Método:</strong> {metodo_pago}</p>"""
+
+        if metodo_pago == "Efectivo":
+            html += f"""
+    <p><strong>Recibido:</strong> ${recibido:.2f} &nbsp; <strong>Cambio:</strong> ${cambio:.2f}</p>"""
+
+        html += f"""
+    <div class="sep"></div>
+    <p>Folio: {folio}</p>
+    <p>¡Gracias por su preferencia!</p>
+    </body>
+    </html>
+    """
+
+        # 4) Guardar a archivo
+        nombre_archivo = f"ticket_pedido_{id_pedido}.html"
+        with open(nombre_archivo, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        return nombre_archivo
+
+
+    def generar_ticket_html(self, id_venta):
+        fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cliente = self.cliente_actual.get("nombre", "Cliente")
+        cuerpo_items = ""
+
+        for item in self.items_venta:
+            cuerpo_items += f"""
+            <tr>
+                <td>{item['nombre']}</td>
+                <td class="precio">{item['cantidad']} x {item['precio_unitario']:.2f}</td>
+                <td class="subtotal">${item['subtotal']:.2f}</td>
+            </tr>
+            """
+
+        total_formateado = f"${self.total_venta:.2f}"
+        codigo_seguimiento = datetime.now().strftime("LV%Y%m%d%H%M%S")
+
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Ticket Venta {id_venta}</title>
+            <style>
+                body {{
+                    width: 230px;
+                    font-family: 'Courier New', monospace;
+                    font-size: 12px;
+                    margin: 0 auto;
+                    color: #000;
+                }}
+                h2, p {{
+                    text-align: center;
+                    margin: 4px 0;
+                }}
+                .separador {{
+                    border-top: 1px dashed #000;
+                    margin: 5px 0;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                }}
+                td {{
+                    padding: 2px;
+                }}
+                td.precio, td.subtotal {{
+                    text-align: right;
+                }}
+            </style>
+        </head>
+        <body>
+
+            <h2>Lavandería Exprés</h2>
+            <p>Calle Principal #123</p>
+            <p>Colonia Centro</p>
+            <p>Tel: 555-123-4567</p>
+            <p>RFC: XAXX010101000</p>
+
+            <div class="separador"></div>
+
+            <p><strong>Fecha:</strong> {fecha}</p>
+            <p><strong>Cliente:</strong> {cliente}</p>
+
+            <div class="separador"></div>
+
+            <table>
+                {cuerpo_items}
+            </table>
+
+            <div class="separador"></div>
+            <p><strong>TOTAL: {total_formateado}</strong></p>
+
+            <div class="separador"></div>
+
+            <p>¡Gracias por su preferencia!</p>
+            <p>Folio: {codigo_seguimiento}</p>
+            <p>Conserve su ticket</p>
+
+        </body>
+        </html>
+        """
+
+        ruta = f"ticket_venta_{id_venta}.html"
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        return ruta
 
 
     def cargar_pedidos(self):

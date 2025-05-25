@@ -252,9 +252,10 @@ class MasterPanel:
     def gestionar_pedidos(self):
         try:
             from pedidos import Pedidos
-            Pedidos(self.ventana)
+            # Le pasamos self.id_usuario_actual para que Pedidos lo use
+            Pedidos(self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo: {e}")
 
     def gestionar_caja(self):
         try:
