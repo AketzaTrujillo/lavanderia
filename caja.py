@@ -498,91 +498,160 @@ class GestionCaja:
             print(f"Error al registrar ingreso: {e}")
 
     def registrar_egreso(self):
-        """Registra un egreso en la caja actual"""
+        """Registra un egreso en la caja actual usando un diálogo personalizado centrado"""
         try:
             if not self.caja_abierta:
-                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                messagebox.showinfo("Información",
+                                    "Debe abrir la caja primero",
+                                    parent=self.ventana)
                 return
 
-            # Solicitar información del egreso
-            concepto = simpledialog.askstring(
-                "Egreso",
-                "Ingrese el concepto del egreso:"
-            )
-
-            if not concepto:
+            resultado = self._dialogo_concepto_monto("Egreso")
+            if resultado is None:
                 return
+            concepto, monto = resultado
 
-            monto = simpledialog.askfloat(
-                "Egreso",
-                "Ingrese el monto del egreso:",
-                minvalue=0.01
-            )
-
-            if monto is None:
-                return
-
-            # Verificar que haya saldo suficiente
+            # —— resto igual: verificar saldo, insertar y actualizar UI ——
             conexion = conectar_bd()
-            cursor = conexion.cursor()
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("SELECT saldo_final FROM caja WHERE id_caja = %s",
+                               (self.id_caja_actual,))
+                fila = cursor.fetchone()
+                if not fila:
+                    messagebox.showerror("Error",
+                                         "No se encontró la caja.",
+                                         parent=self.ventana)
+                    return
+                saldo_actual = fila[0]
+                if saldo_actual < monto:
+                    messagebox.showerror("Saldo insuficiente",
+                                         f"No hay saldo suficiente.\nSaldo actual: ${saldo_actual:.2f}",
+                                         parent=self.ventana)
+                    return
 
-            cursor.execute("""
-                SELECT total_ingresos - total_egresos AS saldo_actual
-                FROM caja
-                WHERE id_caja = %s
-            """, (self.id_caja_actual,))
-
-            resultado = cursor.fetchone()
-
-            if resultado and resultado[0] < monto:
-                messagebox.showerror(
-                    "Saldo Insuficiente",
-                    f"No hay saldo suficiente para este egreso.\nSaldo actual: ${resultado[0]:.2f}"
-                )
+                cursor.execute("""
+                    INSERT INTO movimientos_caja
+                      (id_caja, hora, tipo, concepto, monto, id_usuario)
+                    VALUES (%s, NOW(), %s, %s, %s, %s)
+                """, (
+                    self.id_caja_actual,
+                    'egreso', concepto, monto, self.id_usuario
+                ))
+                cursor.execute("""
+                    UPDATE caja
+                    SET total_egresos = total_egresos + %s,
+                        saldo_final   = saldo_final   - %s
+                    WHERE id_caja = %s
+                """, (monto, monto, self.id_caja_actual))
+                conexion.commit()
+            finally:
                 conexion.close()
-                return
 
-            # Registrar en la base de datos
-            # Insertar en la tabla de movimientos
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                self.id_caja_actual,
-                date.today().strftime("%Y-%m-%d"),
-                datetime.now(),
-                'egreso',  # Debe ser 'egreso' (minúsculas)
-                concepto,
-                monto,
-                self.id_usuario
-            ))
-
-            # Actualizar el total de egresos en la caja
-            cursor.execute("""
-                UPDATE caja 
-                SET total_egresos = total_egresos + %s,
-                    saldo_final = saldo_final - %s
-                WHERE id_caja = %s
-            """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            # Actualizar interfaz
             self.actualizar_estado_caja()
-
-            # Recargar movimientos si estamos en esa pestaña
             if hasattr(self, 'cargar_movimientos'):
                 self.cargar_movimientos()
 
-            messagebox.showinfo(
-                "Registro Exitoso",
-                f"Se ha registrado un egreso de ${monto:.2f} por concepto de {concepto}"
-            )
+            messagebox.showinfo("Registro Exitoso",
+                                f"Se registró un egreso de ${monto:.2f} por {concepto}",
+                                parent=self.ventana)
 
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
+            messagebox.showerror("Error",
+                                 f"No se pudo registrar el egreso:\n{e}",
+                                 parent=self.ventana)
             print(f"Error al registrar egreso: {e}")
+
+    def _dialogo_concepto_monto(self, tipo: str):
+        """Diálogo centrado y estilizado para pedir concepto y monto."""
+        parent = self.ventana
+        top = tk.Toplevel(parent)
+        top.transient(parent)
+        top.grab_set()
+        top.configure(bg="#ffffff")
+        top.title(f"Registrar {tipo}")
+
+        # Contenedor con padding
+        container = ttk.Frame(top, padding=20)
+        container.pack(fill="both", expand=True)
+
+        # Estilo general
+        style = ttk.Style(top)
+        style.configure("TLabel", background="#ffffff", font=("Segoe UI", 10))
+        style.configure("TEntry", font=("Segoe UI", 11))
+        style.configure("Accent.TButton", font=("Segoe UI", 10), padding=6)
+        style.map("Accent.TButton",
+                  foreground=[("active", "#ffffff")],
+                  background=[("active", "#0078D4"), ("!active", "#005A9E")])
+
+        # Variables
+        var_concepto = tk.StringVar()
+        var_monto    = tk.StringVar()
+
+        # Título interno
+        ttk.Label(container, text=f"{tipo} en caja",
+                  font=("Segoe UI Semibold", 12)
+        ).pack(pady=(0, 10))
+
+        # Concepto
+        ttk.Label(container, text="Concepto:").pack(anchor="w")
+        ent1 = ttk.Entry(container, textvariable=var_concepto, width=30)
+        ent1.pack(fill="x", pady=(0, 10))
+        ent1.focus()
+
+        # Monto
+        ttk.Label(container, text="Monto (MXN):").pack(anchor="w")
+        ent2 = ttk.Entry(container, textvariable=var_monto, width=30)
+        ent2.pack(fill="x", pady=(0, 20))
+
+        resultado = {"ok": False, "concepto": None, "monto": None}
+
+        def on_aceptar():
+            c = var_concepto.get().strip()
+            m_str = var_monto.get().strip()
+            if not c:
+                messagebox.showwarning("Concepto vacío",
+                                       "Debe ingresar un concepto válido.",
+                                       parent=top)
+                return
+            try:
+                m = float(m_str)
+                if m <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Monto inválido",
+                                       "Ingrese un número válido mayor que 0.",
+                                       parent=top)
+                return
+            resultado.update(ok=True, concepto=c, monto=m)
+            top.destroy()
+
+        # Botones en línea
+        btn_frame = ttk.Frame(container)
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame, text="Cancelar",
+                   command=top.destroy).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Aceptar",
+                   style="Accent.TButton",
+                   command=on_aceptar).pack(side="right")
+
+        # Enter/Escape
+        top.bind("<Return>", lambda e: on_aceptar())
+        top.bind("<Escape>", lambda e: top.destroy())
+
+        # Forzamos layout, luego centramos
+        top.update_idletasks()
+        w, h = top.winfo_width(), top.winfo_height()
+        px, py = parent.winfo_x(), parent.winfo_y()
+        pw, ph = parent.winfo_width(), parent.winfo_height()
+        x = px + (pw - w)//2
+        y = py + (ph - h)//2
+        top.geometry(f"{w}x{h}+{x}+{y}")
+
+        top.wait_window()
+        return (resultado["concepto"], resultado["monto"]) if resultado["ok"] else None
+
+
 
     def cerrar_caja(self):
         """Método para cerrar la caja actual"""
@@ -2707,91 +2776,6 @@ class GestionCaja:
             traceback.print_exc()
 
 
-    def registrar_egreso(self):
-        """Registra un egreso en la caja actual"""
-        try:
-            if not self.caja_abierta:
-                messagebox.showinfo("Información", "Debe abrir la caja primero")
-                return
-
-            # Solicitar información del egreso
-            concepto = simpledialog.askstring(
-                "Egreso",
-                "Ingrese el concepto del egreso:"
-            )
-
-            if not concepto:
-                return
-
-            monto = simpledialog.askfloat(
-                "Egreso",
-                "Ingrese el monto del egreso:",
-                minvalue=0.01
-            )
-
-            if monto is None:
-                return
-
-            # Verificar que haya saldo suficiente
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            cursor.execute("""
-                SELECT monto_inicial + total_ingresos - total_egresos AS saldo_actual
-                FROM caja
-                WHERE id_caja = %s
-            """, (self.id_caja_actual,))
-
-            resultado = cursor.fetchone()
-
-            if resultado and resultado[0] < monto:
-                messagebox.showerror(
-                    "Saldo Insuficiente",
-                    f"No hay saldo suficiente para este egreso.\nSaldo actual: ${resultado[0]:.2f}"
-                )
-                conexion.close()
-                return
-
-            # Registrar en la base de datos
-            # Insertar en la tabla de movimientos
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                self.id_caja_actual,
-                date.today().strftime("%Y-%m-%d"),
-                datetime.now().strftime("%H:%M:%S"),
-                "Egreso",
-                concepto,
-                monto,
-                self.id_usuario
-            ))
-
-            # Actualizar el total de egresos en la caja
-            cursor.execute("""
-                UPDATE caja 
-                SET total_egresos = total_egresos + %s,
-                    saldo_final = saldo_final - %s
-                WHERE id_caja = %s
-            """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-
-            # Recargar movimientos
-            self.cargar_movimientos()
-
-            messagebox.showinfo(
-                "Registro Exitoso",
-                f"Se ha registrado un egreso de ${monto:.2f} por concepto de {concepto}"
-            )
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el egreso: {str(e)}")
-            print(f"Error al registrar egreso: {e}")
 
     def mostrar_calendario_para(self, target="cortes"):
         """Muestra un calendario para seleccionar fecha"""
@@ -3467,74 +3451,66 @@ class GestionCaja:
             messagebox.showerror("Error", f"No se pudo imprimir el corte: {str(e)}")
             print(f"Error al imprimir corte seleccionado: {e}")
 
-    # Agregar este nuevo método para otros ingresos simples
     def otro_ingreso(self):
-        """Registra un ingreso simple en la caja"""
+        """Registra un ingreso simple en la caja usando diálogo personalizado"""
         try:
             if not self.caja_abierta:
-                messagebox.showinfo("Información", "Debe abrir la caja primero")
+                messagebox.showinfo(
+                    "Información",
+                    "Debe abrir la caja primero",
+                    parent=self.ventana
+                )
                 return
 
-            # Solicitar información del ingreso
-            concepto = simpledialog.askstring(
-                "Otro Ingreso",
-                "Ingrese el concepto del ingreso:"
-            )
-
-            if not concepto:
+            # — 1) Pedimos concepto y monto con la misma interfaz —
+            resultado = self._dialogo_concepto_monto("Ingreso")
+            if resultado is None:
                 return
+            concepto, monto = resultado
 
-            monto = simpledialog.askfloat(
-                "Otro Ingreso",
-                "Ingrese el monto del ingreso:",
-                minvalue=0.01
-            )
-
-            if monto is None:
-                return
-
-            # Registrar en la base de datos
+            # — 2) Inserto en BD igual que registrar_ingreso —
             conexion = conectar_bd()
-            cursor = conexion.cursor()
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("""
+                    INSERT INTO movimientos_caja
+                    (id_caja, hora, tipo, concepto, monto, id_usuario)
+                    VALUES (%s, NOW(), %s, %s, %s, %s)
+                """, (
+                    self.id_caja_actual,
+                    'ingreso',
+                    concepto,
+                    monto,
+                    self.id_usuario
+                ))
+                cursor.execute("""
+                    UPDATE caja
+                    SET total_ingresos = total_ingresos + %s,
+                        saldo_final    = saldo_final + %s
+                    WHERE id_caja = %s
+                """, (monto, monto, self.id_caja_actual))
+                conexion.commit()
+            finally:
+                conexion.close()
 
-            # Insertar en la tabla de movimientos
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                VALUES (%s, 'ingreso', %s, %s, %s, %s)
-            """, (
-                self.id_caja_actual,
-                concepto,
-                monto,
-                datetime.now(),
-                self.id_usuario
-            ))
-
-            # Actualizar el total de ingresos en la caja
-            cursor.execute("""
-                UPDATE caja 
-                SET total_ingresos = total_ingresos + %s,
-                    saldo_final = saldo_final + %s
-                WHERE id_caja = %s
-            """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            # Actualizar interfaz
+            # — 3) Refrescar interfaz y movimientos —
             self.actualizar_estado_caja()
-
-            # Recargar movimientos si estamos en esa pestaña
             if hasattr(self, 'cargar_movimientos'):
                 self.cargar_movimientos()
 
             messagebox.showinfo(
                 "Registro Exitoso",
-                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
+                f"Se registró un ingreso de ${monto:.2f} por concepto de {concepto}",
+                parent=self.ventana
             )
 
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
-            print(f"Error al registrar ingreso: {e}")
+            messagebox.showerror(
+                "Error",
+                f"No se pudo registrar el ingreso:\n{e}",   
+                parent=self.ventana
+            )
+            print(f"Error al registrar otro ingreso: {e}")
 
     def realizar_arqueo_caja(self):
         """Realiza un arqueo de caja - VERSIÓN CORREGIDA CON ACTUALIZACIÓN DE SALDO"""

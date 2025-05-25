@@ -59,7 +59,6 @@ def enviar_correo_html(destinatario, asunto, contenido_html):
     password = "imwg qdss lkrd nfoo"  # CAMBIA ESTO con tu contraseña de aplicación
     # ============================================
 
-
     try:
         # Crear mensaje con formato HTML
         email = MIMEMultipart("alternative")
