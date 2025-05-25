@@ -427,74 +427,7 @@ class GestionCaja:
             import traceback
             traceback.print_exc()
 
-    def registrar_ingreso(self):
-        """Registra un ingreso en la caja actual"""
-        try:
-            if not self.caja_abierta:
-                messagebox.showinfo("Información", "Debe abrir la caja primero")
-                return
-
-            # Solicitar información del ingreso
-            concepto = simpledialog.askstring(
-                "Ingreso",
-                "Ingrese el concepto del ingreso:"
-            )
-
-            if not concepto:
-                return
-
-            monto = simpledialog.askfloat(
-                "Ingreso",
-                "Ingrese el monto del ingreso:",
-                minvalue=0.01
-            )
-
-            if monto is None:
-                return
-
-            # Registrar en la base de datos
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Insertar en la tabla de movimientos
-            cursor.execute("""
-                INSERT INTO movimientos_caja (id_caja, fecha, hora, tipo, concepto, monto, id_usuario)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                self.id_caja_actual,
-                date.today().strftime("%Y-%m-%d"),
-                datetime.now(),
-                'ingreso',  # Debe ser 'ingreso' (minúsculas)
-                concepto,
-                monto,
-                self.id_usuario
-            ))
-
-            # Actualizar el total de ingresos en la caja
-            cursor.execute("""
-                UPDATE caja 
-                SET total_ingresos = total_ingresos + %s,
-                    saldo_final = saldo_final + %s
-                WHERE id_caja = %s
-            """, (monto, monto, self.id_caja_actual))
-
-            conexion.commit()
-            conexion.close()
-
-            # Actualizar interfaz
-            self.actualizar_estado_caja()
-
-            # Recargar movimientos si estamos en esa pestaña
-            if hasattr(self, 'cargar_movimientos'):
-                self.cargar_movimientos()
-
-            messagebox.showinfo(
-                "Registro Exitoso",
-                f"Se ha registrado un ingreso de ${monto:.2f} por concepto de {concepto}"
-            )
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el ingreso: {str(e)}")
+    
             print(f"Error al registrar ingreso: {e}")
 
     def registrar_egreso(self):
@@ -1341,13 +1274,24 @@ class GestionCaja:
 
     # Agregar estos métodos a la clase
     def nueva_venta(self):
-        """Abre el módulo de ventas embebido en esta ventana"""
+        """Abre el módulo de ventas y refresca la caja cuando se cierre."""
         try:
             from ventas import Ventas
-            # Crear una instancia de ventas dentro de la ventana actual
-            Ventas(self.ventana)
+
+            # 1) Instanciamos y capturamos el objeto
+            ventas_win = Ventas(self.ventana)
+
+            # 2) Esperamos a que su Toplevel se cierre
+            #    (Ventas debe exponer su ventana en, por ejemplo, ventas_win.ventana)
+            self.ventana.wait_window(ventas_win.ventana)
+
+            # 3) Solo al cerrar la ventana de ventas refrescamos la caja
+            self.actualizar_estado_caja()
+            if hasattr(self, 'cargar_movimientos'):
+                self.cargar_movimientos()
+
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir ventas: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir ventas: {e}")
 
     def nuevo_pedido(self):
         """Abre el módulo de pedidos"""

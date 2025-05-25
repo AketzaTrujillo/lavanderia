@@ -703,75 +703,88 @@ class Ventas:
             lbl_cambio.config(text="$0.00", fg="#666666")
 
     def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_recibido):
-        """Procesa el pago final"""
+        """Procesa el pago final: registra ingreso por efectivo recibido y cambio."""
         metodo_pago = metodo_pago_var.get()
         cambio = 0.0
-        monto_efectivo = 0.0
+        monto_recibido = 0.0
 
         try:
             if metodo_pago == "Efectivo":
                 try:
                     recibido = float(entry_recibido.get())
-                    if recibido < self.total_venta:
-                        messagebox.showwarning("Efectivo insuficiente", "El monto recibido es menor al total a pagar.")
-                        return
-                    cambio = recibido - self.total_venta
-                    monto_efectivo = self.total_venta
                 except ValueError:
-                    messagebox.showwarning("Error", "El monto en efectivo debe ser un número válido.")
+                    messagebox.showwarning(
+                        "Error", 
+                        "El monto en efectivo debe ser un número válido.",
+                        parent=self.ventana
+                    )
                     return
 
-            # Procesar el pago
-            self.guardar_venta(metodo_pago, cambio, monto_efectivo)
+                if recibido < self.total_venta:
+                    messagebox.showwarning(
+                        "Efectivo insuficiente",
+                        "El monto recibido es menor al total a pagar.",
+                        parent=self.ventana
+                    )
+                    return
+
+                cambio = recibido - self.total_venta
+                monto_recibido = recibido
+
+            # Llamamos con el efectivo recibido y el cambio calculado
+            self.guardar_venta(metodo_pago, cambio, monto_recibido)
+
             ventana_pago.destroy()
 
         except Exception as e:
-            messagebox.showerror("Error", f"Error al procesar el pago: {str(e)}")
+            messagebox.showerror(
+                "Error",
+                f"Error al procesar el pago:\n{e}",
+                parent=self.ventana
+            )
+            print(f"Error en finalizar_pago: {e}")
 
-    def guardar_venta(self, metodo_pago, cambio, monto_efectivo):
-        """Guarda la venta - VERSIÓN CON MANEJO ROBUSTO DE CONEXIONES"""
+
+    def guardar_venta(self, metodo_pago, cambio, monto_recibido):
+        """Guarda la venta y registra movimientos de caja correctamente."""
         try:
-            # MEJORAR: Crear conexión al inicio y mantenerla
+            # 0) Conexión y timeouts
             conexion = conectar_bd()
             if not conexion:
-                messagebox.showerror("Error", "No se pudo conectar a la base de datos")
+                messagebox.showerror(
+                    "Error", "No se pudo conectar a la base de datos", parent=self.ventana
+                )
                 return
-
             cursor = conexion.cursor()
+            cursor.execute("SET SESSION wait_timeout = 28800")
+            cursor.execute("SET SESSION interactive_timeout = 28800")
 
-            # Configurar conexión para que no se cierre automáticamente
-            cursor.execute("SET SESSION wait_timeout = 28800")  # 8 horas
-            cursor.execute("SET SESSION interactive_timeout = 28800")  # 8 horas
-
-            # Verificar que hay una caja abierta
-            fecha_actual = datetime.now().strftime("%Y-%m-%d")
-            cursor.execute("""
-                SELECT id_caja, responsable 
-                FROM caja 
-                WHERE fecha = %s AND hora_cierre IS NULL
-            """, (fecha_actual,))
-
-            caja_info = cursor.fetchone()
-            if not caja_info:
-                messagebox.showerror("Error", "No hay una caja abierta para procesar la venta.")
+            # 1) Obtener caja abierta hoy
+            hoy = datetime.now().strftime("%Y-%m-%d")
+            cursor.execute(
+                "SELECT id_caja, responsable FROM caja WHERE fecha=%s AND hora_cierre IS NULL",
+                (hoy,)
+            )
+            fila = cursor.fetchone()
+            if not fila:
+                messagebox.showerror(
+                    "Error", "No hay una caja abierta para procesar la venta.", parent=self.ventana
+                )
                 cursor.close()
                 conexion.close()
                 return
+            id_caja_actual, responsable_caja = fila
 
-            id_caja_actual = caja_info[0]
-            responsable_caja = caja_info[1]
+            # 2) Calcular puntos de fidelidad
+            puntos_ganados = int(self.total_venta / 10)
 
-            # Calcular puntos
-            puntos_ganados = int(float(self.total_venta) / 10)
-            print(f"🔍 DEBUG - Puntos calculados: {puntos_ganados}")
-
-            # Iniciar transacción
+            # 3) Iniciar transacción
             cursor.execute("START TRANSACTION")
-
             try:
-                # 1. INSERTAR VENTA
+                # 3.1) Insertar venta
                 cursor.execute("""
-                    INSERT INTO ventas (id_usuario, id_cliente, total, metodo_pago, fecha, puntos_ganados)
+                    INSERT INTO ventas
+                    (id_usuario, id_cliente, total, metodo_pago, fecha, puntos_ganados)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """, (
                     self.id_usuario_actual,
@@ -781,141 +794,159 @@ class Ventas:
                     datetime.now(),
                     puntos_ganados
                 ))
-
                 id_venta = cursor.lastrowid
 
-                # 2. INSERTAR DETALLES DE VENTA
-                for item in self.items_venta:
+                # 3.2) Detalle de venta y ajuste de stock
+                for it in self.items_venta:
                     cursor.execute("""
-                        INSERT INTO detalle_venta (id_venta, tipo_item, id_item, cantidad, subtotal)
+                        INSERT INTO detalle_venta
+                        (id_venta, tipo_item, id_item, cantidad, subtotal)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (
-                        id_venta,
-                        item['tipo'],
-                        item['id'],
-                        item['cantidad'],
-                        item['subtotal']
+                        id_venta, it['tipo'], it['id'], it['cantidad'], it['subtotal']
                     ))
-
-                    # Descontar del stock si es producto
-                    if item['tipo'] == 'producto':
+                    if it['tipo'] == 'producto':
                         cursor.execute("""
-                            UPDATE productos 
-                            SET stock = stock - %s 
+                            UPDATE productos
+                            SET stock = stock - %s
                             WHERE id_producto = %s
-                        """, (item['cantidad'], item['id']))
+                        """, (it['cantidad'], it['id']))
 
-                # 3. ACTUALIZAR PUNTOS DEL CLIENTE
+                # 3.3) Actualizar puntos del cliente
                 cursor.execute("""
-                    UPDATE clientes 
-                    SET puntos = puntos + %s 
+                    UPDATE clientes
+                    SET puntos = puntos + %s
                     WHERE id_cliente = %s
                 """, (puntos_ganados, self.cliente_actual['id']))
 
-                # 4. MANEJAR CAMBIO SI ES EFECTIVO
-                if metodo_pago == "Efectivo" and cambio > 0:
+                # 3.4) Movimientos en caja
+                if metodo_pago == "Efectivo":
+                    # 3.4.1) Ingreso por el efectivo recibido
                     cursor.execute("""
-                        INSERT INTO movimientos_caja (id_caja, tipo, concepto, monto, hora, id_usuario)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO movimientos_caja
+                        (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
                     """, (
                         id_caja_actual,
-                        'egreso',
-                        f'Venta #{id_venta} - Cambio',
-                        cambio,
-                        datetime.now(),
+                        f"Venta #{id_venta} – Efectivo",
+                        monto_recibido,
                         responsable_caja
                     ))
-
                     cursor.execute("""
-                        UPDATE caja 
-                        SET total_egresos = total_egresos + %s,
-                            saldo_final = saldo_final - %s
+                        UPDATE caja
+                        SET total_ingresos = total_ingresos + %s,
+                            saldo_final    = saldo_final    + %s
                         WHERE id_caja = %s
-                    """, (cambio, cambio, id_caja_actual))
+                    """, (monto_recibido, monto_recibido, id_caja_actual))
 
-                # 5. REGISTRAR PAGO
+                    # 3.4.2) Egreso por cambio
+                    if cambio > 0:
+                        cursor.execute("""
+                            INSERT INTO movimientos_caja
+                            (id_caja, tipo, concepto, monto, hora, id_usuario)
+                            VALUES (%s, 'egreso', %s, %s, NOW(), %s)
+                        """, (
+                            id_caja_actual,
+                            f"Venta #{id_venta} – Cambio",
+                            cambio,
+                            responsable_caja
+                        ))
+                        cursor.execute("""
+                            UPDATE caja
+                            SET total_egresos = total_egresos + %s,
+                                saldo_final   = saldo_final   - %s
+                            WHERE id_caja = %s
+                        """, (cambio, cambio, id_caja_actual))
+
+                else:
+                    # 3.4.3) Tarjeta/Transferencia (ingreso por total venta)
+                    cursor.execute("""
+                        INSERT INTO movimientos_caja
+                        (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
+                    """, (
+                        id_caja_actual,
+                        f"Venta #{id_venta} – {metodo_pago}",
+                        self.total_venta,
+                        responsable_caja
+                    ))
+                    cursor.execute("""
+                        UPDATE caja
+                        SET total_ingresos = total_ingresos + %s,
+                            saldo_final    = saldo_final    + %s
+                        WHERE id_caja = %s
+                    """, (self.total_venta, self.total_venta, id_caja_actual))
+
+                # 3.5) Registrar en pagos
                 cursor.execute("""
-                    INSERT INTO pagos (id_venta, monto, metodo_pago, fecha_hora)
-                    VALUES (%s, %s, %s, %s)
-                """, (id_venta, self.total_venta, metodo_pago, datetime.now()))
+                    INSERT INTO pagos
+                    (id_venta, monto, metodo_pago, fecha_hora)
+                    VALUES (%s, %s, %s, NOW())
+                """, (id_venta, self.total_venta, metodo_pago))
 
-                # Commit de la transacción
+                # 3.6) Commit
                 cursor.execute("COMMIT")
 
-                # Obtener puntos finales del cliente
-                cursor.execute("SELECT puntos FROM clientes WHERE id_cliente = %s", (self.cliente_actual['id'],))
+                # 3.7) Obtener puntos finales del cliente
+                cursor.execute(
+                    "SELECT puntos FROM clientes WHERE id_cliente = %s",
+                    (self.cliente_actual['id'],)
+                )
                 puntos_finales = cursor.fetchone()[0]
 
-                print(f"✅ Venta guardada exitosamente: ID {id_venta}")
-
-            except Exception as e:
-                # Rollback en caso de error dentro de la transacción
+            except Exception:
                 cursor.execute("ROLLBACK")
-                raise e
-
+                raise
             finally:
-                # SIEMPRE cerrar cursor y conexión
                 cursor.close()
                 conexion.close()
 
-            # Generar ticket
+            # 4) Generar ticket y preparar mensaje final
             ruta_ticket = self.generar_ticket_html(id_venta)
-
-            # Mensajes de confirmación
             mensajes = [
-                f"✅ Venta registrada exitosamente (ID: {id_venta})",
+                f"✅ Venta ID {id_venta} registrada.",
                 f"Cliente: {self.cliente_actual['nombre']}",
-                f"Total: ${self.total_venta:.2f}",
+                f"Total venta: ${self.total_venta:.2f}",
                 f"Método: {metodo_pago}",
                 f"🎁 Puntos ganados: {puntos_ganados}",
                 f"🎯 Puntos totales: {puntos_finales}"
             ]
+            if metodo_pago == "Efectivo":
+                mensajes.append(f"💵 Recibido: ${monto_recibido:.2f}")
+                if cambio > 0:
+                    mensajes.append(f"💰 Cambio: ${cambio:.2f}")
 
-            if cambio > 0:
-                mensajes.append(f"💵 Cambio a entregar: ${cambio:.2f}")
+            messagebox.showinfo("Venta Registrada", "\n".join(mensajes), parent=self.ventana)
 
-            messagebox.showinfo("Venta Registrada", "\n".join(mensajes))
-
-            # Limpiar venta y abrir ticket
+            # 5) Limpiar la interfaz y abrir el ticket
             self.limpiar_venta()
-
             try:
+                import webbrowser
                 webbrowser.open(ruta_ticket)
-            except Exception as e:
-                print(f"No se pudo abrir el ticket: {e}")
-
-        except Exception as e:
-            # Manejo de errores específicos de conexión
-            error_msg = str(e).lower()
-
-            if "lost connection" in error_msg or "mysql server has gone away" in error_msg:
-                messagebox.showerror("Error de Conexión",
-                                     "Se perdió la conexión con la base de datos.\n"
-                                     "Posibles causas:\n"
-                                     "• El servidor MySQL se reinició\n"
-                                     "• Timeout de conexión\n"
-                                     "• Problemas de red\n\n"
-                                     "Intente nuevamente.")
-            elif "lock wait timeout" in error_msg:
-                messagebox.showerror("Error de Base de Datos",
-                                     "La operación tardó demasiado.\n"
-                                     "La venta puede haberse guardado parcialmente.\n"
-                                     "Verifique en el sistema antes de intentar nuevamente.")
-            else:
-                messagebox.showerror("Error", f"No se pudo registrar la venta:\n{str(e)}")
-
-            print(f"Error detallado: {e}")
-            import traceback
-            traceback.print_exc()
-
-            # Intentar cerrar conexión si aún existe
-            try:
-                if 'cursor' in locals():
-                    cursor.close()
-                if 'conexion' in locals():
-                    conexion.close()
             except:
                 pass
+
+        except Exception as e:
+            # Manejo de errores de conexión y transacción
+            err = str(e).lower()
+            if "lost connection" in err or "mysql server has gone away" in err:
+                messagebox.showerror(
+                    "Error de Conexión",
+                    "Se perdió la conexión con la base de datos.",
+                    parent=self.ventana
+                )
+            elif "lock wait timeout" in err:
+                messagebox.showerror(
+                    "Error de Base de Datos",
+                    "La operación tardó demasiado y fue cancelada.",
+                    parent=self.ventana
+                )
+            else:
+                messagebox.showerror("Error al guardar venta", str(e), parent=self.ventana)
+            import traceback; traceback.print_exc()
+
+
+
 
 
 

@@ -542,6 +542,10 @@ DELIMITER ;
 INSERT INTO usuarios (nombre, correo, contraseña, rol)
 VALUES ('Aketzaly', 'admin@lavanderia.com', '1234', 'admin');
 
+INSERT INTO usuarios (nombre, correo, contraseña, rol)
+VALUES ('Ulises', '1', '1234', 'admin');
+
+
 -- Configuración inicial de la empresa
 INSERT INTO configuracion (
     nombre_empresa, direccion, telefono, rfc, moneda, iva,
@@ -635,3 +639,35 @@ SELECT 'Todas las tablas, vistas, triggers y datos iniciales creados' AS mensaje
 SELECT '=====================================================' AS mensaje;
 SELECT 'Usuario admin: admin@lavanderia.com / 1234' AS mensaje;
 SELECT '=====================================================' AS mensaje;
+
+
+DESCRIBE movimientos_caja;
+
+SELECT * FROM movimientos_caja;
+
+describe caja;
+
+SELECT * FROM caja;
+
+describe ventas;
+
+select * FROM ventas;
+
+SELECT id_movimiento, tipo, concepto, monto
+  FROM movimientos_caja;
+ 
+SELECT * FROM movimientos_caja;
+select * FROM ventas;
+
+SHOW TRIGGERS
+  WHERE `Table` = 'movimientos_caja';
+  
+SHOW TRIGGERS
+  WHERE `Table` = 'ventas';
+  
+  select * from pagos;
+  
+  DROP TRIGGER IF EXISTS lavanderiadb.trigger_venta_a_caja;
+  SELECT 'Trigger borrado para siempre ' AS mensaje;
+
+
