@@ -30,6 +30,7 @@ class Pedidos:
         print(f"DEBUG - ID usuario en pedidos: {self.id_usuario_actual}")
 
         self.ventana.title("Módulo de Pedidos - Lavandería")
+
         self.ventana.geometry("1000x700")
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(True, True)

@@ -1,5 +1,6 @@
 """
 Sistema de inicio de sesión para la aplicación de Lavandería
+MEJORADO: Funcionalidad Enter y ventana maximizada
 """
 
 import tkinter as tk
@@ -29,12 +30,17 @@ class App:
         # Configuración de la ventana principal
         self.ventana = tk.Tk()
         self.ventana.title('Sistema de Lavandería - Inicio de sesión')
-        self.ventana.geometry('800x500')
-        self.ventana.config(bg='#fcfcfc')
-        self.ventana.resizable(width=0, height=0)
 
-        # Centrar ventana
-        utl.centrar_ventana(self.ventana, 800, 500)
+        # CONFIGURAR VENTANA MAXIMIZADA (con bordes)
+        self.ventana.state('zoomed')  # Windows - maximizada con bordes
+        # Para Linux también intentar:
+        try:
+            self.ventana.attributes('-zoomed', True)  # Linux
+        except:
+            pass
+
+        self.ventana.config(bg='#fcfcfc')
+        self.ventana.resizable(width=1, height=1)  # Permitir redimensionar
 
         # Establecer ícono si existe
         try:
@@ -45,17 +51,65 @@ class App:
 
         # Cargar imagen del logo
         try:
-            self.logo = utl.leer_imagen("Img/logo_lavanderia.png")
+            self.logo = utl.leer_imagen("Img/logo_lavanderia.png", (800, 400))
         except Exception:
             # Si no se puede cargar la imagen, crear un canvas con colores
             self.logo = None
 
+        # CONFIGURAR TECLAS ESPECIALES
+        self.configurar_teclas()
+
         # Construir interfaz gráfica
         self.construir_interfaz()
+
+        # CONFIGURAR FOCUS INICIAL EN USUARIO
+        self.ventana.after(100, self.configurar_focus_inicial)
 
         # Iniciar bucle principal
         self.ventana.mainloop()
 
+    def configurar_teclas(self):
+        """Configura las teclas especiales del sistema"""
+
+        # F11 para alternar maximizado
+        self.ventana.bind('<F11>', self.toggle_maximizado)
+
+        # Alt+F4 para cerrar (Windows)
+        self.ventana.bind('<Alt-F4>', self.cerrar_aplicacion)
+
+    def minimizar_ventana(self, event=None):
+        """Minimiza la ventana"""
+        self.ventana.iconify()
+
+    def toggle_maximizado(self, event=None):
+        """Alterna entre ventana maximizada y normal"""
+        try:
+            if self.ventana.state() == 'zoomed':
+                self.ventana.state('normal')
+                self.ventana.geometry('800x500')
+                utl.centrar_ventana(self.ventana, 800, 500)
+            else:
+                self.ventana.state('zoomed')
+        except:
+            pass
+
+    def cerrar_aplicacion(self, event=None):
+        """Cierra la aplicación de forma segura"""
+        if messagebox.askyesno("Salir", "¿Está seguro de que desea salir del sistema?"):
+            self.ventana.quit()
+            self.ventana.destroy()
+
+    def configurar_focus_inicial(self):
+        """Configura el foco inicial en el campo de usuario"""
+        self.usuario.focus_set()
+
+    def mover_a_password(self, event=None):
+        """Mueve el foco al campo de contraseña cuando se presiona Enter en usuario"""
+        self.password.focus_set()
+
+    def verificar_con_enter(self, event=None):
+        """Ejecuta la verificación cuando se presiona Enter en el campo de contraseña"""
+        self.verificar()
 
     def construir_interfaz(self):
         """Construye la interfaz gráfica del login con colores invertidos"""
@@ -140,6 +194,9 @@ class App:
         self.usuario = ttk.Entry(frame_form_fill, font=('Times', 14))
         self.usuario.pack(fill=tk.X, padx=20, pady=10)
 
+        # VINCULAR ENTER EN CAMPO USUARIO
+        self.usuario.bind('<Return>', self.mover_a_password)
+
         # Etiqueta y campo de contraseña
         etiqueta_password = tk.Label(
             frame_form_fill,
@@ -154,6 +211,9 @@ class App:
         self.password = ttk.Entry(frame_form_fill, font=('Times', 14), show="*")
         self.password.pack(fill=tk.X, padx=20, pady=10)
 
+        # VINCULAR ENTER EN CAMPO PASSWORD PARA INICIAR SESIÓN
+        self.password.bind('<Return>', self.verificar_con_enter)
+
         # Botón de inicio de sesión
         inicio = tk.Button(
             frame_form_fill,
@@ -165,6 +225,8 @@ class App:
             command=self.verificar
         )
         inicio.pack(fill=tk.X, padx=20, pady=20)
+
+        # VINCULAR ENTER TAMBIÉN AL BOTÓN
         inicio.bind("<Return>", lambda event: self.verificar())
 
         # Botón de recuperación de contraseña
@@ -180,6 +242,17 @@ class App:
         )
         recuperar.pack(pady=(0, 10))
 
+        # Instrucciones en la parte inferior
+        instrucciones = tk.Label(
+            frame_form_fill,
+            text="Presiona ENTER para iniciar sesión",
+            font=('Times', 9),
+            bg='#3a7ff6',
+            fg="#a0c4ff",
+            wraplength=400
+        )
+        instrucciones.pack(pady=(20, 10))
+
     def verificar(self):
         """Verifica las credenciales del usuario"""
         correo = self.usuario.get().strip()
@@ -191,6 +264,11 @@ class App:
                 "Campos incompletos",
                 "Por favor, complete todos los campos."
             )
+            # Regresar foco al campo vacío
+            if not correo:
+                self.usuario.focus_set()
+            else:
+                self.password.focus_set()
             return
 
         try:
@@ -211,10 +289,10 @@ class App:
                 # Abrir panel según rol con el ID de usuario
                 if rol == "admin":
                     from admin_view import MasterPanel
-                    MasterPanel(id_usuario=id_usuario)  # Pasar el ID de usuario
+                    MasterPanel(id_usuario=id_usuario)
                 elif rol == "cajero":
                     from cajero_view import CajeroPanel
-                    CajeroPanel(id_usuario=id_usuario)  # Pasar el ID de usuario
+                    CajeroPanel(id_usuario=id_usuario)
                 else:
                     messagebox.showwarning("Rol desconocido", f"Rol no reconocido: {rol}")
             else:
@@ -222,8 +300,12 @@ class App:
                     "Error de autenticación",
                     "Correo o contraseña incorrectos.\nPor favor, verifique sus credenciales."
                 )
-                # Limpiar campo de contraseña
+                # Limpiar campo de contraseña y regresar foco a usuario
                 self.password.delete(0, tk.END)
+                self.usuario.focus_set()
+                # Seleccionar todo el texto del usuario para facilitar corrección
+                self.usuario.select_range(0, tk.END)
+
         except Exception as e:
             messagebox.showerror(
                 "Error de conexión",
@@ -239,6 +321,7 @@ class App:
                 "Campo vacío",
                 "Por favor ingresa tu correo electrónico en el campo de usuario."
             )
+            self.usuario.focus_set()
             return
 
         try:
@@ -312,6 +395,10 @@ class App:
                         "Éxito",
                         "Contraseña actualizada correctamente."
                     )
+                    # Colocar la nueva contraseña en el campo
+                    self.password.delete(0, tk.END)
+                    self.password.insert(0, nueva_contra)
+                    self.password.focus_set()
             else:
                 messagebox.showerror(
                     "Código incorrecto",

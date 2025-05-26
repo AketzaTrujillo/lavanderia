@@ -11,7 +11,13 @@ class MasterPanel:
     def __init__(self, id_usuario=None):
         self.ventana = tk.Tk()
         self.ventana.title("🏢 Panel de Administrador - Lavandería Exprés")
-        self.ventana.geometry("1000x700")
+        # CONFIGURAR VENTANA MAXIMIZADA (con
+        self.ventana.state('zoomed')  # Windows - maximizada con bordes
+        try:
+            self.ventana.attributes('-zoomed', True)  # Linux
+        except:
+            pass
+
         self.ventana.config(bg="#f0f4f8")
         self.ventana.resizable(True, True)
         self.ventana.minsize(900, 650)

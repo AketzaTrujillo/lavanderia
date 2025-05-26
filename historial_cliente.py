@@ -44,8 +44,8 @@ class HistorialCliente:
 
         # Establecer ícono si existe
         try:
-            if os.path.exists("/Img/lavadora.ico"):
-                self.ventana.iconbitmap("/Img/lavadora.ico")
+            if os.path.exists("Img/lavadora.ico"):
+                self.ventana.iconbitmap("Img/lavadora.ico")
         except Exception:
             pass
 
@@ -53,9 +53,6 @@ class HistorialCliente:
 
         if not ventana_padre:
             self.ventana.mainloop()
-
-    # El resto del código de la clase HistorialCliente sigue aquí...
-    # Incluye métodos como construir_interfaz, cargar_cliente, etc.
 
     def construir_interfaz(self):
         """Construye la interfaz gráfica del módulo"""
@@ -309,39 +306,6 @@ class HistorialCliente:
         self.cargar_cliente()
         if self.datos_cliente:
             self.mostrar_historial()
-
-    def cargar_cliente(self):
-        """Carga los datos del cliente seleccionado"""
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Obtener datos del cliente
-            cursor.execute(
-                "SELECT id_cliente, nombre, telefono, correo, puntos, fecha_registro FROM clientes WHERE id_cliente = %s",
-                (self.id_cliente,)
-            )
-
-            cliente = cursor.fetchone()
-
-            if cliente:
-                self.datos_cliente = {
-                    'id': cliente[0],
-                    'nombre': cliente[1],
-                    'telefono': cliente[2] or "No registrado",
-                    'correo': cliente[3] or "No registrado",
-                    'puntos': cliente[4],
-                    'fecha_registro': cliente[5]
-                }
-            else:
-                messagebox.showerror("Error", "No se encontró el cliente")
-                self.datos_cliente = None
-
-            conexion.close()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al cargar datos del cliente: {str(e)}")
-            self.datos_cliente = None
 
     def mostrar_historial(self):
         """Muestra el historial de pedidos y servicios del cliente"""
@@ -748,3 +712,308 @@ class HistorialCliente:
         # Efecto hover
         btn_detalles.bind("<Enter>", lambda e: btn_detalles.config(bg="#1a5fce"))
         btn_detalles.bind("<Leave>", lambda e: btn_detalles.config(bg="#3a7ff6"))
+
+    def configurar_tab_servicios(self, tab):
+        """Configura la pestaña de servicios detallados"""
+        # Frame para información
+        frame_info = tk.Frame(tab, bg="#f5f5f5")
+        frame_info.pack(fill=tk.X, pady=10)
+
+        tk.Label(
+            frame_info,
+            text="📊 Resumen de Servicios Utilizados",
+            font=("Helvetica", 14, "bold"),
+            bg="#f5f5f5",
+            fg="#3a7ff6"
+        ).pack(pady=(0, 10))
+
+        # Frame para la tabla
+        frame_tabla = tk.Frame(tab, bg="#f5f5f5")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Tabla de servicios
+        columnas = ('servicio', 'veces_usado', 'total_gastado', 'ultima_vez')
+
+        tabla_servicios = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=12)
+
+        # Aplicar estilo a la tabla
+        utl.aplicar_estilo_tabla(tabla_servicios)
+
+        # Configurar encabezados
+        tabla_servicios.heading('servicio', text='Servicio')
+        tabla_servicios.heading('veces_usado', text='Veces Usado')
+        tabla_servicios.heading('total_gastado', text='Total Gastado')
+        tabla_servicios.heading('ultima_vez', text='Última Vez')
+
+        # Configurar anchos
+        tabla_servicios.column('servicio', width=250)
+        tabla_servicios.column('veces_usado', width=120, anchor=tk.CENTER)
+        tabla_servicios.column('total_gastado', width=120, anchor=tk.CENTER)
+        tabla_servicios.column('ultima_vez', width=150, anchor=tk.CENTER)
+
+        # Scrollbar para la tabla
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_servicios.yview)
+        tabla_servicios.configure(yscrollcommand=scrollbar.set)
+
+        # Empaquetar tabla y scrollbar
+        tabla_servicios.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Cargar servicios del cliente
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Consulta para obtener resumen de servicios
+            consulta = """
+            SELECT 
+                s.nombre as servicio,
+                COUNT(dp.id_detalle) as veces_usado,
+                SUM(dp.cantidad * dp.precio_unitario) as total_gastado,
+                MAX(p.fecha_pedido) as ultima_vez
+            FROM detalle_pedido dp
+            JOIN pedidos p ON dp.id_pedido = p.id_pedido
+            JOIN servicios s ON dp.id_item = s.id_servicio
+            WHERE p.id_cliente = %s AND dp.tipo_item = 'servicio'
+            GROUP BY s.id_servicio, s.nombre
+            ORDER BY total_gastado DESC
+            """
+
+            cursor.execute(consulta, (self.datos_cliente['id'],))
+
+            # Insertar datos en la tabla
+            for servicio in cursor.fetchall():
+                # Formatear fecha
+                fecha = utl.formatear_fecha(servicio[3], '%d/%m/%Y') if servicio[3] else "Nunca"
+
+                # Formatear total
+                total = utl.formatear_moneda(servicio[2]) if servicio[2] else "$0.00"
+
+                valores = (
+                    servicio[0],  # Servicio
+                    servicio[1],  # Veces usado
+                    total,        # Total gastado
+                    fecha         # Última vez
+                )
+
+                tabla_servicios.insert('', tk.END, values=valores)
+
+            conexion.close()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar servicios: {str(e)}")
+
+    def configurar_tab_estadisticas(self, tab):
+        """Configura la pestaña de estadísticas"""
+        # Frame principal para estadísticas
+        frame_stats = tk.Frame(tab, bg="#f5f5f5")
+        frame_stats.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Título
+        tk.Label(
+            frame_stats,
+            text="📈 Estadísticas del Cliente",
+            font=("Helvetica", 16, "bold"),
+            bg="#f5f5f5",
+            fg="#3a7ff6"
+        ).pack(pady=(0, 20))
+
+        # Obtener estadísticas
+        try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+
+            # Estadísticas generales
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT p.id_pedido) as total_pedidos,
+                    COUNT(DISTINCT CASE WHEN p.estado = 'Entregado' THEN p.id_pedido END) as pedidos_completados,
+                    COALESCE(SUM(CASE WHEN p.estado = 'Entregado' THEN 
+                        (SELECT SUM(dp.cantidad * dp.precio_unitario) FROM detalle_pedido dp WHERE dp.id_pedido = p.id_pedido)
+                    END), 0) as total_gastado,
+                    MIN(p.fecha_pedido) as primer_pedido,
+                    MAX(p.fecha_pedido) as ultimo_pedido
+                FROM pedidos p
+                WHERE p.id_cliente = %s
+            """, (self.datos_cliente['id'],))
+
+            stats = cursor.fetchone()
+
+            if stats:
+                total_pedidos = stats[0] or 0
+                pedidos_completados = stats[1] or 0
+                total_gastado = stats[2] or 0
+                primer_pedido = stats[3]
+                ultimo_pedido = stats[4]
+
+                # Frame para estadísticas en tarjetas
+                cards_frame = tk.Frame(frame_stats, bg="#f5f5f5")
+                cards_frame.pack(fill=tk.X, pady=10)
+
+                # Configurar grid
+                for i in range(3):
+                    cards_frame.columnconfigure(i, weight=1)
+
+                # Tarjeta 1: Pedidos
+                self.crear_tarjeta_estadistica(
+                    cards_frame, "📦", "Total Pedidos", str(total_pedidos),
+                    f"Completados: {pedidos_completados}", "#2196f3", 0, 0
+                )
+
+                # Tarjeta 2: Gasto total
+                self.crear_tarjeta_estadistica(
+                    cards_frame, "💰", "Total Gastado", utl.formatear_moneda(total_gastado),
+                    f"Promedio: {utl.formatear_moneda(total_gastado / max(pedidos_completados, 1))}", "#4caf50", 0, 1
+                )
+
+                # Tarjeta 3: Fidelidad
+                dias_cliente = 0
+                if primer_pedido:
+                    # Calcular días desde el primer pedido hasta HOY
+                    hoy = datetime.now()
+                    dias_cliente = (hoy - primer_pedido).days
+
+                self.crear_tarjeta_estadistica(
+                    cards_frame, "⭐", "Cliente desde",
+                    utl.formatear_fecha(primer_pedido, '%d/%m/%Y') if primer_pedido else "Nunca",
+                    f"{dias_cliente} días", "#ff9800", 0, 2
+                )
+
+                # Separador
+                ttk.Separator(frame_stats, orient="horizontal").pack(fill=tk.X, pady=20)
+
+                # Gráfico de pedidos por mes (simplificado con texto)
+                tk.Label(
+                    frame_stats,
+                    text="📊 Actividad por Mes",
+                    font=("Helvetica", 14, "bold"),
+                    bg="#f5f5f5",
+                    fg="#333333"
+                ).pack(pady=(0, 10))
+
+                # Frame para actividad mensual
+                frame_mensual = tk.Frame(frame_stats, bg="#ffffff", relief=tk.RAISED, bd=1)
+                frame_mensual.pack(fill=tk.X, pady=10, padx=20)
+
+                # Obtener actividad mensual
+                cursor.execute("""
+                    SELECT 
+                        DATE_FORMAT(p.fecha_pedido, '%Y-%m') as mes,
+                        COUNT(*) as pedidos,
+                        COALESCE(SUM(
+                            (SELECT SUM(dp.cantidad * dp.precio_unitario) 
+                             FROM detalle_pedido dp 
+                             WHERE dp.id_pedido = p.id_pedido)
+                        ), 0) as total_mes
+                    FROM pedidos p
+                    WHERE p.id_cliente = %s
+                    GROUP BY DATE_FORMAT(p.fecha_pedido, '%Y-%m')
+                    ORDER BY mes DESC
+                    LIMIT 6
+                """, (self.datos_cliente['id'],))
+
+                actividad_mensual = cursor.fetchall()
+
+                if actividad_mensual:
+                    # Tabla de actividad mensual
+                    tabla_mensual = ttk.Treeview(
+                        frame_mensual,
+                        columns=('mes', 'pedidos', 'total'),
+                        show='headings',
+                        height=6
+                    )
+
+                    tabla_mensual.heading('mes', text='Mes')
+                    tabla_mensual.heading('pedidos', text='Pedidos')
+                    tabla_mensual.heading('total', text='Total Gastado')
+
+                    tabla_mensual.column('mes', width=100, anchor=tk.CENTER)
+                    tabla_mensual.column('pedidos', width=100, anchor=tk.CENTER)
+                    tabla_mensual.column('total', width=150, anchor=tk.CENTER)
+
+                    # Aplicar estilo
+                    utl.aplicar_estilo_tabla(tabla_mensual)
+
+                    for mes_data in actividad_mensual:
+                        # Formatear mes
+                        try:
+                            fecha_mes = datetime.strptime(mes_data[0], '%Y-%m')
+                            mes_formateado = fecha_mes.strftime('%m/%Y')
+                        except:
+                            mes_formateado = mes_data[0]
+
+                        valores = (
+                            mes_formateado,
+                            mes_data[1],
+                            utl.formatear_moneda(mes_data[2])
+                        )
+                        tabla_mensual.insert('', tk.END, values=valores)
+
+                    tabla_mensual.pack(fill=tk.X, padx=10, pady=10)
+                else:
+                    tk.Label(
+                        frame_mensual,
+                        text="No hay actividad registrada",
+                        font=("Helvetica", 12),
+                        bg="#ffffff",
+                        fg="#666666"
+                    ).pack(pady=20)
+
+            conexion.close()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar estadísticas: {str(e)}")
+            # Mostrar mensaje de error en la pestaña
+            tk.Label(
+                frame_stats,
+                text="Error al cargar estadísticas",
+                font=("Helvetica", 12),
+                bg="#f5f5f5",
+                fg="#d32f2f"
+            ).pack(pady=50)
+
+    def crear_tarjeta_estadistica(self, parent, icono, titulo, valor, descripcion, color, fila, columna):
+        """Crea una tarjeta de estadística"""
+        frame_tarjeta = tk.Frame(parent, bg="#ffffff", relief=tk.RAISED, bd=1)
+        frame_tarjeta.grid(row=fila, column=columna, padx=10, pady=10, sticky="nsew", ipadx=15, ipady=15)
+
+        # Ícono
+        tk.Label(
+            frame_tarjeta,
+            text=icono,
+            font=("Segoe UI Emoji", 24),
+            bg="#ffffff",
+            fg=color
+        ).pack(pady=(10, 5))
+
+        # Título
+        tk.Label(
+            frame_tarjeta,
+            text=titulo,
+            font=("Helvetica", 11, "bold"),
+            bg="#ffffff",
+            fg="#333333"
+        ).pack()
+
+        # Valor principal
+        tk.Label(
+            frame_tarjeta,
+            text=valor,
+            font=("Helvetica", 16, "bold"),
+            bg="#ffffff",
+            fg=color
+        ).pack(pady=(5, 2))
+
+        # Descripción
+        tk.Label(
+            frame_tarjeta,
+            text=descripcion,
+            font=("Helvetica", 9),
+            bg="#ffffff",
+            fg="#666666"
+        ).pack(pady=(0, 10))
+
+
+# Para probar de forma independiente
+if __name__ == "__main__":
+    HistorialCliente()
