@@ -51,7 +51,7 @@ class App:
 
         # Cargar imagen del logo
         try:
-            self.logo = utl.leer_imagen("Img/logo_lavanderia.png", (800, 400))
+            self.logo = utl.leer_imagen("Img/logo_lavanderia.png", (800, 200))
         except Exception:
             # Si no se puede cargar la imagen, crear un canvas con colores
             self.logo = None
