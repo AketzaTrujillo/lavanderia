@@ -9,17 +9,25 @@ def enviar_correo_simple(destinatario, asunto, mensaje):
     """
     Versión simplificada que garantiza el manejo correcto de caracteres UTF-8.
     """
-    # Configura estos valores
-    remitente = "tu_correo@gmail.com"  # CAMBIAR por tu correo real
-    password = "abcdefghijklmnop"  # CAMBIAR por tu contraseña de aplicación
+    # Configuración de correo
+    remitente = "cleanandwhite.business@gmail.com"
+    password = "yigdyxuhdveeppbi"  # Contraseña de aplicación de Gmail
 
     try:
+        print(f"🔄 Intentando enviar correo a: {destinatario}")
+        print(f"📧 Desde: {remitente}")
+
         # Crear servidor
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.ehlo()
+        print("✅ Conexión SMTP establecida")
+
         server.starttls()
+        print("✅ TLS activado")
+
         server.ehlo()
         server.login(remitente, password)
+        print("✅ Login exitoso")
 
         # Crear mensaje simple con codificación correcta
         msg = MIMEMultipart()
@@ -34,11 +42,21 @@ def enviar_correo_simple(destinatario, asunto, mensaje):
         server.sendmail(remitente, destinatario, msg.as_string())
         server.quit()
 
-        print(f"Correo simple enviado exitosamente a {destinatario}")
+        print(f"✅ Correo simple enviado exitosamente a {destinatario}")
         return True
 
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"❌ Error de autenticación: {str(e)}")
+        print("💡 Solución: Verificar que tengas una contraseña de aplicación válida")
+        return False
+    except smtplib.SMTPRecipientsRefused as e:
+        print(f"❌ Destinatario rechazado: {str(e)}")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"❌ Error SMTP: {str(e)}")
+        return False
     except Exception as e:
-        print(f"Error al enviar correo simple: {str(e)}")
+        print(f"❌ Error general al enviar correo simple: {str(e)}")
         return False
 
 
@@ -54,12 +72,15 @@ def enviar_correo_html(destinatario, asunto, contenido_html):
     Returns:
         bool: True si se envió correctamente, False en caso contrario
     """
-    # ==== CONFIGURA ESTOS VALORES CON TUS DATOS ====
-    remitente = "kevalenciahd09@gmail.com"  # CAMBIA ESTO con tu correo de Gmail
-    password = "imwg qdss lkrd nfoo"  # CAMBIA ESTO con tu contraseña de aplicación
-    # ============================================
+    # Configuración de correo
+    remitente = "cleanandwhite.business@gmail.com"
+    password = "yigdyxuhdveeppbi"  # Contraseña de aplicación de Gmail
 
     try:
+        print(f"🔄 Intentando enviar correo HTML a: {destinatario}")
+        print(f"📧 Desde: {remitente}")
+        print(f"📋 Asunto: {asunto}")
+
         # Crear mensaje con formato HTML
         email = MIMEMultipart("alternative")
         email['From'] = remitente
@@ -73,17 +94,34 @@ def enviar_correo_html(destinatario, asunto, contenido_html):
         # Crear conexión segura con el servidor
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.ehlo()
+            print("✅ Conexión SMTP establecida")
+
             server.starttls()
+            print("✅ TLS activado")
+
             server.ehlo()
             server.login(remitente, password)
+            print("✅ Login exitoso")
+
             texto = email.as_string()
             server.sendmail(remitente, destinatario, texto)
+            print("✅ Correo enviado exitosamente")
 
-        print(f"Correo HTML enviado exitosamente a {destinatario}")
+        print(f"✅ Correo HTML enviado exitosamente a {destinatario}")
         return True
 
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"❌ Error de autenticación: {str(e)}")
+        print("💡 Solución: Verificar que tengas una contraseña de aplicación válida")
+        return False
+    except smtplib.SMTPRecipientsRefused as e:
+        print(f"❌ Destinatario rechazado: {str(e)}")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"❌ Error SMTP: {str(e)}")
+        return False
     except Exception as e:
-        print(f"Error al enviar correo HTML: {str(e)}")
+        print(f"❌ Error general al enviar correo HTML: {str(e)}")
         return False
 
 
@@ -95,7 +133,7 @@ def obtener_plantilla_alta_cliente(nombre, correo):
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Bienvenido a Lavandería</title>
+        <title>Bienvenido a Clean & White</title>
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -149,7 +187,7 @@ def obtener_plantilla_alta_cliente(nombre, correo):
     <body>
         <div class="container">
             <div class="header">
-                <h1>¡Bienvenido a Lavandería!</h1>
+                <h1>¡Bienvenido a Clean & White!</h1>
             </div>
             <div class="content">
                 <h2>Hola {nombre},</h2>
@@ -174,7 +212,7 @@ def obtener_plantilla_alta_cliente(nombre, correo):
                 </center>
             </div>
             <div class="footer">
-                <p>© 2025 Lavandería. Todos los derechos reservados.</p>
+                <p>© 2025 Clean & White. Todos los derechos reservados.</p>
                 <p>Si no solicitaste este registro, por favor ignora este mensaje.</p>
             </div>
         </div>
@@ -190,7 +228,7 @@ def obtener_plantilla_actualizacion_puntos(nombre, mensaje, puntos_nuevos, motiv
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Actualización de Puntos - Lavandería</title>
+        <title>Actualización de Puntos - Clean & White</title>
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -280,7 +318,7 @@ def obtener_plantilla_actualizacion_puntos(nombre, mensaje, puntos_nuevos, motiv
                 </center>
             </div>
             <div class="footer">
-                <p>© 2025 Lavandería. Todos los derechos reservados.</p>
+                <p>© 2025 Clean & White. Todos los derechos reservados.</p>
                 <p>Este es un mensaje automático, por favor no responder.</p>
             </div>
         </div>
@@ -296,7 +334,7 @@ def obtener_plantilla_baja_cliente(nombre):
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Confirmación de Baja - Lavandería</title>
+        <title>Confirmación de Baja - Clean & White</title>
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -370,7 +408,7 @@ def obtener_plantilla_baja_cliente(nombre):
                 </center>
             </div>
             <div class="footer">
-                <p>© 2025 Lavandería. Todos los derechos reservados.</p>
+                <p>© 2025 Clean & White. Todos los derechos reservados.</p>
                 <p>Este es un mensaje automático, por favor no responder.</p>
             </div>
         </div>
@@ -381,11 +419,11 @@ def obtener_plantilla_baja_cliente(nombre):
 
 # Ejemplo de uso
 if __name__ == "__main__":
-    destinatario_prueba = "kevalenciahd09@gmail.com"  # Cambia por un correo válido para pruebas
+    destinatario_prueba = "cliente@ejemplo.com"  # Cambia por un correo válido para pruebas
 
     # Ejemplo de alta de cliente
     html_alta = obtener_plantilla_alta_cliente("Juan Pérez", destinatario_prueba)
-    enviar_correo_html(destinatario_prueba, "Bienvenido a Lavanderia", html_alta)
+    enviar_correo_html(destinatario_prueba, "Bienvenido a Clean & White", html_alta)
 
     # Ejemplo de actualización de puntos
     html_puntos = obtener_plantilla_actualizacion_puntos(

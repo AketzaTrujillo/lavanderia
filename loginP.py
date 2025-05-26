@@ -31,16 +31,12 @@ class App:
         self.ventana = tk.Tk()
         self.ventana.title('Sistema de Lavandería - Inicio de sesión')
 
-        # CONFIGURAR VENTANA MAXIMIZADA (con bordes)
-        self.ventana.state('zoomed')  # Windows - maximizada con bordes
-        # Para Linux también intentar:
-        try:
-            self.ventana.attributes('-zoomed', True)  # Linux
-        except:
-            pass
-
+        self.ventana.geometry('800x500')  # Tamaño normal
         self.ventana.config(bg='#fcfcfc')
         self.ventana.resizable(width=1, height=1)  # Permitir redimensionar
+
+        # Centrar ventana
+        utl.centrar_ventana(self.ventana, 800, 500)
 
         # Establecer ícono si existe
         try:
@@ -51,7 +47,7 @@ class App:
 
         # Cargar imagen del logo
         try:
-            self.logo = utl.leer_imagen("Img/logo_lavanderia.png", (800, 200))
+            self.logo = utl.leer_imagen("Img/logo_lavanderia.png", (400, 100))
         except Exception:
             # Si no se puede cargar la imagen, crear un canvas con colores
             self.logo = None
