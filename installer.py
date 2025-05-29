@@ -53,7 +53,8 @@ def instalar_sistema():
         conn = mysql.connector.connect(
             host=host,
             user=user,
-            password=password
+            password=password,
+            autocommit=True
         )
 
         if conn.is_connected():
@@ -83,11 +84,14 @@ def instalar_sistema():
     try:
         messagebox.showinfo("Instalando", "Ejecutando script SQL completo...\n\nEsto tomará 2-3 minutos.\nNo cierre esta ventana.")
 
-        # Conectar
+        # Conectar con configuración mejorada
         conn = mysql.connector.connect(
             host=host,
             user=user,
-            password=password
+            password=password,
+            autocommit=False,
+            charset='utf8mb4',
+            sql_mode=''
         )
         cursor = conn.cursor()
 
@@ -314,8 +318,50 @@ def ejecutar_bloque_delimiter(cursor, bloque):
     if not bloque_limpio:
         return
 
-    # Ejecutar el bloque completo
-    cursor.execute(bloque_limpio)
+    # Manejar el error multi keyword
+    try:
+        # Intentar ejecución normal primero
+        cursor.execute(bloque_limpio)
+    except mysql.connector.Error as e:
+        error_msg = str(e).lower()
+        if 'multi' in error_msg or 'unexpected keyword' in error_msg:
+            # Si hay error multi, dividir en comandos individuales
+            comandos = dividir_bloque_en_comandos(bloque_limpio)
+            for comando in comandos:
+                if comando.strip():
+                    cursor.execute(comando.strip())
+        else:
+            raise e
+
+def dividir_bloque_en_comandos(bloque):
+    """Divide un bloque complejo en comandos individuales"""
+    comandos = []
+    comando_actual = []
+
+    lineas = bloque.split('\n')
+    nivel_begin = 0
+
+    for linea in lineas:
+        linea_upper = linea.strip().upper()
+
+        # Contar BEGIN/END para saber cuándo termina un procedimiento
+        if linea_upper.startswith('BEGIN'):
+            nivel_begin += 1
+        elif linea_upper.startswith('END'):
+            nivel_begin -= 1
+
+        comando_actual.append(linea)
+
+        # Si terminamos un bloque completo o encontramos ;
+        if (nivel_begin == 0 and linea.strip().endswith(';')) or linea_upper == 'END;':
+            comandos.append('\n'.join(comando_actual))
+            comando_actual = []
+
+    # Agregar último comando si existe
+    if comando_actual:
+        comandos.append('\n'.join(comando_actual))
+
+    return comandos
 
 if __name__ == "__main__":
     print("🚀 Instalador con soporte DELIMITER")

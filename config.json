@@ -1,6 +1,6 @@
 {
-  "host": "localhost",
-  "user": "root",
-  "password": "tired2019",
-  "database": "lavanderiadb"
+    "host": "localhost",
+    "user": "root",
+    "password": "tired2019",
+    "database": "lavanderiadb"
 }

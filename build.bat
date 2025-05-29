@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Sistema de Lavandería - Builder
+title Sistema de Lavandería - Builder v2.0
 
 echo.
 echo ================================================================
-echo         🏢 SISTEMA DE LAVANDERÍA - CONSTRUCTOR AUTOMÁTICO
+echo         🏢 SISTEMA DE LAVANDERÍA - CONSTRUCTOR AUTOMÁTICO v2.0
 echo ================================================================
 echo.
 
@@ -43,10 +43,10 @@ echo.
 echo 📈 Actualizando pip...
 python -m pip install --upgrade pip
 
-REM Instalar dependencias
+REM Instalar dependencias con versiones específicas
 echo.
 echo 📚 Instalando dependencias...
-pip install pyinstaller mysql-connector-python Pillow pandas numpy matplotlib seaborn reportlab XlsxWriter tkcalendar flask requests pyautogui
+pip install pyinstaller==6.2.0 mysql-connector-python==8.2.0 Pillow==10.1.0 pandas==2.2.3 numpy==2.2.5 matplotlib==3.10.1 seaborn==0.13.2 reportlab==4.4.0 XlsxWriter==3.2.3 tkcalendar==1.6.1 flask==3.1.0 requests==2.32.3 pyautogui==0.9.54 pywin32==310
 
 if %errorlevel% neq 0 (
     echo ❌ Error al instalar dependencias
@@ -70,7 +70,7 @@ REM Verificar archivos necesarios
 echo.
 echo 📋 Verificando archivos necesarios...
 
-set "archivos_requeridos=main.py loginP.py conexion.py utileria.py config.json lavanderia_estructura.sql"
+set "archivos_requeridos=main.py loginP.py conexion.py utileria.py installer.py lavanderia_estructura.sql"
 for %%f in (%archivos_requeridos%) do (
     if not exist "%%f" (
         echo ❌ Archivo faltante: %%f
@@ -81,7 +81,28 @@ for %%f in (%archivos_requeridos%) do (
 
 echo ✅ Todos los archivos necesarios están presentes
 
-REM Crear el ejecutable principal
+REM Crear el instalador PRIMERO
+echo.
+echo 🔧 Creando instalador...
+pyinstaller --onefile ^
+    --windowed ^
+    --name=InstaladorLavanderia ^
+    --add-data="lavanderia_estructura.sql;." ^
+    --hidden-import=tkinter ^
+    --hidden-import=tkinter.ttk ^
+    --hidden-import=tkinter.simpledialog ^
+    --hidden-import=mysql.connector ^
+    installer.py
+
+if %errorlevel% neq 0 (
+    echo ❌ Error al crear instalador
+    pause
+    exit /b 1
+)
+
+echo ✅ Instalador creado
+
+REM Crear el ejecutable principal del sistema
 echo.
 echo 🔨 Creando ejecutable principal del sistema...
 pyinstaller --onefile ^
@@ -135,26 +156,6 @@ if %errorlevel% neq 0 (
 
 echo ✅ Ejecutable principal creado
 
-REM Crear el instalador
-echo.
-echo 🔧 Creando instalador...
-pyinstaller --onefile ^
-    --windowed ^
-    --name=InstaladorLavanderia ^
-    --add-data="lavanderia_estructura.sql;." ^
-    --hidden-import=tkinter ^
-    --hidden-import=tkinter.ttk ^
-    --hidden-import=mysql.connector ^
-    installer.py
-
-if %errorlevel% neq 0 (
-    echo ❌ Error al crear instalador
-    pause
-    exit /b 1
-)
-
-echo ✅ Instalador creado
-
 REM Crear carpeta de distribución final
 echo.
 echo 📦 Preparando distribución final...
@@ -177,7 +178,7 @@ echo 📄 Creando documentación...
 echo # Sistema de Lavandería - Distribución
 echo.
 echo ## Archivos incluidos:
-echo - `InstaladorLavanderia.exe` - Ejecutar PRIMERO para instalar el sistema PRIMERO para instalar el sistema
+echo - `InstaladorLavanderia.exe` - Ejecutar PRIMERO para instalar el sistema
 echo - `SistemaLavanderia.exe` - Aplicación principal del sistema
 echo - `config.json` - Archivo de configuración
 echo - `lavanderia_estructura.sql` - Script de base de datos
@@ -192,54 +193,7 @@ echo.
 echo ## Credenciales iniciales:
 echo - Usuario: admin@lavanderia.com
 echo - Contraseña: 1234
-echo.
-echo ## Soporte:
-echo Para soporte técnico, contacte al desarrollador.
-) > "distribucion\LEEME.txt"
-
-echo ✅ Documentación creada
-
-REM Mostrar resumen final
-echo.
-echo ================================================================
-echo                    🎉 CONSTRUCCIÓN COMPLETADA
-echo ================================================================
-echo.
-echo 📁 Archivos generados en la carpeta 'distribucion':
-echo    • InstaladorLavanderia.exe (Ejecutar primero)
-echo    • SistemaLavanderia.exe (Aplicación principal)
-echo    • Archivos de configuración y recursos
-echo.
-echo 💡 Para distribuir el sistema:
-echo    1. Comprima la carpeta 'distribucion' en un ZIP
-echo    2. Distribuya el ZIP a los usuarios finales
-echo    3. Los usuarios deben ejecutar InstaladorLavanderia.exe primero
-echo.
-echo ✅ El sistema está listo para distribuir
-echo.
-
-REM Preguntar si abrir la carpeta de distribución
-set /p "abrir=¿Desea abrir la carpeta de distribución? (s/n): "
-if /i "%abrir%"=="s" (
-    start explorer "distribucion"
-)
-
-echo.
-echo Presione cualquier tecla para continuar...
-pause >nul PRIMERO para instalar el sistema
-echo - `SistemaLavanderia.exe` - Aplicación principal del sistema
-echo - `config.json` - Archivo de configuración
-echo - `lavanderia_estructura.sql` - Script de base de datos
-echo - `Img/` - Carpeta de imágenes e iconos
-echo.
-echo ## Instrucciones de instalación:
-echo 1. Asegúrese de tener MySQL Server instalado
-echo 2. Ejecute `InstaladorLavanderia.exe`
-echo 3. Siga las instrucciones del asistente
-echo 4. Una vez instalado, ejecute `SistemaLavanderia.exe`
-echo.
-echo ## Credenciales iniciales:
-echo - Usuario: admin@lavanderia.com
+echo - Usuario: 1
 echo - Contraseña: 1234
 echo.
 echo ## Soporte:
