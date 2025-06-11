@@ -580,3 +580,12 @@ INSERT INTO productos (nombre, precio, stock) VALUES
 INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES
 ('Cliente General', '555-000-0001', 'cliente@ejemplo.com', 0);
 
+
+ALTER TABLE productos
+    ADD COLUMN promo_desc VARCHAR(100) NULL,
+    ADD COLUMN nuevo_precio DECIMAL(10,2) NULL;
+
+ALTER TABLE servicios
+    ADD COLUMN promo_desc VARCHAR(100) NULL,
+    ADD COLUMN nuevo_precio DECIMAL(10,2) NULL;
+

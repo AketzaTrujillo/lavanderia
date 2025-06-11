@@ -31,13 +31,13 @@ class Pedidos:
 
         self.ventana.title("Módulo de Pedidos - Lavandería")
 
-        self.ventana.geometry("1000x700")
+        self.ventana.geometry("1400x800")
         self.ventana.config(bg="#f5f5f5")
         self.ventana.resizable(True, True)
 
         if ventana_padre:
             # Centrar la ventana si existe una ventana padre
-            utl.centrar_ventana(self.ventana, 1000, 700)
+            utl.centrar_ventana(self.ventana, 1400, 800)
             # Hacer esta ventana modal
             self.ventana.transient(ventana_padre)
             self.ventana.grab_set()
@@ -66,11 +66,11 @@ class Pedidos:
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Pestaña para Nuevo Pedido
-        self.tab_nuevo = tk.Frame(self.notebook, bg="#f5f5f5")
+        self.tab_nuevo = tk.Frame(self.notebook, bg="#f5f7fa")
         self.notebook.add(self.tab_nuevo, text="Nuevo Pedido")
 
         # Pestaña para Lista de Pedidos
-        self.tab_lista = tk.Frame(self.notebook, bg="#f5f5f5")
+        self.tab_lista = tk.Frame(self.notebook, bg="#f5f7fa")
         self.notebook.add(self.tab_lista, text="Lista de Pedidos")
 
         # Configurar las pestañas
@@ -78,288 +78,161 @@ class Pedidos:
         self.configurar_tab_lista()
 
     def configurar_tab_nuevo(self):
-        """Configura la pestaña para crear nuevos pedidos"""
-        # Frame principal
-        frame_principal = tk.Frame(self.tab_nuevo, bg="#f5f5f5")
+        # Frame principal con dos columnas
+        frame_principal = tk.Frame(self.tab_nuevo, bg="#f5f7fa")
         frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Título
-        titulo = tk.Label(
+        tk.Label(
             frame_principal,
             text="Nuevo Pedido",
-            font=("Helvetica", 20, "bold"),
-            bg="#f5f5f5",
-            fg="#303f9f"
-        )
-        titulo.pack(pady=10)
+            font=("Helvetica", 22, "bold"),
+            bg="#f5f7fa",
+            fg="#1976D2"
+        ).pack(pady=(0, 18))
 
-        # Frame superior para selección de cliente
-        frame_cliente = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_cliente.pack(fill=tk.X, pady=10)
+        # Frame de columnas
+        frame_columnas = tk.Frame(frame_principal, bg="#f5f7fa")
+        frame_columnas.pack(fill=tk.BOTH, expand=True)
 
-        lbl_cliente = tk.Label(
-            frame_cliente,
-            text="Cliente:",
-            font=("Helvetica", 12),
-            bg="#f5f5f5"
-        )
-        lbl_cliente.pack(side=tk.LEFT, padx=5)
+        # ==================== COLUMNA IZQUIERDA ====================
+        col_izq = tk.Frame(frame_columnas, bg="#f5f7fa")
+        col_izq.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        self.lbl_cliente_seleccionado = tk.Label(
-            frame_cliente,
-            text="No seleccionado",
-            font=("Helvetica", 12),
-            bg="#f5f5f5",
-            fg="#777777"
-        )
-        self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=5)
+        # Cliente
+        frame_cliente = tk.Frame(col_izq, bg="#e3f2fd", bd=1, relief="solid")
+        frame_cliente.pack(fill=tk.X, pady=(0, 18), padx=5)
 
+        tk.Label(frame_cliente, text="Cliente:", font=("Helvetica", 13, "bold"), bg="#e3f2fd", fg="#1565C0").pack(side=tk.LEFT, padx=10, pady=8)
+        self.lbl_cliente_seleccionado = tk.Label(frame_cliente, text="No seleccionado", font=("Helvetica", 13), bg="#e3f2fd", fg="#757575")
+        self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=10)
         btn_seleccionar_cliente = tk.Button(
-            frame_cliente,
-            text="Seleccionar Cliente",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.seleccionar_cliente
+            frame_cliente, text="Seleccionar Cliente", font=("Helvetica", 11, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.seleccionar_cliente
         )
-        btn_seleccionar_cliente.pack(side=tk.LEFT, padx=10)
+        btn_seleccionar_cliente.pack(side=tk.RIGHT, padx=10, pady=8)
 
-        # Frame para servicios disponibles
-        frame_servicios = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_servicios.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Servicios disponibles
+        frame_servicios = tk.LabelFrame(col_izq, text="Servicios disponibles", font=("Helvetica", 12, "bold"), bg="#f5f7fa", fg="#1976D2", bd=1, relief="solid")
+        frame_servicios.pack(fill=tk.BOTH, expand=True, pady=10, padx=5)
 
-        lbl_servicios = tk.Label(
-            frame_servicios,
-            text="Servicios disponibles:",
-            font=("Helvetica", 12, "bold"),
-            bg="#f5f5f5"
-        )
-        lbl_servicios.pack(anchor=tk.W, pady=5)
-
-        # Frame para búsqueda
-        frame_busqueda = tk.Frame(frame_servicios, bg="#f5f5f5")
+        # Búsqueda
+        frame_busqueda = tk.Frame(frame_servicios, bg="#f5f7fa")
         frame_busqueda.pack(fill=tk.X, pady=5)
-
-        lbl_buscar = tk.Label(
-            frame_busqueda,
-            text="Buscar:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        lbl_buscar.pack(side=tk.LEFT, padx=5)
-
+        tk.Label(frame_busqueda, text="Buscar:", font=("Helvetica", 11), bg="#f5f7fa").pack(side=tk.LEFT, padx=5)
         self.entry_buscar_servicio = tk.Entry(frame_busqueda, width=30, font=("Helvetica", 11))
         self.entry_buscar_servicio.pack(side=tk.LEFT, padx=5)
-
         btn_buscar = tk.Button(
-            frame_busqueda,
-            text="Buscar",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
+            frame_busqueda, text="Buscar", font=("Helvetica", 10, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2",
             command=lambda: self.buscar_servicios(self.entry_buscar_servicio.get().strip())
         )
         btn_buscar.pack(side=tk.LEFT, padx=5)
 
         # Tabla de servicios
-        frame_tabla_servicios = tk.Frame(frame_servicios, bg="#f5f5f5")
+        frame_tabla_servicios = tk.Frame(frame_servicios, bg="#f5f7fa")
         frame_tabla_servicios.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo')
-
-        self.tabla_servicios = ttk.Treeview(frame_tabla_servicios, columns=columnas, show='headings', height=4)
-
-        # Configurar encabezados
-        self.tabla_servicios.heading('id', text='ID')
-        self.tabla_servicios.heading('nombre', text='Nombre')
-        self.tabla_servicios.heading('descripcion', text='Descripción')
-        self.tabla_servicios.heading('precio', text='Precio')
-        self.tabla_servicios.heading('tiempo', text='Tiempo Est.')
-
-        # Configurar anchos
-        self.tabla_servicios.column('id', width=50, anchor=tk.CENTER)
-        self.tabla_servicios.column('nombre', width=150)
-        self.tabla_servicios.column('descripcion', width=300)
-        self.tabla_servicios.column('precio', width=100, anchor=tk.CENTER)
-        self.tabla_servicios.column('tiempo', width=100, anchor=tk.CENTER)
-
-        # Scrollbar para la tabla
-        scrollbar_servicios = ttk.Scrollbar(frame_tabla_servicios, orient=tk.VERTICAL,
-                                            command=self.tabla_servicios.yview)
-        self.tabla_servicios.configure(yscrollcommand=scrollbar_servicios.set)
-
-        # Empaquetar tabla y scrollbar
+        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo', 'promo')
+        self.tabla_servicios = ttk.Treeview(frame_tabla_servicios, columns=columnas, show='headings', height=7)
+        for col, ancho in zip(columnas, [50, 150, 300, 100, 100, 120]):
+            self.tabla_servicios.heading(col, text=col.capitalize())
+            self.tabla_servicios.column(col, width=ancho, anchor=tk.CENTER if col in ('id', 'precio', 'tiempo') else tk.W)
         self.tabla_servicios.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar_servicios = ttk.Scrollbar(frame_tabla_servicios, orient=tk.VERTICAL, command=self.tabla_servicios.yview)
+        self.tabla_servicios.configure(yscrollcommand=scrollbar_servicios.set)
         scrollbar_servicios.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Frame para agregar servicio
-        frame_agregar = tk.Frame(frame_servicios, bg="#f5f5f5")
+        # Agregar servicio
+        frame_agregar = tk.Frame(frame_servicios, bg="#f5f7fa")
         frame_agregar.pack(fill=tk.X, pady=10)
-
-        lbl_cantidad = tk.Label(
-            frame_agregar,
-            text="Cantidad:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        lbl_cantidad.pack(side=tk.LEFT, padx=5)
-
+        tk.Label(frame_agregar, text="Cantidad:", font=("Helvetica", 11), bg="#f5f7fa").pack(side=tk.LEFT, padx=5)
         self.entry_cantidad = tk.Entry(frame_agregar, width=5, font=("Helvetica", 11))
         self.entry_cantidad.pack(side=tk.LEFT, padx=5)
-        self.entry_cantidad.insert(0, "1")  # Valor por defecto
-
+        self.entry_cantidad.insert(0, "1")
         btn_agregar = tk.Button(
-            frame_agregar,
-            text="Agregar al pedido",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.agregar_servicio
+            frame_agregar, text="Agregar al pedido", font=("Helvetica", 10, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.agregar_servicio
         )
         btn_agregar.pack(side=tk.LEFT, padx=10)
 
-        # Frame para detalles del pedido
-        frame_detalles = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_detalles.pack(fill=tk.BOTH, expand=True, pady=10)
+        # ==================== COLUMNA DERECHA ====================
+        col_der = tk.Frame(frame_columnas, bg="#f5f7fa")
+        col_der.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
-        lbl_detalles = tk.Label(
-            frame_detalles,
-            text="Detalles del pedido:",
-            font=("Helvetica", 12, "bold"),
-            bg="#f5f5f5"
-        )
-        lbl_detalles.pack(anchor=tk.W, pady=5)
-
-        # Tabla de detalles
-        frame_tabla_detalles = tk.Frame(frame_detalles, bg="#f5f5f5")
+        # Detalles del pedido
+        frame_detalles = tk.LabelFrame(col_der, text="Detalles del pedido", font=("Helvetica", 12, "bold"), bg="#f5f7fa", fg="#1976D2", bd=1, relief="solid")
+        frame_detalles.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
+        frame_tabla_detalles = tk.Frame(frame_detalles, bg="#f5f7fa")
         frame_tabla_detalles.pack(fill=tk.BOTH, expand=True, pady=5)
-
         columnas_detalle = ('servicio', 'cantidad', 'precio_unitario', 'subtotal')
-
-        self.tabla_detalles = ttk.Treeview(frame_tabla_detalles, columns=columnas_detalle, show='headings', height=4)
-
-        # Configurar encabezados
-        self.tabla_detalles.heading('servicio', text='Servicio')
-        self.tabla_detalles.heading('cantidad', text='Cantidad')
-        self.tabla_detalles.heading('precio_unitario', text='Precio Unit.')
-        self.tabla_detalles.heading('subtotal', text='Subtotal')
-
-        # Configurar anchos
-        self.tabla_detalles.column('servicio', width=300)
-        self.tabla_detalles.column('cantidad', width=100, anchor=tk.CENTER)
-        self.tabla_detalles.column('precio_unitario', width=100, anchor=tk.CENTER)
-        self.tabla_detalles.column('subtotal', width=100, anchor=tk.CENTER)
-
-        # Scrollbar para la tabla
+        self.tabla_detalles = ttk.Treeview(frame_tabla_detalles, columns=columnas_detalle, show='headings', height=7)
+        for col, ancho in zip(columnas_detalle, [200, 80, 80, 80]):
+            self.tabla_detalles.heading(col, text=col.replace('_', ' ').capitalize())
+            self.tabla_detalles.column(col, width=ancho, anchor=tk.CENTER if col != 'servicio' else tk.W)
+        self.tabla_detalles.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar_detalles = ttk.Scrollbar(frame_tabla_detalles, orient=tk.VERTICAL, command=self.tabla_detalles.yview)
         self.tabla_detalles.configure(yscrollcommand=scrollbar_detalles.set)
-
-        # Empaquetar tabla y scrollbar
-        self.tabla_detalles.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar_detalles.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Frame para botones de acción sobre detalles
-        frame_accion = tk.Frame(frame_detalles, bg="#f5f5f5")
+        # Botones de acción sobre detalles
+        frame_accion = tk.Frame(frame_detalles, bg="#f5f7fa")
         frame_accion.pack(fill=tk.X, pady=5)
+        tk.Button(
+            frame_accion, text="Quitar item", font=("Helvetica", 10, "bold"),
+            bg="#e53935", fg="white", relief="flat", cursor="hand2", command=self.quitar_item
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            frame_accion, text="Limpiar todo", font=("Helvetica", 10, "bold"),
+            bg="#e53935", fg="white", relief="flat", cursor="hand2", command=self.limpiar_pedido
+        ).pack(side=tk.LEFT, padx=5)
 
-        btn_quitar = tk.Button(
-            frame_accion,
-            text="Quitar item",
-            font=("Helvetica", 10),
-            bg="#e53935",
-            fg="white",
-            command=self.quitar_item
-        )
-        btn_quitar.pack(side=tk.LEFT, padx=5)
-
-        btn_limpiar = tk.Button(
-            frame_accion,
-            text="Limpiar todo",
-            font=("Helvetica", 10),
-            bg="#e53935",
-            fg="white",
-            command=self.limpiar_pedido
-        )
-        btn_limpiar.pack(side=tk.LEFT, padx=5)
-
-        # Frame para observaciones y total
-        frame_observaciones = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_observaciones.pack(fill=tk.X, pady=10)
-
-        lbl_observaciones = tk.Label(
-            frame_observaciones,
-            text="Observaciones:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        lbl_observaciones.pack(anchor=tk.W, pady=5)
-
+        # Observaciones
+        frame_observaciones = tk.LabelFrame(col_der, text="Observaciones", font=("Helvetica", 11, "bold"), bg="#f5f7fa", fg="#1976D2", bd=1, relief="solid")
+        frame_observaciones.pack(fill=tk.X, pady=5, padx=5)
         self.txt_observaciones = tk.Text(frame_observaciones, height=3, font=("Helvetica", 11))
-        self.txt_observaciones.pack(fill=tk.X, pady=5)
+        self.txt_observaciones.pack(fill=tk.X, pady=5, padx=5)
 
-        # Frame para total y guardar
-        frame_total = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_total.pack(fill=tk.X, pady=10)
-
-        lbl_total_titulo = tk.Label(
-            frame_total,
-            text="TOTAL:",
-            font=("Helvetica", 14, "bold"),
-            bg="#f5f5f5"
-        )
-        lbl_total_titulo.pack(side=tk.LEFT, padx=5)
-
+        # Total y guardar (siempre abajo)
+        frame_total = tk.Frame(col_der, bg="#e3f2fd", bd=1, relief="solid")
+        frame_total.pack(fill=tk.X, pady=10, padx=5)
+        tk.Label(
+            frame_total, text="TOTAL:", font=("Helvetica", 15, "bold"),
+            bg="#e3f2fd", fg="#1565C0"
+        ).pack(side=tk.LEFT, padx=10, pady=10)
         self.lbl_total = tk.Label(
-            frame_total,
-            text="$0.00",
-            font=("Helvetica", 14, "bold"),
-            bg="#f5f5f5",
-            fg="#303f9f"
+            frame_total, text="$0.00", font=("Helvetica", 18, "bold"),
+            bg="#e3f2fd", fg="#2E7D32"
         )
-        self.lbl_total.pack(side=tk.LEFT, padx=5)
-
-        btn_guardar = tk.Button(
-            frame_total,
-            text="Guardar Pedido",
-            font=("Helvetica", 12, "bold"),
-            bg="#303f9f",
-            fg="white",
-            command=self.procesar_pago
-        )
-        btn_guardar.pack(side=tk.RIGHT, padx=10)
+        self.lbl_total.pack(side=tk.LEFT, padx=10, pady=10)
+        tk.Button(
+            frame_total, text="Guardar Pedido", font=("Helvetica", 13, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.procesar_pago
+        ).pack(side=tk.RIGHT, padx=10, pady=10)
 
         # Cargar servicios al iniciar
         self.cargar_servicios()
 
     def configurar_tab_lista(self):
-        """Configura la pestaña para listar y gestionar pedidos"""
-        # Frame principal
-        frame_principal = tk.Frame(self.tab_lista, bg="#f5f5f5")
+        frame_principal = tk.Frame(self.tab_lista, bg="#f5f7fa")
         frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Título
-        titulo = tk.Label(
+        tk.Label(
             frame_principal,
             text="Listado de Pedidos",
-            font=("Helvetica", 20, "bold"),
-            bg="#f5f5f5",
-            fg="#303f9f"
-        )
-        titulo.pack(pady=10)
+            font=("Helvetica", 22, "bold"),
+            bg="#f5f7fa",
+            fg="#1976D2"
+        ).pack(pady=(0, 18))
 
-        # Frame para filtros
-        frame_filtros = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_filtros.pack(fill=tk.X, pady=10)
-
-        # Filtro por estado
-        lbl_estado = tk.Label(
-            frame_filtros,
-            text="Filtrar por estado:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        lbl_estado.pack(side=tk.LEFT, padx=5)
-
+        # Filtros
+        frame_filtros = tk.Frame(frame_principal, bg="#e3f2fd", bd=1, relief="solid")
+        frame_filtros.pack(fill=tk.X, pady=(0, 18), padx=10)
+        tk.Label(frame_filtros, text="Filtrar por estado:", font=("Helvetica", 11, "bold"), bg="#e3f2fd", fg="#1565C0").pack(side=tk.LEFT, padx=10, pady=8)
         self.combo_estado = ttk.Combobox(
             frame_filtros,
             values=["Todos", "Recibido", "En proceso", "Listo para entrega", "Entregado"],
@@ -367,113 +240,57 @@ class Pedidos:
             state="readonly"
         )
         self.combo_estado.pack(side=tk.LEFT, padx=5)
-        self.combo_estado.current(0)  # "Todos" por defecto
+        self.combo_estado.current(0)
         self.combo_estado.bind("<<ComboboxSelected>>", lambda _: self.cargar_pedidos())
-
-        # Filtro por cliente
-        lbl_cliente = tk.Label(
-            frame_filtros,
-            text="Buscar por cliente:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        )
-        lbl_cliente.pack(side=tk.LEFT, padx=(20, 5))
-
+        tk.Label(frame_filtros, text="Buscar por cliente:", font=("Helvetica", 11, "bold"), bg="#e3f2fd", fg="#1565C0").pack(side=tk.LEFT, padx=(20, 5))
         self.entry_buscar_cliente = tk.Entry(frame_filtros, width=20, font=("Helvetica", 11))
         self.entry_buscar_cliente.pack(side=tk.LEFT, padx=5)
-
-        btn_buscar = tk.Button(
-            frame_filtros,
-            text="Buscar",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.buscar_pedidos_cliente
-        )
-        btn_buscar.pack(side=tk.LEFT, padx=5)
-
-        btn_refrescar = tk.Button(
-            frame_filtros,
-            text="🔄 Refrescar",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.cargar_pedidos
-        )
-        btn_refrescar.pack(side=tk.RIGHT, padx=5)
+        tk.Button(
+            frame_filtros, text="Buscar", font=("Helvetica", 10, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.buscar_pedidos_cliente
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            frame_filtros, text="🔄 Refrescar", font=("Helvetica", 10, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.cargar_pedidos
+        ).pack(side=tk.RIGHT, padx=10)
 
         # Tabla de pedidos
-        frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
+        frame_tabla = tk.Frame(frame_principal, bg="#f5f7fa")
         frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
-
         columnas = ('id', 'cliente', 'fecha', 'total', 'estado', 'observaciones')
-
         self.tabla_pedidos = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=10)
-
-        # Aplicar estilo a la tabla
         utl.aplicar_estilo_tabla(self.tabla_pedidos)
-
-        # Configurar encabezados
-        self.tabla_pedidos.heading('id', text='ID')
-        self.tabla_pedidos.heading('cliente', text='Cliente')
-        self.tabla_pedidos.heading('fecha', text='Fecha')
-        self.tabla_pedidos.heading('total', text='Total')
-        self.tabla_pedidos.heading('estado', text='Estado')
-        self.tabla_pedidos.heading('observaciones', text='Observaciones')
-
-        # Configurar anchos
-        self.tabla_pedidos.column('id', width=50, anchor=tk.CENTER)
-        self.tabla_pedidos.column('cliente', width=200)
-        self.tabla_pedidos.column('fecha', width=150, anchor=tk.CENTER)
-        self.tabla_pedidos.column('total', width=100, anchor=tk.CENTER)
-        self.tabla_pedidos.column('estado', width=120, anchor=tk.CENTER)
-        self.tabla_pedidos.column('observaciones', width=250)
-
-        # Scrollbar para la tabla
+        for col, ancho in zip(columnas, [50, 200, 150, 100, 120, 250]):
+            self.tabla_pedidos.heading(col, text=col.capitalize())
+            self.tabla_pedidos.column(col, width=ancho, anchor=tk.CENTER if col in ('id', 'fecha', 'total', 'estado') else tk.W)
+        self.tabla_pedidos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_pedidos.yview)
         self.tabla_pedidos.configure(yscrollcommand=scrollbar.set)
-
-        # Empaquetar tabla y scrollbar
-        self.tabla_pedidos.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Frame para botones de acción
-        frame_acciones = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_acciones.pack(fill=tk.X, pady=10)
-
         # Botones de acción
-        btn_ver_detalles = tk.Button(
-            frame_acciones,
-            text="Ver Detalles",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.ver_detalles_pedido
-        )
-        btn_ver_detalles.pack(side=tk.LEFT, padx=5)
-
-        btn_cambiar_estado = tk.Button(
-            frame_acciones,
-            text="Cambiar Estado",
-            font=("Helvetica", 10),
-            bg="#303f9f",
-            fg="white",
-            command=self.cambiar_estado_pedido
-        )
-        btn_cambiar_estado.pack(side=tk.LEFT, padx=5)
-
-        btn_eliminar = tk.Button(
-            frame_acciones,
-            text="Eliminar",
-            font=("Helvetica", 10),
-            bg="#e53935",
-            fg="white",
-            command=self.eliminar_pedido
-        )
-        btn_eliminar.pack(side=tk.LEFT, padx=5)
+        frame_acciones = tk.Frame(frame_principal, bg="#f5f7fa")
+        frame_acciones.pack(fill=tk.X, pady=10)
+        tk.Button(
+            frame_acciones, text="Ver Detalles", font=("Helvetica", 11, "bold"),
+            bg="#1976D2", fg="white", relief="flat", cursor="hand2", command=self.ver_detalles_pedido
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            frame_acciones, text="Cambiar Estado", font=("Helvetica", 11, "bold"),
+            bg="#1976D2", fg="white", relief="flat", cursor="hand2", command=self.cambiar_estado_pedido
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            frame_acciones, text="Eliminar", font=("Helvetica", 11, "bold"),
+            bg="#e53935", fg="white", relief="flat", cursor="hand2", command=self.eliminar_pedido
+        ).pack(side=tk.LEFT, padx=5)
 
         # Cargar pedidos al iniciar
         self.cargar_pedidos()
+
+        for estado, color in self.colores_estado.items():
+            self.tabla_pedidos.tag_configure(estado, background=color)
 
     def seleccionar_cliente(self):
         """Abre ventana para seleccionar un cliente"""
@@ -792,32 +609,28 @@ class Pedidos:
         cargar_clientes()
 
     def cargar_servicios(self):
-        """Carga los servicios disponibles en la tabla"""
-        # Limpiar tabla
+        """Carga los servicios disponibles en la tabla, mostrando descuentos/promos"""
         for item in self.tabla_servicios.get_children():
             self.tabla_servicios.delete(item)
 
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-
-            # Obtener servicios activos
             consulta = """
             SELECT id_servicio, nombre, descripcion, precio, 
-                   CONCAT(tiempo_estimado, ' min') as tiempo 
+                   CONCAT(tiempo_estimado, ' min') as tiempo,
+                   promo_desc, nuevo_precio
             FROM servicios 
             WHERE activo = 1 
             ORDER BY nombre
             """
-
             cursor.execute(consulta)
-
             for servicio in cursor.fetchall():
-                # Formatear precio
-                precio_formateado = f"${float(servicio[3]):.2f}"
-                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                precio_final = float(servicio[6]) if servicio[6] is not None else float(servicio[3])
+                precio_formateado = f"${precio_final:.2f}"
+                promo = servicio[5] if servicio[5] else ""
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4], promo)
                 self.tabla_servicios.insert('', tk.END, values=valores)
-
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar los servicios: {str(e)}")
@@ -859,8 +672,7 @@ class Pedidos:
             messagebox.showerror("Error", f"Error al buscar servicios: {str(e)}")
 
     def agregar_servicio(self):
-        """Agrega un servicio al pedido actual"""
-
+        """Agrega un servicio al pedido actual, usando el precio promocional si existe"""
         if not self.cliente_actual:
             messagebox.showwarning("Cliente requerido", "Por favor, selecciona un cliente primero")
             return
@@ -874,11 +686,10 @@ class Pedidos:
         id_servicio = int(valores[0])
         nombre_servicio = valores[1]
         precio_str = valores[3].replace('$', '').replace(',', '').strip()
-
+        promo = valores[5] if len(valores) > 5 else ""
 
         try:
             precio_unitario = float(precio_str)
-
             try:
                 cantidad = int(self.entry_cantidad.get().strip())
                 if cantidad <= 0:
@@ -905,7 +716,8 @@ class Pedidos:
                     'nombre': nombre_servicio,
                     'cantidad': cantidad,
                     'precio_unitario': precio_unitario,
-                    'subtotal': subtotal
+                    'subtotal': subtotal,
+                    'promo': promo
                 })
 
             self.actualizar_tabla_detalles()
@@ -1257,42 +1069,19 @@ class Pedidos:
             if fila:
                 id_caja_act, resp = fila
 
-                # 6.2) Ingreso (todo el efectivo recibido o total venta)
-                if metodo == "Efectivo":
-                    ingreso_monto = recibido
-                    concepto = f"Pedido #{id_pedido} – Efectivo"
-                else:
-                    ingreso_monto = monto
-                    concepto = f"Pedido #{id_pedido} – {metodo}"
-
+                # 6.2) Registrar solo el total de la venta como ingreso, sin egreso por cambio
+                concepto = f"Pedido #{id_pedido} – {metodo}"
                 cur.execute("""
                     INSERT INTO movimientos_caja
                     (id_caja, tipo, concepto, monto, hora, id_usuario)
                     VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
-                """, (id_caja_act, concepto, ingreso_monto, resp))
+                """, (id_caja_act, concepto, monto, resp))
                 cur.execute("""
                     UPDATE caja
                     SET total_ingresos = total_ingresos + %s,
                         saldo_final    = saldo_final    + %s
                     WHERE id_caja = %s
-                """, (ingreso_monto, ingreso_monto, id_caja_act))
-
-                # 6.3) Egreso por cambio si aplica
-                if metodo == "Efectivo" and cambio > 0:
-                    cur.execute("""
-                        INSERT INTO movimientos_caja
-                        (id_caja, tipo, concepto, monto, hora, id_usuario)
-                        VALUES (%s, 'egreso', %s, %s, NOW(), %s)
-                    """, (id_caja_act,
-                        f"Pedido #{id_pedido} – Cambio",
-                        cambio,
-                        resp))
-                    cur.execute("""
-                        UPDATE caja
-                        SET total_egresos = total_egresos + %s,
-                            saldo_final   = saldo_final   - %s
-                        WHERE id_caja = %s
-                    """, (cambio, cambio, id_caja_act))
+                """, (monto, monto, id_caja_act))
 
             # 7) Marcar pedido como recibido
             cur.execute(
@@ -1359,101 +1148,36 @@ class Pedidos:
     def generar_ticket_pedido(self, id_pedido, id_venta, metodo_pago, recibido, cambio):
         """
         Genera un ticket HTML para un pedido y devuelve la ruta del archivo.
-        No abre el ticket; quien lo llame debe abrirlo con webbrowser.open().
+        Formato compacto, listo para impresora térmica.
         """
-        # 1) Encabezado
         ahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         cliente = self.cliente_actual.get("nombre", "Cliente")
         folio = f"LP{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        ruta_archivo = f"tickets/ticket_pedido_{id_pedido}.html"
 
-        # 2) Cuerpo de los ítems
+        # Crear carpeta tickets si no existe
+        os.makedirs("tickets", exist_ok=True)
+
+        # Cuerpo de los ítems
         cuerpo_items = ""
         for item in self.items_pedido:
-            subtotal = item.get('subtotal', item['cantidad'] * item['precio_unitario'])
+            promo_text = f" <span style='color:#1976D2;'>[{item['promo']}]</span>" if item.get('promo') else ""
             cuerpo_items += f"""
             <tr>
-                <td>{item.get('nombre', item.get('servicio',''))}</td>
-                <td class="precio">{item['cantidad']} x ${item['precio_unitario']:.2f}</td>
-                <td class="subtotal">${subtotal:.2f}</td>
-            </tr>"""
-
-        total_formateado = f"${self.total_pedido:.2f}"
-
-        # 3) Armar el HTML
-        html = f"""<!DOCTYPE html>
-    <html lang="es">
-    <head>
-    <meta charset="UTF-8">
-    <title>Ticket Pedido #{id_pedido}</title>
-    <style>
-        body {{ width:230px; font-family:'Courier New', monospace; font-size:12px; margin:0 auto; }}
-        h2, p {{ text-align:center; margin:4px 0; }}
-        .sep {{ border-top:1px dashed #000; margin:5px 0; }}
-        table {{ width:100%; border-collapse:collapse; }}
-        td {{ padding:2px; }}
-        td.precio, td.subtotal {{ text-align:right; }}
-    </style>
-    </head>
-    <body>
-    <h2>Lavandería Exprés</h2>
-    <p>Calle Principal #123</p>
-    <p>Colonia Centro</p>
-    <p>Tel: 555-123-4567</p>
-    <div class="sep"></div>
-    <p><strong>Fecha:</strong> {ahora}</p>
-    <p><strong>Pedido #:</strong> {id_pedido} &nbsp;&nbsp; <strong>Venta #:</strong> {id_venta}</p>
-    <p><strong>Cliente:</strong> {cliente}</p>
-    <div class="sep"></div>
-    <table>
-        {cuerpo_items}
-    </table>
-    <div class="sep"></div>
-    <p><strong>TOTAL:</strong> {total_formateado}</p>
-    <p><strong>Método:</strong> {metodo_pago}</p>"""
-
-        if metodo_pago == "Efectivo":
-            html += f"""
-    <p><strong>Recibido:</strong> ${recibido:.2f} &nbsp; <strong>Cambio:</strong> ${cambio:.2f}</p>"""
-
-        html += f"""
-    <div class="sep"></div>
-    <p>Folio: {folio}</p>
-    <p>¡Gracias por su preferencia!</p>
-    </body>
-    </html>
-    """
-
-        # 4) Guardar a archivo
-        nombre_archivo = f"ticket_pedido_{id_pedido}.html"
-        with open(nombre_archivo, "w", encoding="utf-8") as f:
-            f.write(html)
-
-        return nombre_archivo
-
-
-    def generar_ticket_html(self, id_venta):
-        fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        cliente = self.cliente_actual.get("nombre", "Cliente")
-        cuerpo_items = ""
-
-        for item in self.items_venta:
-            cuerpo_items += f"""
-            <tr>
-                <td>{item['nombre']}</td>
-                <td class="precio">{item['cantidad']} x {item['precio_unitario']:.2f}</td>
-                <td class="subtotal">${item['subtotal']:.2f}</td>
+                <td>{item.get('nombre', '')}{promo_text}</td>
+                <td class="precio">{item.get('cantidad', 0)} x {item.get('precio_unitario', 0.0):.2f}</td>
+                <td class="subtotal">${item.get('subtotal', 0.0):.2f}</td>
             </tr>
             """
 
-        total_formateado = f"${self.total_venta:.2f}"
-        codigo_seguimiento = datetime.now().strftime("LV%Y%m%d%H%M%S")
+        total_formateado = f"${self.total_pedido:.2f}"
 
         html = f"""
         <!DOCTYPE html>
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <title>Ticket Venta {id_venta}</title>
+            <title>Ticket Pedido #{id_pedido}</title>
             <style>
                 body {{
                     width: 230px;
@@ -1483,47 +1207,44 @@ class Pedidos:
             </style>
         </head>
         <body>
-
             <h2>Lavandería Exprés</h2>
             <p>Calle Principal #123</p>
             <p>Colonia Centro</p>
             <p>Tel: 555-123-4567</p>
-            <p>RFC: XAXX010101000</p>
-
             <div class="separador"></div>
-
-            <p><strong>Fecha:</strong> {fecha}</p>
+            <p><strong>Fecha:</strong> {ahora}</p>
+            <p><strong>Pedido #:</strong> {id_pedido} &nbsp;&nbsp; <strong>Venta #:</strong> {id_venta}</p>
             <p><strong>Cliente:</strong> {cliente}</p>
-
             <div class="separador"></div>
-
             <table>
                 {cuerpo_items}
             </table>
-
             <div class="separador"></div>
             <p><strong>TOTAL: {total_formateado}</strong></p>
+            <p><strong>Método:</strong> {metodo_pago}</p>
+        """
 
+        if metodo_pago == "Efectivo":
+            html += f"""
+            <p><strong>Recibido:</strong> ${recibido:.2f} &nbsp; <strong>Cambio:</strong> ${cambio:.2f}</p>
+            """
+
+        html += f"""
             <div class="separador"></div>
-
+            <p>Folio: {folio}</p>
             <p>¡Gracias por su preferencia!</p>
-            <p>Folio: {codigo_seguimiento}</p>
             <p>Conserve su ticket</p>
-
         </body>
         </html>
         """
 
-        ruta = f"ticket_venta_{id_venta}.html"
-        with open(ruta, "w", encoding="utf-8") as f:
-            f.write(html)
+        with open(ruta_archivo, "w", encoding="utf-8") as file:
+            file.write(html)
 
-        return ruta
-
+        return ruta_archivo
 
     def cargar_pedidos(self):
-        """Carga los pedidos en la tabla según los filtros aplicados"""
-        # Limpiar tabla
+        """Carga los pedidos en la tabla de la pestaña 'Lista de Pedidos'"""
         for item in self.tabla_pedidos.get_children():
             self.tabla_pedidos.delete(item)
 
@@ -1531,148 +1252,87 @@ class Pedidos:
             conexion = conectar_bd()
             cursor = conexion.cursor()
 
-            # Obtener filtro de estado
-            filtro_estado = self.combo_estado.get()
-
-            # Construir consulta según filtro
-            consulta = """
-            SELECT p.id_pedido, c.nombre, p.fecha_pedido, 
-                   (SELECT SUM(dp.cantidad * dp.precio_unitario) 
-                    FROM detalle_pedido dp 
-                    WHERE dp.id_pedido = p.id_pedido) as total,
-                   p.estado, p.observaciones
+            estado_filtro = self.combo_estado.get()
+            where_clause = ""
+            if estado_filtro != "Todos":
+                where_clause = "WHERE p.estado = %s"
+            
+            consulta = f"""
+            SELECT p.id_pedido, c.nombre, p.fecha_pedido, p.estado, p.observaciones,
+                   (SELECT SUM(dp.cantidad * dp.precio_unitario) FROM detalle_pedido dp WHERE dp.id_pedido = p.id_pedido) as total
             FROM pedidos p
-            INNER JOIN clientes c ON p.id_cliente = c.id_cliente
+            JOIN clientes c ON p.id_cliente = c.id_cliente
+            {where_clause}
+            ORDER BY p.fecha_pedido DESC
             """
 
-            parametros = []
-
-            # Agregar condición de estado si no es "Todos"
-            if filtro_estado != "Todos":
-                consulta += " WHERE p.estado = %s"
-                parametros.append(filtro_estado)
-
-            consulta += " ORDER BY p.fecha_pedido DESC"
-
-            if parametros:
-                cursor.execute(consulta, parametros)
+            if estado_filtro != "Todos":
+                cursor.execute(consulta, (estado_filtro,))
             else:
                 cursor.execute(consulta)
 
-            for pedido in cursor.fetchall():
-                # Formatear fecha y total
-                fecha_formateada = utl.formatear_fecha(pedido[2], '%d/%m/%Y %H:%M')
-                total_formateado = f"${float(pedido[3] or 0):.2f}"
-
-                valores = (
-                    pedido[0],              # ID
-                    pedido[1],              # Cliente
-                    fecha_formateada,       # Fecha
-                    total_formateado,       # Total
-                    pedido[4],              # Estado
-                    pedido[5] or ""         # Observaciones
+            for row in cursor.fetchall():
+                id_pedido, cliente, fecha, estado, observaciones, total = row
+                self.tabla_pedidos.insert(
+                    '', tk.END,
+                    values=(
+                        id_pedido, cliente, fecha.strftime("%d/%m/%Y %H:%M"), 
+                        f"${total:.2f}" if total else "$0.00", estado, observaciones
+                    ),
+                    tags=(estado,)  # <-- Esto aplica el color según el estado
                 )
-
-                # Insertar en la tabla con etiqueta de estado para aplicar color
-                item_id = self.tabla_pedidos.insert('', tk.END, values=valores, tags=(pedido[4],))
-
-                # Aplicar color según estado
-                if pedido[4] in self.colores_estado:
-                    self.tabla_pedidos.tag_configure(pedido[4], background=self.colores_estado[pedido[4]])
-
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar los pedidos: {str(e)}")
 
     def buscar_pedidos_cliente(self):
-        """Busca pedidos por nombre de cliente"""
-        texto_busqueda = self.entry_buscar_cliente.get().strip()
-
-        if not texto_busqueda:
+        """Filtra la lista de pedidos por el nombre del cliente ingresado."""
+        texto = self.entry_buscar_cliente.get().strip()
+        if not texto:
             self.cargar_pedidos()
             return
-
-        # Limpiar tabla
-        for item in self.tabla_pedidos.get_children():
-            self.tabla_pedidos.delete(item)
-
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-
-            # Obtener filtro de estado
-            filtro_estado = self.combo_estado.get()
-
-            # Construir consulta según filtros
             consulta = """
-            SELECT p.id_pedido, c.nombre, p.fecha_pedido, 
-                   (SELECT SUM(dp.cantidad * dp.precio_unitario) 
-                    FROM detalle_pedido dp 
-                    WHERE dp.id_pedido = p.id_pedido) as total,
-                   p.estado, p.observaciones
-            FROM pedidos p
-            INNER JOIN clientes c ON p.id_cliente = c.id_cliente
-            WHERE c.nombre LIKE %s
+                SELECT p.id_pedido, c.nombre, p.fecha_pedido, p.estado, p.observaciones,
+                       (SELECT SUM(dp.cantidad * dp.precio_unitario) FROM detalle_pedido dp WHERE dp.id_pedido = p.id_pedido) as total
+                FROM pedidos p
+                JOIN clientes c ON p.id_cliente = c.id_cliente
+                WHERE c.nombre LIKE %s
+                ORDER BY p.fecha_pedido DESC
             """
-
-            parametros = [f"%{texto_busqueda}%"]
-
-            # Agregar condición de estado si no es "Todos"
-            if filtro_estado != "Todos":
-                consulta += " AND p.estado = %s"
-                parametros.append(filtro_estado)
-
-            consulta += " ORDER BY p.fecha_pedido DESC"
-
-            cursor.execute(consulta, parametros)
-
-            for pedido in cursor.fetchall():
-                # Formatear fecha y total
-                fecha_formateada = utl.formatear_fecha(pedido[2], '%d/%m/%Y %H:%M')
-                total_formateado = f"${float(pedido[3] or 0):.2f}"
-
-                valores = (
-                    pedido[0],              # ID
-                    pedido[1],              # Cliente
-                    fecha_formateada,       # Fecha
-                    total_formateado,       # Total
-                    pedido[4],              # Estado
-                    pedido[5] or ""         # Observaciones
-                )
-
-                # Insertar en la tabla con etiqueta de estado para aplicar color
-                item_id = self.tabla_pedidos.insert('', tk.END, values=valores, tags=(pedido[4],))
-
-                # Aplicar color según estado
-                if pedido[4] in self.colores_estado:
-                    self.tabla_pedidos.tag_configure(pedido[4], background=self.colores_estado[pedido[4]])
-
+            cursor.execute(consulta, (f"%{texto}%",))
+            self.tabla_pedidos.delete(*self.tabla_pedidos.get_children())
+            for row in cursor.fetchall():
+                id_pedido, cliente, fecha, estado, observaciones, total = row
+                self.tabla_pedidos.insert('', tk.END, values=(
+                    id_pedido, cliente, fecha.strftime("%d/%m/%Y %H:%M"), 
+                    f"${total:.2f}" if total else "$0.00", estado, observaciones
+                ))
             conexion.close()
         except Exception as e:
-            messagebox.showerror("Error", f"Error al buscar pedidos: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo buscar pedidos: {str(e)}")
 
     def ver_detalles_pedido(self):
-        """Muestra los detalles de un pedido seleccionado"""
+        """Muestra los detalles de un pedido seleccionado en una nueva ventana"""
         seleccion = self.tabla_pedidos.selection()
-
         if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para ver sus detalles")
+            messagebox.showwarning("Selección requerida", "Selecciona un pedido para ver los detalles")
             return
 
         # Obtener ID del pedido seleccionado
-        valores = self.tabla_pedidos.item(seleccion[0], 'values')
-        id_pedido = valores[0]
-        cliente = valores[1]
+        id_pedido = self.tabla_pedidos.item(seleccion[0], 'values')[0]
 
         # Crear ventana de detalles
         ventana_detalles = tk.Toplevel(self.ventana)
         ventana_detalles.title(f"Detalles del Pedido #{id_pedido}")
-        ventana_detalles.geometry("700x500")
+        ventana_detalles.geometry("600x400")
         ventana_detalles.config(bg="#f5f5f5")
         ventana_detalles.grab_set()  # Hacer modal
 
         # Centrar ventana
-        utl.centrar_ventana(ventana_detalles, 700, 500)
+        utl.centrar_ventana(ventana_detalles, 600, 400)
 
         # Frame principal
         frame_principal = tk.Frame(ventana_detalles, bg="#f5f5f5")
@@ -1685,334 +1345,109 @@ class Pedidos:
             font=("Helvetica", 16, "bold"),
             bg="#f5f5f5",
             fg="#303f9f"
-        ).pack(pady=(0, 5))
-
-        # Subtítulo
-        tk.Label(
-            frame_principal,
-            text=f"Cliente: {cliente}",
-            font=("Helvetica", 12),
-            bg="#f5f5f5",
-            fg="#303f9f"
         ).pack(pady=(0, 20))
 
-        # Separador
-        ttk.Separator(frame_principal, orient="horizontal").pack(fill=tk.X, pady=10)
-
-        # Frame para la tabla
+        # Tabla de detalles
         frame_tabla = tk.Frame(frame_principal, bg="#f5f5f5")
         frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        # Tabla de detalles
-        columnas = ('servicio', 'cantidad', 'precio_unitario', 'subtotal')
-
-        tabla_detalles = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
-
-        # Aplicar estilo a la tabla
+        columnas_detalle = ('Servicio', 'Cantidad', 'Precio Unitario', 'Subtotal')
+        tabla_detalles = ttk.Treeview(frame_tabla, columns=columnas_detalle, show='headings', height=10)
         utl.aplicar_estilo_tabla(tabla_detalles)
-
-        # Configurar encabezados
-        tabla_detalles.heading('servicio', text='Servicio')
-        tabla_detalles.heading('cantidad', text='Cantidad')
-        tabla_detalles.heading('precio_unitario', text='Precio Unit.')
-        tabla_detalles.heading('subtotal', text='Subtotal')
-
-        # Configurar anchos
-        tabla_detalles.column('servicio', width=300)
-        tabla_detalles.column('cantidad', width=100, anchor=tk.CENTER)
-        tabla_detalles.column('precio_unitario', width=100, anchor=tk.CENTER)
-        tabla_detalles.column('subtotal', width=100, anchor=tk.CENTER)
-
-        # Scrollbar para la tabla
+        for col, ancho in zip(columnas_detalle, [250, 80, 100, 100]):
+            tabla_detalles.heading(col, text=col)
+            tabla_detalles.column(col, width=ancho, anchor=tk.CENTER if col != 'Servicio' else tk.W)
+        tabla_detalles.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=tabla_detalles.yview)
         tabla_detalles.configure(yscrollcommand=scrollbar.set)
-
-        # Empaquetar tabla y scrollbar
-        tabla_detalles.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Frame para información adicional
-        frame_info = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_info.pack(fill=tk.X, pady=10)
 
         # Cargar detalles del pedido
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-
-            # Obtener detalles del pedido
             consulta = """
-            SELECT s.nombre, dp.cantidad, dp.precio_unitario,
-                   (dp.cantidad * dp.precio_unitario) as subtotal
-            FROM detalle_pedido dp
-            JOIN servicios s ON dp.id_item = s.id_servicio
-            WHERE dp.id_pedido = %s AND dp.tipo_item = 'servicio'
+                SELECT s.nombre, dp.cantidad, dp.precio_unitario, (dp.cantidad * dp.precio_unitario) as subtotal
+                FROM detalle_pedido dp
+                JOIN servicios s ON dp.id_item = s.id_servicio
+                WHERE dp.id_pedido = %s
             """
-
             cursor.execute(consulta, (id_pedido,))
-
-            total = 0.0
-
-            for detalle in cursor.fetchall():
-                # Formatear valores monetarios
-                precio_unitario = f"${float(detalle[2]):.2f}"
-                subtotal = f"${float(detalle[3]):.2f}"
-
-                valores = (
-                    detalle[0],         # Servicio
-                    detalle[1],         # Cantidad
-                    precio_unitario,    # Precio unitario
-                    subtotal            # Subtotal
-                )
-
-                tabla_detalles.insert('', tk.END, values=valores)
-                total += float(detalle[3])
-
-            # Obtener información general del pedido
-            consulta_pedido = """
-            SELECT estado, fecha_pedido, observaciones
-            FROM pedidos
-            WHERE id_pedido = %s
-            """
-
-            cursor.execute(consulta_pedido, (id_pedido,))
-            estado, fecha, observaciones = cursor.fetchone()
-
-            fecha_formateada = utl.formatear_fecha(fecha, '%d/%m/%Y %H:%M')
-
-            # Mostrar información general
-            tk.Label(
-                frame_info,
-                text=f"Estado: {estado}",
-                font=("Helvetica", 12, "bold"),
-                bg="#f5f5f5"
-            ).pack(anchor=tk.W, pady=5)
-
-            tk.Label(
-                frame_info,
-                text=f"Fecha: {fecha_formateada}",
-                font=("Helvetica", 12),
-                bg="#f5f5f5"
-            ).pack(anchor=tk.W, pady=5)
-
-            tk.Label(
-                frame_info,
-                text=f"Total: ${total:.2f}",
-                font=("Helvetica", 14, "bold"),
-                bg="#f5f5f5",
-                fg="#303f9f"
-            ).pack(anchor=tk.W, pady=5)
-
-            # Mostrar observaciones si existen
-            if observaciones:
-                tk.Label(
-                    frame_info,
-                    text="Observaciones:",
-                    font=("Helvetica", 12, "bold"),
-                    bg="#f5f5f5"
-                ).pack(anchor=tk.W, pady=(10, 5))
-
-                txt_obs = tk.Text(frame_info, height=3, font=("Helvetica", 11), wrap=tk.WORD)
-                txt_obs.pack(fill=tk.X, pady=5)
-                txt_obs.insert("1.0", observaciones)
-                txt_obs.config(state=tk.DISABLED)  # Solo lectura
-
+            for row in cursor.fetchall():
+                tabla_detalles.insert('', tk.END, values=(
+                    row[0], row[1], f"${row[2]:.2f}", f"${row[3]:.2f}"
+                ))
             conexion.close()
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar los detalles del pedido: {str(e)}")
+            messagebox.showerror("Error", f"No se pudieron cargar los detalles del pedido: {str(e)}")
 
-        # Botón para cerrar
+        # Botón cerrar
         tk.Button(
             frame_principal,
             text="Cerrar",
             font=("Helvetica", 11),
-            bg="#303f9f",
+            bg="#e53935",
             fg="white",
-            width=10,
+            cursor="hand2",
             command=ventana_detalles.destroy
-        ).pack(pady=20)
+        ).pack(side=tk.BOTTOM, pady=10)
 
     def cambiar_estado_pedido(self):
-        """Permite cambiar el estado de un pedido seleccionado"""
+        """Cambia el estado del pedido seleccionado"""
         seleccion = self.tabla_pedidos.selection()
-
         if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para cambiar su estado")
+            messagebox.showwarning("Selección requerida", "Selecciona un pedido para cambiar el estado")
             return
 
-        # Obtener datos del pedido seleccionado
-        valores = self.tabla_pedidos.item(seleccion[0], 'values')
-        id_pedido = valores[0]
-        estado_actual = valores[4]
+        id_pedido = self.tabla_pedidos.item(seleccion[0], 'values')[0]
 
-        # Crear ventana para cambiar estado
-        ventana_estado = tk.Toplevel(self.ventana)
-        ventana_estado.title(f"Cambiar Estado del Pedido #{id_pedido}")
-        ventana_estado.geometry("400x250")
-        ventana_estado.config(bg="#f5f5f5")
-        ventana_estado.grab_set()  # Hacer modal
+        # Obtener estado actual
+        estado_actual = self.tabla_pedidos.item(seleccion[0], 'values')[4]
 
-        # Centrar ventana
-        utl.centrar_ventana(ventana_estado, 400, 250)
-
-        # Frame principal
-        frame_principal = tk.Frame(ventana_estado, bg="#f5f5f5")
-        frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-        # Título
-        tk.Label(
-            frame_principal,
-            text=f"CAMBIAR ESTADO DEL PEDIDO #{id_pedido}",
-            font=("Helvetica", 12, "bold"),
-            bg="#f5f5f5",
-            fg="#303f9f"
-        ).pack(pady=(0, 20))
-
-        # Estado actual
-        frame_actual = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_actual.pack(fill=tk.X, pady=10)
-
-        tk.Label(
-            frame_actual,
-            text="Estado actual:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).pack(side=tk.LEFT, padx=5)
-
-        lbl_estado_actual = tk.Label(
-            frame_actual,
-            text=estado_actual,
-            font=("Helvetica", 11, "bold"),
-            bg="#f5f5f5",
-            fg=self.colores_estado.get(estado_actual, "#333333")
-        )
-        lbl_estado_actual.pack(side=tk.LEFT, padx=5)
-
-        # Nuevo estado
-        frame_nuevo = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_nuevo.pack(fill=tk.X, pady=10)
-
-        tk.Label(
-            frame_nuevo,
-            text="Nuevo estado:",
-            font=("Helvetica", 11),
-            bg="#f5f5f5"
-        ).pack(side=tk.LEFT, padx=5)
-
-        # Lista de estados disponibles (quitar el estado actual)
+        # Definir siguiente estado
         estados = ["Recibido", "En proceso", "Listo para entrega", "Entregado"]
-        if estado_actual in estados:
-            estados.remove(estado_actual)
+        try:
+            nuevo_estado = estados[estados.index(estado_actual) + 1]
+        except IndexError:
+            nuevo_estado = estados[0]  # Volver al primer estado si está en el último
 
-        combo_nuevo_estado = ttk.Combobox(
-            frame_nuevo,
-            values=estados,
-            width=15,
-            state="readonly"
-        )
-        combo_nuevo_estado.pack(side=tk.LEFT, padx=5)
-
-        if estados:
-            combo_nuevo_estado.current(0)  # Seleccionar el primer estado disponible
-
-        # Botones
-        frame_botones = tk.Frame(frame_principal, bg="#f5f5f5")
-        frame_botones.pack(fill=tk.X, pady=20)
-
-        def actualizar_estado():
-            nuevo_estado = combo_nuevo_estado.get()
-
-            if not nuevo_estado:
-                messagebox.showwarning("Estado requerido", "Por favor, selecciona un nuevo estado")
-                return
-
+        # Confirmar cambio
+        if messagebox.askyesno("Confirmar", f"Cambiar estado a '{nuevo_estado}'?"):
             try:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
-
-                # Actualizar estado del pedido
-                consulta = "UPDATE pedidos SET estado = %s WHERE id_pedido = %s"
-                cursor.execute(consulta, (nuevo_estado, id_pedido))
-
+                cursor.execute(
+                    "UPDATE pedidos SET estado = %s WHERE id_pedido = %s",
+                    (nuevo_estado, id_pedido)
+                )
                 conexion.commit()
                 conexion.close()
-
-                messagebox.showinfo("Éxito", f"Estado del pedido actualizado a: {nuevo_estado}")
-                ventana_estado.destroy()
-
-                # Actualizar la lista de pedidos
+                messagebox.showinfo("Éxito", f"Estado cambiado a '{nuevo_estado}'")
                 self.cargar_pedidos()
-
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo actualizar el estado: {str(e)}")
-
-        btn_actualizar = tk.Button(
-            frame_botones,
-            text="Actualizar",
-            font=("Helvetica", 11),
-            bg="#303f9f",
-            fg="white",
-            width=10,
-            cursor="hand2",
-            command=actualizar_estado
-        )
-        btn_actualizar.pack(side=tk.LEFT, padx=5)
-
-        btn_cancelar = tk.Button(
-            frame_botones,
-            text="Cancelar",
-            font=("Helvetica", 11),
-            bg="#e53935",
-            fg="white",
-            width=10,
-            cursor="hand2",
-            command=ventana_estado.destroy
-        )
-        btn_cancelar.pack(side=tk.RIGHT, padx=5)
+                messagebox.showerror("Error", f"No se pudo cambiar el estado: {str(e)}")
 
     def eliminar_pedido(self):
         """Elimina un pedido seleccionado"""
         seleccion = self.tabla_pedidos.selection()
-
         if not seleccion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona un pedido para eliminar")
+            messagebox.showwarning("Selección requerida", "Selecciona un pedido para eliminar")
             return
 
-        # Obtener datos del pedido seleccionado
-        valores = self.tabla_pedidos.item(seleccion[0], 'values')
-        id_pedido = valores[0]
+        id_pedido = self.tabla_pedidos.item(seleccion[0], 'values')[0]
 
         # Confirmar eliminación
-        confirmacion = messagebox.askyesno(
-            "Confirmar eliminación",
-            f"¿Estás seguro de eliminar el pedido #{id_pedido}?\n\nEsta acción no se puede deshacer."
-        )
-
-        if not confirmacion:
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            # Eliminar primero los detalles del pedido (por las claves foráneas)
-            cursor.execute("DELETE FROM detalle_pedido WHERE id_pedido = %s", (id_pedido,))
-
-            # Eliminar el pedido
-            cursor.execute("DELETE FROM pedidos WHERE id_pedido = %s", (id_pedido,))
-
-            conexion.commit()
-            conexion.close()
-
-            messagebox.showinfo("Éxito", f"Pedido #{id_pedido} eliminado correctamente")
-
-            # Actualizar la lista de pedidos
-            self.cargar_pedidos()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo eliminar el pedido: {str(e)}")
-
-
-# Si se ejecuta este archivo directamente, crear la ventana
-if __name__ == "__main__":
-    Pedidos()
+        if messagebox.askyesno("Confirmar", "¿Estás seguro de eliminar este pedido?"):
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute(
+                    "DELETE FROM pedidos WHERE id_pedido = %s",
+                    (id_pedido,)
+                )
+                conexion.commit()
+                conexion.close()
+                messagebox.showinfo("Éxito", "Pedido eliminado correctamente")
+                self.cargar_pedidos()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo eliminar el pedido: {str(e)}")

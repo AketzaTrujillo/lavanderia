@@ -51,40 +51,40 @@ class Ventas:
 
     def construir_interfaz(self):
         # Frame principal
-        self.frame_principal = tk.Frame(self.ventana, bg="#e0f7fa")
+        self.frame_principal = tk.Frame(self.ventana, bg="#f5f7fa")
         self.frame_principal.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Título
         tk.Label(
             self.frame_principal,
             text="Registro de Ventas",
-            font=("Helvetica", 20, "bold"),
-            bg="#e0f7fa",
-            fg="#00796b"
-        ).pack(pady=10)
+            font=("Helvetica", 22, "bold"),
+            bg="#f5f7fa",
+            fg="#1976D2"
+        ).pack(pady=(0, 18))
 
         # =================== CLIENTE ====================
-        frame_cliente = tk.Frame(self.frame_principal, bg="#e0f7fa")
-        frame_cliente.pack(fill=tk.X, pady=10)
+        frame_cliente = tk.Frame(self.frame_principal, bg="#e3f2fd", bd=1, relief="solid")
+        frame_cliente.pack(fill=tk.X, pady=(0, 18), padx=10)
 
-        tk.Label(frame_cliente, text="Cliente:", font=("Helvetica", 12), bg="#e0f7fa").pack(side=tk.LEFT, padx=5)
+        tk.Label(frame_cliente, text="Cliente:", font=("Helvetica", 13, "bold"), bg="#e3f2fd", fg="#1565C0").pack(side=tk.LEFT, padx=10, pady=8)
 
-        self.lbl_cliente_seleccionado = tk.Label(frame_cliente, text="No seleccionado", font=("Helvetica", 12), bg="#e0f7fa", fg="#777777")
-        self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=5)
-
+        self.lbl_cliente_seleccionado = tk.Label(frame_cliente, text="No seleccionado", font=("Helvetica", 13), bg="#e3f2fd", fg="#757575")
+        self.lbl_cliente_seleccionado.pack(side=tk.LEFT, padx=10)
 
         btn_seleccionar_cliente = tk.Button(
-            frame_cliente, text="Seleccionar Cliente", font=("Helvetica", 11),
-            bg="#00796b", fg="black", command=self.seleccionar_cliente
+            frame_cliente, text="Seleccionar Cliente", font=("Helvetica", 11, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.seleccionar_cliente
         )
-        btn_seleccionar_cliente.pack(side=tk.LEFT, padx=10)
+        btn_seleccionar_cliente.pack(side=tk.RIGHT, padx=10, pady=8)
 
         # =================== TABS ====================
         self.notebook = ttk.Notebook(self.frame_principal)
-        self.notebook.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 18), padx=10)
 
-        tab_productos = tk.Frame(self.notebook, bg="#e0f7fa")
-        tab_servicios = tk.Frame(self.notebook, bg="#e0f7fa")
+        tab_productos = tk.Frame(self.notebook, bg="#f5f7fa")
+        tab_servicios = tk.Frame(self.notebook, bg="#f5f7fa")
 
         self.notebook.add(tab_productos, text="Productos")
         self.notebook.add(tab_servicios, text="Servicios")
@@ -93,36 +93,70 @@ class Ventas:
         self.configurar_tab_servicios(tab_servicios)
 
         # =================== TABLA ITEMS ====================
-        self.tabla_items = ttk.Treeview(self.frame_principal, columns=('tipo', 'nombre', 'cantidad', 'precio_unitario', 'subtotal'), show='headings', height=7)
+        frame_tabla = tk.Frame(self.frame_principal, bg="#f5f7fa")
+        frame_tabla.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        self.tabla_items = ttk.Treeview(
+            frame_tabla,
+            columns=('tipo', 'nombre', 'cantidad', 'precio_unitario', 'subtotal'),
+            show='headings',
+            height=8
+        )
         for col in ('tipo', 'nombre', 'cantidad', 'precio_unitario', 'subtotal'):
             self.tabla_items.heading(col, text=col.capitalize())
-            self.tabla_items.column(col, width=100, anchor=tk.CENTER)
-        self.tabla_items.pack(fill=tk.BOTH, expand=True)
+            self.tabla_items.column(col, width=120, anchor=tk.CENTER)
+        self.tabla_items.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla_items.yview)
+        self.tabla_items.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # =================== BOTONES DE CONTROL ====================
-        frame_botones = tk.Frame(self.frame_principal, bg="#e0f7fa")
-        frame_botones.pack(fill=tk.X, pady=5)
+        frame_botones = tk.Frame(self.frame_principal, bg="#f5f7fa")
+        frame_botones.pack(fill=tk.X, pady=(0, 8), padx=10)
 
-        tk.Button(frame_botones, text="Quitar Item", font=("Helvetica", 10), bg="#e57373", fg="white", command=self.quitar_item).pack(side=tk.LEFT, padx=5)
-        tk.Button(frame_botones, text="Limpiar Todo", font=("Helvetica", 10), bg="#c62828", fg="white", command=self.limpiar_venta).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            frame_botones, text="Quitar Item", font=("Helvetica", 11),
+            bg="#e57373", fg="white", activebackground="#d32f2f", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.quitar_item
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            frame_botones, text="Limpiar Todo", font=("Helvetica", 11),
+            bg="#c62828", fg="white", activebackground="#b71c1c", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.limpiar_venta
+        ).pack(side=tk.LEFT, padx=5)
 
         # =================== TOTAL Y PROCESAR ====================
-        frame_total = tk.Frame(self.frame_principal, bg="#e0f7fa")
-        frame_total.pack(fill=tk.X, pady=10)
+        frame_total = tk.Frame(self.frame_principal, bg="#e3f2fd", bd=1, relief="solid")
+        frame_total.pack(fill=tk.X, pady=(0, 8), padx=10)
 
-        tk.Label(frame_total, text="TOTAL:", font=("Helvetica", 14, "bold"), bg="#e0f7fa").pack(side=tk.LEFT, padx=5)
+        tk.Label(
+            frame_total, text="TOTAL:", font=("Helvetica", 15, "bold"),
+            bg="#e3f2fd", fg="#1565C0"
+        ).pack(side=tk.LEFT, padx=10, pady=10)
 
-        self.lbl_total = tk.Label(frame_total, text="$0.00", font=("Helvetica", 14, "bold"), bg="#e0f7fa", fg="#00796b")
-        self.lbl_total.pack(side=tk.LEFT, padx=5)
+        self.lbl_total = tk.Label(
+            frame_total, text="$0.00", font=("Helvetica", 18, "bold"),
+            bg="#e3f2fd", fg="#2E7D32"
+        )
+        self.lbl_total.pack(side=tk.LEFT, padx=10, pady=10)
 
-        tk.Button(frame_total, text="Procesar Pago", font=("Helvetica", 12, "bold"), bg="#00796b", fg="white", command=self.procesar_pago).pack(side=tk.RIGHT, padx=10)
+        tk.Button(
+            frame_total, text="Procesar Pago", font=("Helvetica", 13, "bold"),
+            bg="#1976D2", fg="white", activebackground="#1565C0", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.procesar_pago
+        ).pack(side=tk.RIGHT, padx=10, pady=10)
 
         # =================== VOLVER ====================
-        frame_volver = tk.Frame(self.frame_principal, bg="#e0f7fa")
-        frame_volver.pack(fill=tk.X, pady=10)
+        frame_volver = tk.Frame(self.frame_principal, bg="#f5f7fa")
+        frame_volver.pack(fill=tk.X, pady=(0, 5), padx=10)
 
-        tk.Button(frame_volver, text="Volver", font=("Helvetica", 12), bg="#c62828", fg="white", command=self.ventana.destroy).pack(side=tk.RIGHT, padx=10)
-
+        tk.Button(
+            frame_volver, text="Volver", font=("Helvetica", 12),
+            bg="#c62828", fg="white", activebackground="#b71c1c", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.ventana.destroy
+        ).pack(side=tk.RIGHT, padx=10, pady=5)
 
 
 
@@ -146,7 +180,7 @@ class Ventas:
         btn_buscar_producto.pack(side=tk.LEFT, padx=5)
 
         # Tabla de productos
-        columnas = ('id', 'nombre', 'precio', 'stock')
+        columnas = ('id', 'nombre', 'precio', 'stock', 'promo')
         self.tabla_productos = ttk.Treeview(tab, columns=columnas, show='headings', height=7)
 
         # Configurar encabezados más claros y con anchos adecuados
@@ -154,12 +188,14 @@ class Ventas:
         self.tabla_productos.heading('nombre', text='PRODUCTO')
         self.tabla_productos.heading('precio', text='PRECIO')
         self.tabla_productos.heading('stock', text='STOCK')
+        self.tabla_productos.heading('promo', text='PROMO')
 
         # Configurar anchos adecuados
         self.tabla_productos.column('id', width=50, anchor=tk.CENTER)
         self.tabla_productos.column('nombre', width=250, anchor=tk.W)
         self.tabla_productos.column('precio', width=100, anchor=tk.CENTER)
         self.tabla_productos.column('stock', width=80, anchor=tk.CENTER)
+        self.tabla_productos.column('promo', width=120, anchor=tk.CENTER)
 
         # Aplicar estilo a la tabla
         utl.aplicar_estilo_tabla(self.tabla_productos)
@@ -208,7 +244,7 @@ class Ventas:
         btn_buscar_servicio.pack(side=tk.LEFT, padx=5)
 
         # Tabla de servicios
-        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo')
+        columnas = ('id', 'nombre', 'descripcion', 'precio', 'tiempo', 'promo')
         self.tabla_servicios = ttk.Treeview(tab, columns=columnas, show='headings', height=7)
         for col in columnas:
             self.tabla_servicios.heading(col, text=col.capitalize())
@@ -246,12 +282,15 @@ class Ventas:
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-            # Mostrar TODOS los productos, no solo los que tienen stock
-            cursor.execute("SELECT id_producto, nombre, precio, stock FROM productos ORDER BY nombre")
+            # Ahora también traemos promo_desc y nuevo_precio
+            cursor.execute("SELECT id_producto, nombre, precio, stock, promo_desc, nuevo_precio FROM productos ORDER BY nombre")
 
             for producto in cursor.fetchall():
-                precio_formateado = f"${float(producto[2]):.2f}"
-                valores = (producto[0], producto[1], precio_formateado, producto[3])
+                # Usar el precio promocional si existe
+                precio_final = float(producto[5]) if producto[5] is not None else float(producto[2])
+                precio_formateado = f"${precio_final:.2f}"
+                promo = producto[4] if producto[4] else ""
+                valores = (producto[0], producto[1], precio_formateado, producto[3], promo)
 
                 # Insertar productos sin stock con una etiqueta especial
                 if producto[3] <= 0:
@@ -322,6 +361,7 @@ class Ventas:
         nombre_producto = valores[1]
         precio_producto = float(valores[2].replace('$', '').replace(',', ''))
         stock_disponible = int(valores[3])
+        promo = valores[4] if len(valores) > 4 else ""
 
         # Advertir si el producto no tiene stock
         if stock_disponible <= 0:
@@ -351,7 +391,8 @@ class Ventas:
             'nombre': nombre_producto,
             'cantidad': cantidad,
             'precio_unitario': precio_producto,
-            'subtotal': subtotal
+            'subtotal': subtotal,
+            'promo': promo
         }
 
         existe = False
@@ -383,15 +424,18 @@ class Ventas:
             cursor = conexion.cursor()
             cursor.execute("""
                 SELECT id_servicio, nombre, descripcion, precio, 
-                       CONCAT(tiempo_estimado, ' min') as tiempo 
+                       CONCAT(tiempo_estimado, ' min') as tiempo,
+                       promo_desc, nuevo_precio
                 FROM servicios 
                 WHERE activo = 1 
                 ORDER BY nombre
             """)
 
             for servicio in cursor.fetchall():
-                precio_formateado = f"${float(servicio[3]):.2f}"
-                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4])
+                precio_final = float(servicio[6]) if servicio[6] is not None else float(servicio[3])
+                precio_formateado = f"${precio_final:.2f}"
+                promo = servicio[5] if servicio[5] else ""
+                valores = (servicio[0], servicio[1], servicio[2], precio_formateado, servicio[4], promo)
                 self.tabla_servicios.insert('', tk.END, values=valores)
 
             conexion.close()
@@ -448,6 +492,7 @@ class Ventas:
         id_servicio = valores[0]
         nombre_servicio = valores[1]
         precio_servicio = float(valores[3].replace('$', '').replace(',', ''))
+        promo = valores[5] if len(valores) > 5 else ""
 
         try:
             cantidad = int(self.entry_cantidad_servicio.get().strip())
@@ -466,7 +511,8 @@ class Ventas:
             'nombre': nombre_servicio,
             'cantidad': cantidad,
             'precio_unitario': precio_servicio,
-            'subtotal': subtotal
+            'subtotal': subtotal,
+            'promo': promo
         }
         existe = False
         for i, it in enumerate(self.items_venta):
@@ -493,9 +539,12 @@ class Ventas:
 
         # Agregar los nuevos
         for item in self.items_venta:
+            nombre = item['nombre']
+            if 'promo' in item and item['promo']:
+                nombre = f"{nombre} ({item['promo']})"
             valores = (
                 item['tipo'].capitalize(),
-                item['nombre'],
+                nombre,
                 item['cantidad'],
                 f"${item['precio_unitario']:.2f}",
                 f"${item['subtotal']:.2f}"
@@ -821,7 +870,7 @@ class Ventas:
 
                 # 3.4) Movimientos en caja
                 if metodo_pago == "Efectivo":
-                    # 3.4.1) Ingreso por el efectivo recibido
+                    # Solo registrar el total de la venta como ingreso
                     cursor.execute("""
                         INSERT INTO movimientos_caja
                         (id_caja, tipo, concepto, monto, hora, id_usuario)
@@ -829,7 +878,7 @@ class Ventas:
                     """, (
                         id_caja_actual,
                         f"Venta #{id_venta} – Efectivo",
-                        monto_recibido,
+                        self.total_venta,
                         responsable_caja
                     ))
                     cursor.execute("""
@@ -837,29 +886,9 @@ class Ventas:
                         SET total_ingresos = total_ingresos + %s,
                             saldo_final    = saldo_final    + %s
                         WHERE id_caja = %s
-                    """, (monto_recibido, monto_recibido, id_caja_actual))
-
-                    # 3.4.2) Egreso por cambio
-                    if cambio > 0:
-                        cursor.execute("""
-                            INSERT INTO movimientos_caja
-                            (id_caja, tipo, concepto, monto, hora, id_usuario)
-                            VALUES (%s, 'egreso', %s, %s, NOW(), %s)
-                        """, (
-                            id_caja_actual,
-                            f"Venta #{id_venta} – Cambio",
-                            cambio,
-                            responsable_caja
-                        ))
-                        cursor.execute("""
-                            UPDATE caja
-                            SET total_egresos = total_egresos + %s,
-                                saldo_final   = saldo_final   - %s
-                            WHERE id_caja = %s
-                        """, (cambio, cambio, id_caja_actual))
-
+                    """, (self.total_venta, self.total_venta, id_caja_actual))
                 else:
-                    # 3.4.3) Tarjeta/Transferencia (ingreso por total venta)
+                    # Tarjeta/Transferencia (igual que antes)
                     cursor.execute("""
                         INSERT INTO movimientos_caja
                         (id_caja, tipo, concepto, monto, hora, id_usuario)
@@ -956,9 +985,10 @@ class Ventas:
         cuerpo_items = ""
 
         for item in self.items_venta:
+            promo_text = f" <span style='color:#1976D2;'>[{item['promo']}]</span>" if item.get('promo') else ""
             cuerpo_items += f"""
             <tr>
-                <td>{item['nombre']}</td>
+                <td>{item['nombre']}{promo_text}</td>
                 <td class="precio">{item['cantidad']} x {item['precio_unitario']:.2f}</td>
                 <td class="subtotal">${item['subtotal']:.2f}</td>
             </tr>

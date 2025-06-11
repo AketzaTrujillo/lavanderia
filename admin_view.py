@@ -156,7 +156,10 @@ class MasterPanel:
              "fila": 2, "columna": 1},
             {"texto": "Gestionar Respaldos", "comando": self.gestionar_respaldos, "icono": "💾",
              "descripcion": "Copias de seguridad del sistema", "color": "#374151", "color_hover": "#1f2937", "fila": 2,
-             "columna": 2}
+             "columna": 2},
+            {"texto": "Promos y Descuentos", "comando": self.abrir_promos_descuentos, "icono": "🏷️",
+             "descripcion": "Gestiona promociones y descuentos para productos y servicios",
+             "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3, "columna": 0}
         ]
 
         for config in botones:
@@ -297,6 +300,13 @@ class MasterPanel:
             SeguimientoPedidos(self.ventana, self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
+
+    def abrir_promos_descuentos(self):
+        try:
+            from promos_descuentos import PromosDescuentosVentana
+            PromosDescuentosVentana(self.ventana, id_usuario=self.id_usuario)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de promociones: {str(e)}")
 
     def salir(self):
         if messagebox.askyesno("Confirmar salida", "¿Estás seguro de que deseas cerrar sesión?"):
