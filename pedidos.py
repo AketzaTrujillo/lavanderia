@@ -1014,8 +1014,11 @@ class Pedidos:
             conn = conectar_bd()
             cur  = conn.cursor()
 
-            # 2.1) Calcular puntos de fidelidad para este pedido
-            puntos_ganados = int(self.total_pedido / 10)
+            # 2.1) Calcular puntos de fidelidad para este pedido usando valor_punto_en_dinero
+            cur.execute("SELECT valor_punto_en_dinero FROM configuracion LIMIT 1")
+            row = cur.fetchone()
+            valor_punto = float(row[0]) if row and row[0] else 10  # 10 es el valor por defecto si no hay registro
+            puntos_ganados = int(self.total_pedido / valor_punto)
 
             # 3) Insertar en ventas, incluyendo id_pedido y puntos_ganados
             cur.execute("""

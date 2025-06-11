@@ -825,7 +825,12 @@ class Ventas:
             id_caja_actual, responsable_caja = fila
 
             # 2) Calcular puntos de fidelidad
-            puntos_ganados = int(self.total_venta / 10)
+            # Antes de calcular puntos_ganados, obtén el valor actual desde la base de datos:
+            cursor.execute("SELECT valor_punto_en_dinero FROM configuracion LIMIT 1")
+            row = cursor.fetchone()
+            valor_punto = float(row[0]) if row and row[0] else 10  # 10 es el valor por defecto si no hay registro
+
+            puntos_ganados = int(self.total_venta / valor_punto)
 
             # 3) Iniciar transacción
             cursor.execute("START TRANSACTION")

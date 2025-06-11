@@ -159,7 +159,10 @@ class MasterPanel:
              "columna": 2},
             {"texto": "Promos y Descuentos", "comando": self.abrir_promos_descuentos, "icono": "🏷️",
              "descripcion": "Gestiona promociones y descuentos para productos y servicios",
-             "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3, "columna": 0}
+             "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3, "columna": 0},
+            {"texto": "Puntos de Lealtad", "comando": self.gestionar_puntos_lealtad, "icono": "⭐",
+             "descripcion": "Gestiona y consulta los puntos de lealtad de los clientes",
+             "color": "#f59e42", "color_hover": "#d97706", "fila": 3, "columna": 2}
         ]
 
         for config in botones:
@@ -307,6 +310,13 @@ class MasterPanel:
             PromosDescuentosVentana(self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de promociones: {str(e)}")
+
+    def gestionar_puntos_lealtad(self):
+        try:
+            from puntos_lealtad import PuntosLealtadVentana
+            PuntosLealtadVentana(self.ventana)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de puntos de lealtad: {str(e)}")
 
     def salir(self):
         if messagebox.askyesno("Confirmar salida", "¿Estás seguro de que deseas cerrar sesión?"):
