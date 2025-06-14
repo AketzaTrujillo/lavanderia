@@ -11,7 +11,7 @@ class MasterPanel:
     def __init__(self, id_usuario=None):
         self.ventana = tk.Tk()
         self.ventana.title("🏢 Panel de Administrador - Lavandería Exprés")
-        # CONFIGURAR VENTANA MAXIMIZADA (con
+        # CONFIGURAR VENTANA MAXIMIZADA
         self.ventana.state('zoomed')  # Windows - maximizada con bordes
         try:
             self.ventana.attributes('-zoomed', True)  # Linux
@@ -160,6 +160,9 @@ class MasterPanel:
             {"texto": "Promos y Descuentos", "comando": self.abrir_promos_descuentos, "icono": "🏷️",
              "descripcion": "Gestiona promociones y descuentos para productos y servicios",
              "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3, "columna": 0},
+            {"texto": "Gestionar Permisos", "comando": self.gestionar_permisos_usuarios, "icono": "🔒",
+             "descripcion": "Administrar permisos de acceso de cajeros", "color": "#7c2d12", "color_hover": "#991b1b",
+             "fila": 3, "columna": 1},
             {"texto": "Puntos de Lealtad", "comando": self.gestionar_puntos_lealtad, "icono": "⭐",
              "descripcion": "Gestiona y consulta los puntos de lealtad de los clientes",
              "color": "#f59e42", "color_hover": "#d97706", "fila": 3, "columna": 2}
@@ -180,49 +183,42 @@ class MasterPanel:
         icono_label.pack(pady=(10, 5))
 
         titulo_label = tk.Label(frame_boton, text=config['texto'], font=("Segoe UI", 13, "bold"), bg="#ffffff",
-                                fg="#1f2937", wraplength=200)
+                                fg="#1f2937")
         titulo_label.pack(pady=(0, 5))
 
-        desc_label = tk.Label(frame_boton, text=config['descripcion'], font=("Segoe UI", 9), bg="#ffffff", fg="#6b7280",
-                              wraplength=180, justify=tk.CENTER)
+        desc_label = tk.Label(frame_boton, text=config['descripcion'], font=("Segoe UI", 9), bg="#ffffff",
+                              fg="#6b7280", wraplength=140, justify=tk.CENTER)
         desc_label.pack(pady=(0, 10))
 
-        btn_accion = tk.Button(frame_boton, text="ABRIR", font=("Segoe UI", 10, "bold"), bg=config['color'], fg="white",
-                               activebackground=config['color_hover'], activeforeground="white", relief=tk.FLAT,
-                               cursor="hand2", command=config['comando'], width=15, pady=5)
+        btn_accion = tk.Button(frame_boton, text="Acceder", command=config['comando'], bg=config['color'], fg="white",
+                               font=("Segoe UI", 10, "bold"), padx=15, pady=5, cursor="hand2")
         btn_accion.pack(pady=(0, 10))
 
-        def on_enter(event):
-            frame_boton.config(bg="#f8fafc", relief=tk.RAISED, bd=2)
-            icono_label.config(bg="#f8fafc")
-            titulo_label.config(bg="#f8fafc")
-            desc_label.config(bg="#f8fafc")
+        def on_enter(e):
             btn_accion.config(bg=config['color_hover'])
+            frame_boton.config(relief=tk.RAISED, bd=2)
 
-        def on_leave(event):
-            frame_boton.config(bg="#ffffff", relief=tk.RAISED, bd=1)
-            icono_label.config(bg="#ffffff")
-            titulo_label.config(bg="#ffffff")
-            desc_label.config(bg="#ffffff")
+        def on_leave(e):
             btn_accion.config(bg=config['color'])
+            frame_boton.config(relief=tk.RAISED, bd=1)
 
-        for widget in [frame_boton, icono_label, titulo_label, desc_label]:
-            widget.bind("<Enter>", on_enter)
-            widget.bind("<Leave>", on_leave)
+        btn_accion.bind("<Enter>", on_enter)
+        btn_accion.bind("<Leave>", on_leave)
+        frame_boton.bind("<Enter>", on_enter)
+        frame_boton.bind("<Leave>", on_leave)
 
-    def crear_boton_cerrar_sesion(self, parent):
-        frame_boton = tk.Frame(parent, bg="#fef2f2", relief=tk.RAISED, bd=1)
-        frame_boton.grid(row=3, column=1, padx=10, pady=20, sticky="nsew", ipadx=10, ipady=10)
+    def crear_boton_cerrar_sesion(self, grid_frame):
+        frame_cerrar = tk.Frame(grid_frame, bg="#ffffff", relief=tk.RAISED, bd=1)
+        frame_cerrar.grid(row=4, column=1, padx=10, pady=15, sticky="nsew", ipadx=10, ipady=10)
 
-        tk.Label(frame_boton, text="🚪", font=("Segoe UI Emoji", 28), bg="#fef2f2", fg="#dc2626").pack(pady=(10, 5))
-        tk.Label(frame_boton, text="Cerrar Sesión", font=("Segoe UI", 13, "bold"), bg="#fef2f2", fg="#1f2937").pack(
-            pady=(0, 5))
-        tk.Label(frame_boton, text="Salir del sistema de forma segura", font=("Segoe UI", 9), bg="#fef2f2",
-                 fg="#6b7280", wraplength=180, justify=tk.CENTER).pack(pady=(0, 10))
+        tk.Label(frame_cerrar, text="🚪", font=("Segoe UI Emoji", 28), bg="#ffffff", fg="#dc2626").pack(pady=(10, 5))
+        tk.Label(frame_cerrar, text="Cerrar Sesión", font=("Segoe UI", 13, "bold"), bg="#ffffff",
+                 fg="#1f2937").pack(pady=(0, 5))
+        tk.Label(frame_cerrar, text="Salir del sistema de forma segura", font=("Segoe UI", 9), bg="#ffffff",
+                 fg="#6b7280", wraplength=140, justify=tk.CENTER).pack(pady=(0, 10))
 
-        btn_salir = tk.Button(frame_boton, text="SALIR", font=("Segoe UI", 10, "bold"), bg="#dc2626", fg="white",
-                              activebackground="#b91c1c", activeforeground="white", relief=tk.FLAT, cursor="hand2",
-                              command=self.salir, width=15, pady=5)
+        btn_salir = tk.Button(frame_cerrar, text="Cerrar Sesión", command=self.salir, bg="#dc2626", fg="white",
+                              font=("Segoe UI", 10, "bold"), padx=15, pady=5, cursor="hand2")
         btn_salir.pack(pady=(0, 10))
 
     def crear_footer(self):
@@ -235,41 +231,47 @@ class MasterPanel:
         footer_content = tk.Frame(footer_frame, bg="#ffffff")
         footer_content.pack(fill=tk.BOTH, expand=True, padx=30, pady=10)
 
-        tk.Label(footer_content, text="💻 Sistema de Lavandería v2.0 | Desarrollado con ❤️", font=("Segoe UI", 9),
+        tk.Label(footer_content, text="🏢 Panel de Administración | Sistema de Lavandería v2.0", font=("Segoe UI", 9),
                  bg="#ffffff", fg="#6b7280").pack(side=tk.LEFT)
-        tk.Label(footer_content, text="🟢 Sistema operativo • Base de datos conectada", font=("Segoe UI", 9),
-                 bg="#ffffff", fg="#059669").pack(side=tk.RIGHT)
+        tk.Label(footer_content, text="🟢 Conectado • Sistema operativo", font=("Segoe UI", 9), bg="#ffffff",
+                 fg="#059669").pack(side=tk.RIGHT)
+
+    # ==================== MÉTODOS DE FUNCIONALIDAD (NOMBRES EXACTOS) ====================
 
     def gestionar_usuarios(self):
+        """CORREGIDO: Usar gestionar_usuarios no usuarios"""
         try:
             from gestionar_usuarios import GestionUsuarios
             GestionUsuarios(self.ventana)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de usuarios: {str(e)}")
 
     def gestionar_productos(self):
+        """CORREGIDO: Usar gestionar_productos_servicios no productos"""
         try:
             from gestionar_productos_servicios import GestionProductosServicios
             GestionProductosServicios(self.ventana)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de productos: {str(e)}")
 
     def gestionar_clientes(self):
+        """CORRECTO: GestionClientes del módulo clientes"""
         try:
             from clientes import GestionClientes
             GestionClientes(self.ventana)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de clientes: {str(e)}")
 
     def gestionar_pedidos(self):
+        """CORRECTO: Pedidos del módulo pedidos"""
         try:
             from pedidos import Pedidos
-            # Le pasamos self.id_usuario_actual para que Pedidos lo use
             Pedidos(self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {e}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de pedidos: {str(e)}")
 
     def gestionar_caja(self):
+        """CORRECTO: GestionCaja del módulo caja"""
         try:
             from caja import GestionCaja
             GestionCaja(ventana_padre=self.ventana, id_usuario=self.id_usuario)
@@ -277,6 +279,7 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
 
     def gestionar_respaldos(self):
+        """CORRECTO: ModuloRespaldo del módulo respaldos2"""
         try:
             from respaldos2 import ModuloRespaldo
             ModuloRespaldo(self.ventana, self.id_usuario)
@@ -284,13 +287,15 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos: {str(e)}")
 
     def registrar_ventas(self):
+        """CORRECTO: Ventas del módulo ventas"""
         try:
             from ventas import Ventas
             Ventas(self.ventana, id_usuario=self.id_usuario)
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo abrir el módulo: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de ventas: {str(e)}")
 
     def generar_reportes(self):
+        """CORRECTO: abrir_reportes del módulo reportes"""
         try:
             from reportes import abrir_reportes
             abrir_reportes(self.ventana)
@@ -298,6 +303,7 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de reportes: {str(e)}")
 
     def seguimiento_pedidos(self):
+        """CORRECTO: SeguimientoPedidos del módulo seguimiento_pedidos"""
         try:
             from seguimiento_pedidos import SeguimientoPedidos
             SeguimientoPedidos(self.ventana, self.id_usuario)
@@ -305,16 +311,30 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
 
     def abrir_promos_descuentos(self):
+        """Módulo de promociones (puede no existir aún)"""
         try:
             from promos_descuentos import PromosDescuentosVentana
             PromosDescuentosVentana(self.ventana, id_usuario=self.id_usuario)
+        except ImportError:
+            messagebox.showinfo("Información", "El módulo de promociones y descuentos estará disponible próximamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de promociones: {str(e)}")
 
+    def gestionar_permisos_usuarios(self):
+        """NUEVO: Abrir ventana de gestión de permisos de usuarios"""
+        try:
+            from permisos_usuarios import GestionPermisosUsuarios
+            GestionPermisosUsuarios(self.ventana)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir el módulo de permisos: {str(e)}")
+
     def gestionar_puntos_lealtad(self):
+        """Módulo de puntos de lealtad (puede no existir aún)"""
         try:
             from puntos_lealtad import PuntosLealtadVentana
             PuntosLealtadVentana(self.ventana)
+        except ImportError:
+            messagebox.showinfo("Información", "El módulo de puntos de lealtad estará disponible próximamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de puntos de lealtad: {str(e)}")
 
