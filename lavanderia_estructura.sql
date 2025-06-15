@@ -587,5 +587,219 @@ ALTER TABLE productos
 
 ALTER TABLE servicios
     ADD COLUMN promo_desc VARCHAR(100) NULL,
-    ADD COLUMN nuevo_precio DECIMAL(10,2) NULL;
+    ADD COLUMN nuevo_precio DECIMAL(10,2) NULLe
 
+CREATE TABLE cuentas_abiertas (
+    id_cuenta INT AUTO_INCREMENT PRIMARY KEY,
+    numero_cuenta VARCHAR(20) UNIQUE NOT NULL, -- Mesa 1, Cliente A, etc.
+    nombre_cliente VARCHAR(100) NOT NULL,
+    id_cliente INT NULL, -- Referencia opcional a clientes registrados
+    fecha_apertura DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hora_apertura TIME DEFAULT (CURRENT_TIME),
+    estado ENUM('abierta', 'cerrada', 'pausada') DEFAULT 'abierta',
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    descuento DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) DEFAULT 0.00,
+    observaciones TEXT,
+    id_usuario_apertura INT NOT NULL, -- Quién abrió la cuenta
+    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE SET NULL,
+    FOREIGN KEY (id_usuario_apertura) REFERENCES usuarios(id_usuario)
+);
+
+-- Crear tabla para los items de las cuentas abiertas
+CREATE TABLE items_cuenta_abierta (
+    id_item INT AUTO_INCREMENT PRIMARY KEY,
+    id_cuenta INT NOT NULL,
+    tipo_item ENUM('producto', 'servicio') NOT NULL,
+    id_item_ref INT NOT NULL, -- ID del producto o servicio
+    nombre_item VARCHAR(200) NOT NULL, -- Nombre al momento de la venta
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    fecha_agregado DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id_usuario INT NOT NULL, -- Quién agregó el item
+    observaciones VARCHAR(500),
+
+    FOREIGN KEY (id_cuenta) REFERENCES cuentas_abiertas(id_cuenta) ON DELETE CASCADE,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- Modificar tabla ventas para relacionar con cuentas abiertas
+ALTER TABLE ventas
+ADD COLUMN id_cuenta_abierta INT NULL,
+ADD FOREIGN KEY (id_cuenta_abierta) REFERENCES cuentas_abiertas(id_cuenta);
+
+-- Crear índices para mejor rendimiento
+CREATE INDEX idx_cuentas_estado ON cuentas_abiertas(estado);
+CREATE INDEX idx_cuentas_fecha ON cuentas_abiertas(fecha_apertura);
+CREATE INDEX idx_items_cuenta ON items_cuenta_abierta(id_cuenta);
+
+-- Crear trigger para actualizar totales de cuenta automáticamente
+DELIMITER //
+CREATE TRIGGER actualizar_total_cuenta_insert
+AFTER INSERT ON items_cuenta_abierta
+FOR EACH ROW
+BEGIN
+    UPDATE cuentas_abiertas
+    SET subtotal = (
+        SELECT COALESCE(SUM(subtotal), 0)
+        FROM items_cuenta_abierta
+        WHERE id_cuenta = NEW.id_cuenta
+    ),
+    total = subtotal - descuento
+    WHERE id_cuenta = NEW.id_cuenta;
+END //
+
+CREATE TRIGGER actualizar_total_cuenta_update
+AFTER UPDATE ON items_cuenta_abierta
+FOR EACH ROW
+BEGIN
+    UPDATE cuentas_abiertas
+    SET subtotal = (
+        SELECT COALESCE(SUM(subtotal), 0)
+        FROM items_cuenta_abierta
+        WHERE id_cuenta = NEW.id_cuenta
+    ),
+    total = subtotal - descuento
+    WHERE id_cuenta = NEW.id_cuenta;
+END //
+
+CREATE TRIGGER actualizar_total_cuenta_delete
+AFTER DELETE ON items_cuenta_abierta
+FOR EACH ROW
+BEGIN
+    UPDATE cuentas_abiertas
+    SET subtotal = (
+        SELECT COALESCE(SUM(subtotal), 0)
+        FROM items_cuenta_abierta
+        WHERE id_cuenta = OLD.id_cuenta
+    ),
+    total = subtotal - descuento
+    WHERE id_cuenta = OLD.id_cuenta;
+END //
+DELIMITER ;
+
+-- Vista para consultar cuentas abiertas con detalles
+CREATE VIEW vista_cuentas_abiertas AS
+SELECT
+    ca.id_cuenta,
+    ca.numero_cuenta,
+    ca.nombre_cliente,
+    c.telefono as telefono_cliente,
+    ca.fecha_apertura,
+    ca.hora_apertura,
+    ca.estado,
+    ca.subtotal,
+    ca.descuento,
+    ca.total,
+    ca.observaciones,
+    u.nombre as usuario_apertura,
+    COUNT(ica.id_item) as cantidad_items,
+    TIMESTAMPDIFF(MINUTE, ca.fecha_apertura, NOW()) as minutos_abierta
+FROM cuentas_abiertas ca
+LEFT JOIN clientes c ON ca.id_cliente = c.id_cliente
+LEFT JOIN usuarios u ON ca.id_usuario_apertura = u.id_usuario
+LEFT JOIN items_cuenta_abierta ica ON ca.id_cuenta = ica.id_cuenta
+GROUP BY ca.id_cuenta
+ORDER BY ca.fecha_apertura DESC;
+
+-- Vista para el detalle de items en cuentas abiertas
+CREATE VIEW vista_detalle_cuentas_abiertas AS
+SELECT
+    ica.id_item,
+    ica.id_cuenta,
+    ca.numero_cuenta,
+    ca.nombre_cliente,
+    ica.tipo_item,
+    ica.nombre_item,
+    ica.cantidad,
+    ica.precio_unitario,
+    ica.subtotal,
+    ica.fecha_agregado,
+    u.nombre as usuario_que_agrego,
+    ica.observaciones
+FROM items_cuenta_abierta ica
+JOIN cuentas_abiertas ca ON ica.id_cuenta = ca.id_cuenta
+JOIN usuarios u ON ica.id_usuario = u.id_usuario
+ORDER BY ica.fecha_agregado DESC;
+
+-- =====================================================
+-- EJECUTAR EN MySQL PARA CREAR TABLAS DE CUENTAS ABIERTAS
+-- =====================================================
+
+USE lavanderiadb;
+
+-- 1. Crear tabla cuentas_abiertas
+CREATE TABLE IF NOT EXISTS cuentas_abiertas (
+    id_cuenta INT AUTO_INCREMENT PRIMARY KEY,
+    numero_cuenta VARCHAR(20) UNIQUE NOT NULL,
+    nombre_cliente VARCHAR(100) NOT NULL,
+    id_cliente INT NULL,
+    fecha_apertura DATETIME DEFAULT CURRENT_TIMESTAMP,
+    hora_apertura TIME DEFAULT (CURRENT_TIME),
+    estado ENUM('abierta', 'cerrada', 'pausada') DEFAULT 'abierta',
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    descuento DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) DEFAULT 0.00,
+    observaciones TEXT,
+    id_usuario_apertura INT NOT NULL,
+    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente) ON DELETE SET NULL,
+    FOREIGN KEY (id_usuario_apertura) REFERENCES usuarios(id_usuario)
+);
+
+-- 2. Crear tabla items_cuenta_abierta
+CREATE TABLE IF NOT EXISTS items_cuenta_abierta (
+    id_item INT AUTO_INCREMENT PRIMARY KEY,
+    id_cuenta INT NOT NULL,
+    tipo_item ENUM('producto', 'servicio') NOT NULL,
+    id_item_ref INT NOT NULL,
+    nombre_item VARCHAR(200) NOT NULL,
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    fecha_agregado DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id_usuario INT NOT NULL,
+    observaciones VARCHAR(500),
+
+    FOREIGN KEY (id_cuenta) REFERENCES cuentas_abiertas(id_cuenta) ON DELETE CASCADE,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
+
+-- 3. Modificar tabla ventas (solo si no existe la columna)
+ALTER TABLE ventas
+ADD COLUMN IF NOT EXISTS id_cuenta_abierta INT NULL;
+
+-- 4. Crear índices
+CREATE INDEX IF NOT EXISTS idx_cuentas_estado ON cuentas_abiertas(estado);
+CREATE INDEX IF NOT EXISTS idx_cuentas_fecha ON cuentas_abiertas(fecha_apertura);
+CREATE INDEX IF NOT EXISTS idx_items_cuenta ON items_cuenta_abierta(id_cuenta);
+
+-- 5. Crear vista para cuentas abiertas
+CREATE OR REPLACE VIEW vista_cuentas_abiertas AS
+SELECT
+    ca.id_cuenta,
+    ca.numero_cuenta,
+    ca.nombre_cliente,
+    c.telefono as telefono_cliente,
+    ca.fecha_apertura,
+    ca.hora_apertura,
+    ca.estado,
+    ca.subtotal,
+    ca.descuento,
+    ca.total,
+    ca.observaciones,
+    u.nombre as usuario_apertura,
+    COUNT(ica.id_item) as cantidad_items,
+    TIMESTAMPDIFF(MINUTE, ca.fecha_apertura, NOW()) as minutos_abierta
+FROM cuentas_abiertas ca
+LEFT JOIN clientes c ON ca.id_cliente = c.id_cliente
+LEFT JOIN usuarios u ON ca.id_usuario_apertura = u.id_usuario
+LEFT JOIN items_cuenta_abierta ica ON ca.id_cuenta = ica.id_cuenta
+GROUP BY ca.id_cuenta
+ORDER BY ca.fecha_apertura DESC;
+
+SELECT 'Tablas de cuentas abiertas creadas exitosamente' as Resultado;

@@ -11,10 +11,9 @@ class MasterPanel:
     def __init__(self, id_usuario=None):
         self.ventana = tk.Tk()
         self.ventana.title("🏢 Panel de Administrador - Lavandería Exprés")
-        # CONFIGURAR VENTANA MAXIMIZADA
-        self.ventana.state('zoomed')  # Windows - maximizada con bordes
+        self.ventana.state('zoomed')
         try:
-            self.ventana.attributes('-zoomed', True)  # Linux
+            self.ventana.attributes('-zoomed', True)
         except:
             pass
 
@@ -35,25 +34,20 @@ class MasterPanel:
         self.ventana.mainloop()
 
     def construir_interfaz(self):
-        # Canvas para scroll SIN scrollbar visible
         self.canvas = tk.Canvas(self.ventana, bg="#f0f4f8", highlightthickness=0, bd=0)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Frame scrollable
         self.frame_principal = tk.Frame(self.canvas, bg="#f0f4f8")
         self.canvas_window = self.canvas.create_window((0, 0), window=self.frame_principal, anchor="nw")
 
-        # Configurar scroll
         def configurar_scroll(event=None):
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-            # Hacer que el frame ocupe todo el ancho del canvas
             canvas_width = self.canvas.winfo_width()
             self.canvas.itemconfig(self.canvas_window, width=canvas_width)
 
         self.frame_principal.bind("<Configure>", configurar_scroll)
         self.canvas.bind("<Configure>", configurar_scroll)
 
-        # SCROLL CON MOUSE - FUNCIONAL
         def scroll_mouse(event):
             self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
@@ -63,15 +57,11 @@ class MasterPanel:
         def scroll_linux_down(event):
             self.canvas.yview_scroll(1, "units")
 
-        # Vincular eventos de scroll
-        self.canvas.bind("<MouseWheel>", scroll_mouse)  # Windows
-        self.canvas.bind("<Button-4>", scroll_linux_up)  # Linux up
-        self.canvas.bind("<Button-5>", scroll_linux_down)  # Linux down
-
-        # Hacer que el canvas reciba el foco para scroll
+        self.canvas.bind("<MouseWheel>", scroll_mouse)
+        self.canvas.bind("<Button-4>", scroll_linux_up)
+        self.canvas.bind("<Button-5>", scroll_linux_down)
         self.canvas.focus_set()
 
-        # También vincular a todos los widgets hijos
         def bind_scroll_to_all(widget):
             widget.bind("<MouseWheel>", scroll_mouse)
             widget.bind("<Button-4>", scroll_linux_up)
@@ -129,7 +119,9 @@ class MasterPanel:
         for i in range(3):
             grid_frame.columnconfigure(i, weight=1)
 
+        # ⭐ BOTONES ACTUALIZADOS - SIN CONFIGURACIONES
         botones = [
+            # Primera fila
             {"texto": "Gestionar Usuarios", "comando": self.gestionar_usuarios, "icono": "👤",
              "descripcion": "Administrar cuentas de usuario del sistema", "color": "#2563eb", "color_hover": "#1d4ed8",
              "fila": 0, "columna": 0},
@@ -139,33 +131,50 @@ class MasterPanel:
             {"texto": "Gestionar Clientes", "comando": self.gestionar_clientes, "icono": "👥",
              "descripcion": "Base de datos y perfiles de clientes", "color": "#d97706", "color_hover": "#b45309",
              "fila": 0, "columna": 2},
+
+            # Segunda fila
             {"texto": "Gestionar Pedidos", "comando": self.gestionar_pedidos, "icono": "📋",
              "descripcion": "Control y seguimiento de pedidos", "color": "#7c3aed", "color_hover": "#6d28d9", "fila": 1,
              "columna": 0},
-            {"texto": "Registrar Ventas", "comando": self.registrar_ventas, "icono": "💰",
-             "descripcion": "Punto de venta y facturación", "color": "#dc2626", "color_hover": "#b91c1c", "fila": 1,
+            {"texto": "Ventas con Cuentas", "comando": self.ventas_con_cuentas_abiertas, "icono": "💰",
+             "descripcion": "Sistema de ventas con cuentas abiertas", "color": "#dc2626", "color_hover": "#b91c1c",
+             "fila": 1,
              "columna": 1},
-            {"texto": "Gestionar Caja", "comando": self.gestionar_caja, "icono": "💵",
-             "descripcion": "Control de ingresos, egresos y arqueos", "color": "#0891b2", "color_hover": "#0e7490",
-             "fila": 1, "columna": 2},
-            {"texto": "Seguimiento Pedidos", "comando": self.seguimiento_pedidos, "icono": "📊",
-             "descripcion": "Monitoreo en tiempo real de pedidos", "color": "#be185d", "color_hover": "#9d174d",
-             "fila": 2, "columna": 0},
-            {"texto": "Generar Reportes", "comando": self.generar_reportes, "icono": "📈",
-             "descripcion": "Análisis, estadísticas y reportes", "color": "#7c2d12", "color_hover": "#92400e",
-             "fila": 2, "columna": 1},
-            {"texto": "Gestionar Respaldos", "comando": self.gestionar_respaldos, "icono": "💾",
-             "descripcion": "Copias de seguridad del sistema", "color": "#374151", "color_hover": "#1f2937", "fila": 2,
+            {"texto": "Registrar Ventas", "comando": self.registrar_ventas, "icono": "💵",
+             "descripcion": "Punto de venta tradicional", "color": "#16a34a", "color_hover": "#15803d", "fila": 1,
              "columna": 2},
+
+            # Tercera fila
+            {"texto": "Cuentas Abiertas", "comando": self.gestionar_cuentas_abiertas, "icono": "🧾",
+             "descripcion": "Gestión de cuentas abiertas y facturación", "color": "#0891b2", "color_hover": "#0e7490",
+             "fila": 2, "columna": 0},
+            {"texto": "Gestionar Caja", "comando": self.gestionar_caja, "icono": "🏦",
+             "descripcion": "Control de ingresos, egresos y arqueos", "color": "#be185d", "color_hover": "#9d174d",
+             "fila": 2, "columna": 1},
+            {"texto": "Seguimiento Pedidos", "comando": self.seguimiento_pedidos, "icono": "📊",
+             "descripcion": "Monitoreo en tiempo real de pedidos", "color": "#7c2d12", "color_hover": "#92400e",
+             "fila": 2, "columna": 2},
+
+            # Cuarta fila
+            {"texto": "Generar Reportes", "comando": self.generar_reportes, "icono": "📈",
+             "descripcion": "Análisis, estadísticas y reportes", "color": "#374151", "color_hover": "#1f2937",
+             "fila": 3,
+             "columna": 0},
+            {"texto": "Gestionar Respaldos", "comando": self.gestionar_respaldos, "icono": "💾",
+             "descripcion": "Copias de seguridad del sistema", "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3,
+             "columna": 1},
             {"texto": "Promos y Descuentos", "comando": self.abrir_promos_descuentos, "icono": "🏷️",
-             "descripcion": "Gestiona promociones y descuentos para productos y servicios",
-             "color": "#0ea5e9", "color_hover": "#0369a1", "fila": 3, "columna": 0},
+             "descripcion": "Gestiona promociones y descuentos", "color": "#f59e42", "color_hover": "#d97706",
+             "fila": 3,
+             "columna": 2},
+
+            # Quinta fila
             {"texto": "Gestionar Permisos", "comando": self.gestionar_permisos_usuarios, "icono": "🔒",
-             "descripcion": "Administrar permisos de acceso de cajeros", "color": "#7c2d12", "color_hover": "#991b1b",
-             "fila": 3, "columna": 1},
+             "descripcion": "Administrar permisos de acceso de cajeros", "color": "#991b1b", "color_hover": "#7f1d1d",
+             "fila": 4, "columna": 0},
             {"texto": "Puntos de Lealtad", "comando": self.gestionar_puntos_lealtad, "icono": "⭐",
-             "descripcion": "Gestiona y consulta los puntos de lealtad de los clientes",
-             "color": "#f59e42", "color_hover": "#d97706", "fila": 3, "columna": 2}
+             "descripcion": "Gestiona y consulta los puntos de lealtad", "color": "#7c3aed", "color_hover": "#6d28d9",
+             "fila": 4, "columna": 1}
         ]
 
         for config in botones:
@@ -178,48 +187,65 @@ class MasterPanel:
         frame_boton.grid(row=config['fila'], column=config['columna'], padx=10, pady=10, sticky="nsew", ipadx=10,
                          ipady=10)
 
-        icono_label = tk.Label(frame_boton, text=config['icono'], font=("Segoe UI Emoji", 28), bg="#ffffff",
+        icono_label = tk.Label(frame_boton, text=config['icono'], font=("Segoe UI Emoji", 24), bg="#ffffff",
                                fg=config['color'])
-        icono_label.pack(pady=(10, 5))
+        icono_label.pack(pady=(15, 5))
 
-        titulo_label = tk.Label(frame_boton, text=config['texto'], font=("Segoe UI", 13, "bold"), bg="#ffffff",
+        titulo_label = tk.Label(frame_boton, text=config['texto'], font=("Segoe UI", 11, "bold"), bg="#ffffff",
                                 fg="#1f2937")
         titulo_label.pack(pady=(0, 5))
 
-        desc_label = tk.Label(frame_boton, text=config['descripcion'], font=("Segoe UI", 9), bg="#ffffff",
-                              fg="#6b7280", wraplength=140, justify=tk.CENTER)
-        desc_label.pack(pady=(0, 10))
-
-        btn_accion = tk.Button(frame_boton, text="Acceder", command=config['comando'], bg=config['color'], fg="white",
-                               font=("Segoe UI", 10, "bold"), padx=15, pady=5, cursor="hand2")
-        btn_accion.pack(pady=(0, 10))
+        desc_label = tk.Label(frame_boton, text=config['descripcion'], font=("Segoe UI", 8), bg="#ffffff",
+                              fg="#6b7280", wraplength=150)
+        desc_label.pack(pady=(0, 15))
 
         def on_enter(e):
-            btn_accion.config(bg=config['color_hover'])
-            frame_boton.config(relief=tk.RAISED, bd=2)
+            frame_boton.config(bg=config['color'])
+            icono_label.config(bg=config['color'], fg="#ffffff")
+            titulo_label.config(bg=config['color'], fg="#ffffff")
+            desc_label.config(bg=config['color'], fg="#ffffff")
 
         def on_leave(e):
-            btn_accion.config(bg=config['color'])
-            frame_boton.config(relief=tk.RAISED, bd=1)
+            frame_boton.config(bg="#ffffff")
+            icono_label.config(bg="#ffffff", fg=config['color'])
+            titulo_label.config(bg="#ffffff", fg="#1f2937")
+            desc_label.config(bg="#ffffff", fg="#6b7280")
 
-        btn_accion.bind("<Enter>", on_enter)
-        btn_accion.bind("<Leave>", on_leave)
-        frame_boton.bind("<Enter>", on_enter)
-        frame_boton.bind("<Leave>", on_leave)
+        def on_click(e):
+            config['comando']()
 
-    def crear_boton_cerrar_sesion(self, grid_frame):
-        frame_cerrar = tk.Frame(grid_frame, bg="#ffffff", relief=tk.RAISED, bd=1)
-        frame_cerrar.grid(row=4, column=1, padx=10, pady=15, sticky="nsew", ipadx=10, ipady=10)
+        widgets = [frame_boton, icono_label, titulo_label, desc_label]
+        for widget in widgets:
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            widget.bind("<Button-1>", on_click)
 
-        tk.Label(frame_cerrar, text="🚪", font=("Segoe UI Emoji", 28), bg="#ffffff", fg="#dc2626").pack(pady=(10, 5))
-        tk.Label(frame_cerrar, text="Cerrar Sesión", font=("Segoe UI", 13, "bold"), bg="#ffffff",
-                 fg="#1f2937").pack(pady=(0, 5))
-        tk.Label(frame_cerrar, text="Salir del sistema de forma segura", font=("Segoe UI", 9), bg="#ffffff",
-                 fg="#6b7280", wraplength=140, justify=tk.CENTER).pack(pady=(0, 10))
+    def crear_boton_cerrar_sesion(self, parent):
+        frame_salir = tk.Frame(parent, bg="#dc2626", relief=tk.RAISED, bd=1)
+        frame_salir.grid(row=5, column=1, padx=10, pady=20, sticky="nsew")
 
-        btn_salir = tk.Button(frame_cerrar, text="Cerrar Sesión", command=self.salir, bg="#dc2626", fg="white",
-                              font=("Segoe UI", 10, "bold"), padx=15, pady=5, cursor="hand2")
-        btn_salir.pack(pady=(0, 10))
+        icono_salir = tk.Label(frame_salir, text="🚪", font=("Segoe UI Emoji", 20), bg="#dc2626", fg="#ffffff")
+        icono_salir.pack(pady=(10, 5))
+
+        texto_salir = tk.Label(frame_salir, text="Cerrar Sesión", font=("Segoe UI", 12, "bold"), bg="#dc2626",
+                               fg="#ffffff")
+        texto_salir.pack(pady=(0, 10))
+
+        def on_enter_salir(e):
+            frame_salir.config(bg="#b91c1c")
+            icono_salir.config(bg="#b91c1c")
+            texto_salir.config(bg="#b91c1c")
+
+        def on_leave_salir(e):
+            frame_salir.config(bg="#dc2626")
+            icono_salir.config(bg="#dc2626")
+            texto_salir.config(bg="#dc2626")
+
+        widgets_salir = [frame_salir, icono_salir, texto_salir]
+        for widget in widgets_salir:
+            widget.bind("<Enter>", on_enter_salir)
+            widget.bind("<Leave>", on_leave_salir)
+            widget.bind("<Button-1>", lambda e: self.salir())
 
     def crear_footer(self):
         footer_frame = tk.Frame(self.frame_principal, bg="#ffffff", height=50)
@@ -236,10 +262,9 @@ class MasterPanel:
         tk.Label(footer_content, text="🟢 Conectado • Sistema operativo", font=("Segoe UI", 9), bg="#ffffff",
                  fg="#059669").pack(side=tk.RIGHT)
 
-    # ==================== MÉTODOS DE FUNCIONALIDAD (NOMBRES EXACTOS) ====================
+    # ==================== MÉTODOS EXISTENTES ====================
 
     def gestionar_usuarios(self):
-        """CORREGIDO: Usar gestionar_usuarios no usuarios"""
         try:
             from gestionar_usuarios import GestionUsuarios
             GestionUsuarios(self.ventana)
@@ -247,7 +272,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de usuarios: {str(e)}")
 
     def gestionar_productos(self):
-        """CORREGIDO: Usar gestionar_productos_servicios no productos"""
         try:
             from gestionar_productos_servicios import GestionProductosServicios
             GestionProductosServicios(self.ventana)
@@ -255,7 +279,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de productos: {str(e)}")
 
     def gestionar_clientes(self):
-        """CORRECTO: GestionClientes del módulo clientes"""
         try:
             from clientes import GestionClientes
             GestionClientes(self.ventana)
@@ -263,7 +286,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de clientes: {str(e)}")
 
     def gestionar_pedidos(self):
-        """CORRECTO: Pedidos del módulo pedidos"""
         try:
             from pedidos import Pedidos
             Pedidos(self.ventana, id_usuario=self.id_usuario)
@@ -271,7 +293,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de pedidos: {str(e)}")
 
     def gestionar_caja(self):
-        """CORRECTO: GestionCaja del módulo caja"""
         try:
             from caja import GestionCaja
             GestionCaja(ventana_padre=self.ventana, id_usuario=self.id_usuario)
@@ -279,7 +300,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de caja: {str(e)}")
 
     def gestionar_respaldos(self):
-        """CORRECTO: ModuloRespaldo del módulo respaldos2"""
         try:
             from respaldos2 import ModuloRespaldo
             ModuloRespaldo(self.ventana, self.id_usuario)
@@ -287,7 +307,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de respaldos: {str(e)}")
 
     def registrar_ventas(self):
-        """CORRECTO: Ventas del módulo ventas"""
         try:
             from ventas import Ventas
             Ventas(self.ventana, id_usuario=self.id_usuario)
@@ -295,7 +314,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de ventas: {str(e)}")
 
     def generar_reportes(self):
-        """CORRECTO: abrir_reportes del módulo reportes"""
         try:
             from reportes import abrir_reportes
             abrir_reportes(self.ventana)
@@ -303,7 +321,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de reportes: {str(e)}")
 
     def seguimiento_pedidos(self):
-        """CORRECTO: SeguimientoPedidos del módulo seguimiento_pedidos"""
         try:
             from seguimiento_pedidos import SeguimientoPedidos
             SeguimientoPedidos(self.ventana, self.id_usuario)
@@ -311,17 +328,15 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de seguimiento: {str(e)}")
 
     def abrir_promos_descuentos(self):
-        """Módulo de promociones (puede no existir aún)"""
         try:
             from promos_descuentos import PromosDescuentosVentana
             PromosDescuentosVentana(self.ventana, id_usuario=self.id_usuario)
         except ImportError:
-            messagebox.showinfo("Información", "El módulo de promociones y descuentos estará disponible próximamente.")
+            messagebox.showinfo("Información", "El módulo de promociones estará disponible próximamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de promociones: {str(e)}")
 
     def gestionar_permisos_usuarios(self):
-        """NUEVO: Abrir ventana de gestión de permisos de usuarios"""
         try:
             from permisos_usuarios import GestionPermisosUsuarios
             GestionPermisosUsuarios(self.ventana)
@@ -329,7 +344,6 @@ class MasterPanel:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de permisos: {str(e)}")
 
     def gestionar_puntos_lealtad(self):
-        """Módulo de puntos de lealtad (puede no existir aún)"""
         try:
             from puntos_lealtad import PuntosLealtadVentana
             PuntosLealtadVentana(self.ventana)
@@ -337,6 +351,24 @@ class MasterPanel:
             messagebox.showinfo("Información", "El módulo de puntos de lealtad estará disponible próximamente.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo abrir el módulo de puntos de lealtad: {str(e)}")
+
+    # ==================== NUEVOS MÉTODOS PARA CUENTAS ABIERTAS ====================
+
+    def gestionar_cuentas_abiertas(self):
+        """Gestión de cuentas abiertas"""
+        try:
+            from cuentas_abiertas_gui import abrir_gestion_cuentas_abiertas
+            abrir_gestion_cuentas_abiertas(self.ventana, {'id_usuario': self.id_usuario})
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir gestión de cuentas abiertas:\n{str(e)}")
+
+    def ventas_con_cuentas_abiertas(self):
+        """Sistema de ventas con cuentas abiertas"""
+        try:
+            from ventas_con_cuentas import abrir_ventas_con_cuentas_abiertas
+            abrir_ventas_con_cuentas_abiertas(self.ventana, {'id_usuario': self.id_usuario})
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al abrir sistema de ventas:\n{str(e)}")
 
     def salir(self):
         if messagebox.askyesno("Confirmar salida", "¿Estás seguro de que deseas cerrar sesión?"):
