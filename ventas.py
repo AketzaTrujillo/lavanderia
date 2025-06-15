@@ -85,12 +85,18 @@ class Ventas:
 
         tab_productos = tk.Frame(self.notebook, bg="#f5f7fa")
         tab_servicios = tk.Frame(self.notebook, bg="#f5f7fa")
+        tab_encargo = tk.Frame(self.notebook, bg="#f5f7fa") 
+        tab_kilo = tk.Frame(self.notebook, bg="#f5f7fa")
 
         self.notebook.add(tab_productos, text="Productos")
         self.notebook.add(tab_servicios, text="Servicios")
+        self.notebook.add(tab_encargo, text="Por Encargo")  
+        self.notebook.add(tab_kilo, text="Por Kilo")
 
         self.configurar_tab_productos(tab_productos)
         self.configurar_tab_servicios(tab_servicios)
+        self.configurar_tab_encargo(tab_encargo)
+        self.configurar_tab_kilo(tab_kilo)
 
         # =================== TABLA ITEMS ====================
         frame_tabla = tk.Frame(self.frame_principal, bg="#f5f7fa")
@@ -274,6 +280,100 @@ class Ventas:
 
         #Cargar servicios al iniciar
         self.cargar_servicios()
+        
+        
+    def configurar_tab_encargo(self, tab):
+            frame_encargo = tk.Frame(tab, bg="#e0f7fa")
+            frame_encargo.pack(fill=tk.X, pady=10)
+
+            tk.Label(
+                frame_encargo,
+                text="Kilos de ropa a lavar:",
+                font=("Helvetica", 12),
+                bg="#e0f7fa"
+            ).pack(side=tk.LEFT, padx=10)
+
+            self.entry_kilos = tk.Entry(frame_encargo, width=10, font=("Helvetica", 12))
+            self.entry_kilos.insert(0, "1")
+            self.entry_kilos.pack(side=tk.LEFT)
+
+            btn_agregar_encargo = tk.Button(
+                frame_encargo,
+                text="Agregar a la venta",
+                font=("Helvetica", 11),
+                bg="#00796b", fg="white",
+                command=self.agregar_encargo
+            )
+            btn_agregar_encargo.pack(side=tk.LEFT, padx=10)
+    
+    def configurar_tab_kilo(self, tab):
+        tk.Label(
+            tab,
+            text="Selecciona una opción de Lavadora o Secadora:",
+            font=("Helvetica", 14, "bold"),
+            bg="#f5f7fa",
+            fg="#1976D2"
+        ).pack(pady=10)
+
+        frame_botones = tk.Frame(tab, bg="#f5f7fa")
+        frame_botones.pack(pady=10)
+
+        # Lavadoras
+        tk.Label(frame_botones, text="Lavadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=0, column=0, columnspan=3, pady=(0,5))
+
+        btn_lavadora_7 = tk.Button(frame_botones, text="Lavadora Chica\n7kg - $55", width=20, height=3,
+            command=lambda: self.agregar_kilo("Lavadora Chica", 7, 55.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+        btn_lavadora_7.grid(row=1, column=0, padx=10, pady=5)
+
+        btn_lavadora_13 = tk.Button(frame_botones, text="Lavadora Mediana\n13kg - $85", width=20, height=3,
+            command=lambda: self.agregar_kilo("Lavadora Mediana", 13, 85.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+        btn_lavadora_13.grid(row=1, column=1, padx=10, pady=5)
+
+        btn_lavadora_25 = tk.Button(frame_botones, text="Lavadora Grande\n25kg - $160", width=20, height=3,
+            command=lambda: self.agregar_kilo("Lavadora Grande", 25, 160.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+        btn_lavadora_25.grid(row=1, column=2, padx=10, pady=5)
+
+        # Secadoras
+        tk.Label(frame_botones, text="Secadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=2, column=0, columnspan=3, pady=(20,5))
+
+        btn_secadora_7 = tk.Button(frame_botones, text="Secadora Chica\n7kg - $30", width=20, height=3,
+            command=lambda: self.agregar_kilo("Secadora Chica", 7, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
+        btn_secadora_7.grid(row=3, column=0, padx=10, pady=5)
+
+        btn_secadora_13 = tk.Button(frame_botones, text="Secadora Grande\n13kg - $30", width=20, height=3,
+            command=lambda: self.agregar_kilo("Secadora Grande", 13, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
+        btn_secadora_13.grid(row=3, column=1, padx=10, pady=5)
+            
+    def agregar_kilo(self, nombre, precio, kilos):
+        try:
+            # Convertir valores a float en caso de venir como string
+            if isinstance(precio, str):
+                precio = precio.replace('$', '').strip()
+            if isinstance(kilos, str):
+                kilos = kilos.strip()
+
+            precio = float(precio)
+            kilos = float(kilos)
+
+            if kilos <= 0:
+                raise ValueError("Los kilos deben ser mayores que cero.")
+
+            # No calculamos ni incluimos precio_unitario
+            item = {
+                'tipo': 'por kilo',
+                'id': None,
+                'nombre': f"{nombre} ({kilos:.0f} kg)",
+                'cantidad': kilos,
+                'subtotal': round(precio, 2)
+            }
+
+            self.items_venta.append(item)
+            self.actualizar_tabla_items()
+            self.calcular_total()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo agregar el servicio por kilo: {str(e)}")
+                
 
     def cargar_productos(self):
         for item in self.tabla_productos.get_children():
@@ -304,6 +404,7 @@ class Ventas:
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar los productos: {str(e)}")
+            
 
     def buscar_productos(self, texto_busqueda):
         for item in self.tabla_productos.get_children():
@@ -348,6 +449,36 @@ class Ventas:
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"Error al buscar productos: {str(e)}")
+            
+    
+    def agregar_encargo(self):
+        try:
+            kilos = float(self.entry_kilos.get())
+            if kilos < 1:
+                messagebox.showwarning("Cantidad inválida", "Debe ingresar al menos 1 kg.")
+                return
+        except ValueError:
+            messagebox.showwarning("Entrada inválida", "Debe ingresar un número válido.")
+            return
+
+        precio_kg = 30.0
+        subtotal = kilos * precio_kg
+
+        item = {
+            'tipo': 'encargo',
+            'id': None,  # No aplica ID de producto/servicio
+            'nombre': f"Encargo (Lavado por kg)",
+            'cantidad': kilos,
+            'precio_unitario': precio_kg,
+            'subtotal': subtotal
+        }
+
+        self.items_venta.append(item)
+        self.actualizar_tabla_items()
+        self.calcular_total()
+        self.entry_kilos.delete(0, tk.END)
+        self.entry_kilos.insert(0, "1")
+
 
     def agregar_producto_seleccionado(self):
         seleccion = self.tabla_productos.selection()
@@ -533,23 +664,30 @@ class Ventas:
     # Actualizar Items a comprar
 
     def actualizar_tabla_items(self):
-        # Limpiar tabla
+        # Limpiar la tabla actual
         for item in self.tabla_items.get_children():
             self.tabla_items.delete(item)
 
-        # Agregar los nuevos
+        # Insertar cada item de la venta
         for item in self.items_venta:
-            nombre = item['nombre']
-            if 'promo' in item and item['promo']:
-                nombre = f"{nombre} ({item['promo']})"
-            valores = (
-                item['tipo'].capitalize(),
-                nombre,
-                item['cantidad'],
-                f"${item['precio_unitario']:.2f}",
-                f"${item['subtotal']:.2f}"
-            )
-            self.tabla_items.insert('', tk.END, values=valores)
+            # Obtener precio_unitario de forma segura
+            precio_unitario = item.get('precio_unitario', '')
+
+            if isinstance(precio_unitario, (int, float)):
+                precio_unitario = f"${precio_unitario:.2f}"
+            elif precio_unitario is None:
+                precio_unitario = ''
+            # Si es cadena ya está bien
+
+            # Insertar en la tabla
+            self.tabla_items.insert('', 'end', values=(
+                item.get('tipo', ''),
+                item.get('nombre', ''),
+                item.get('cantidad', ''),
+                precio_unitario,
+                f"${item.get('subtotal', 0):.2f}"
+            ))
+
 
         # Aplicar estilo
         utl.aplicar_estilo_tabla(self.tabla_items)
