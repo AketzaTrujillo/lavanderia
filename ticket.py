@@ -403,6 +403,18 @@ class Ticket:
 
             self.agregar_texto(f"Vendedor: {venta[6]}")
             self.agregar_texto(f"Forma de pago: {venta[3]}")
+            # Si el método de pago fue Crédito, mostrar saldo restante
+            if venta[3].lower() == "crédito" and venta[4]:  # Si hay cliente asociado
+                cursor.execute("""
+                    SELECT credito_maximo, credito_usado
+                    FROM clientes
+                    WHERE nombre = %s
+                """, (venta[4],))
+                datos_credito = cursor.fetchone()
+                if datos_credito:
+                    credito_maximo, credito_usado = datos_credito
+                    saldo_restante = credito_maximo - credito_usado
+                    self.agregar_texto(f"Saldo Crédito Restante: ${saldo_restante:.2f}")
             self.agregar_linea()
 
             # Obtener y agregar items al ticket

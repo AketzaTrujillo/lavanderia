@@ -150,7 +150,7 @@ class GestionClientes:
         frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
 
         # Tabla de clientes (TreeView)
-        columnas = ('id', 'nombre', 'telefono', 'correo', 'puntos', 'fecha_registro')
+        columnas = ('id', 'nombre', 'telefono', 'correo', 'puntos', 'credito', 'saldo_credito', 'fecha_registro')
 
         self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
 
@@ -164,6 +164,8 @@ class GestionClientes:
         self.tabla.heading('correo', text='Correo')
         self.tabla.heading('puntos', text='Puntos')
         self.tabla.heading('fecha_registro', text='Fecha Registro')
+        self.tabla.heading('credito', text='Crédito')
+        self.tabla.heading('saldo_credito', text='Saldo Crédito')
 
         # Configurar anchos de columnas
         self.tabla.column('id', width=50, anchor=tk.CENTER)
@@ -172,7 +174,8 @@ class GestionClientes:
         self.tabla.column('correo', width=150)
         self.tabla.column('puntos', width=80, anchor=tk.CENTER)
         self.tabla.column('fecha_registro', width=150, anchor=tk.CENTER)
-
+        self.tabla.column('credito', width=80, anchor=tk.CENTER)
+        self.tabla.column('saldo_credito', width=120, anchor=tk.CENTER)
         # Scrollbar para la tabla
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla.yview)
         self.tabla.configure(yscrollcommand=scrollbar.set)
@@ -224,7 +227,38 @@ class GestionClientes:
 
         # Cargar clientes iniciales
         self.cargar_clientes()
+        
+        # Etiqueta de crédito disponible (inicialmente vacía)
+        self.label_credito_disponible = tk.Label(
+            frame_busqueda,
+            text="Crédito Disponible: $0.00",
+            font=("Helvetica", 11, "bold"),
+            bg="#f5f5f5",
+            fg="#333"
+        )
+        self.label_credito_disponible.pack(side=tk.RIGHT, padx=10)
 
+        # Evento cuando se selecciona un cliente
+        self.tabla.bind("<<TreeviewSelect>>", self.mostrar_credito_disponible)
+
+    def mostrar_credito_disponible(self, event=None):
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            self.label_credito_disponible.config(text="Crédito Disponible: $0.00")
+            return
+
+        item = self.tabla.item(seleccion[0])
+        valores = item['values']
+
+        try:
+            credito_maximo = float(valores[5])
+            credito_usado = float(valores[6])
+            disponible = credito_maximo - credito_usado
+            self.label_credito_disponible.config(text=f"Crédito Disponible: ${disponible:.2f}")
+        except Exception:
+            self.label_credito_disponible.config(text="Crédito Disponible: $0.00")
+
+    
     def cargar_clientes(self):
         """Carga todos los clientes en la tabla"""
         # Limpiar tabla
@@ -234,8 +268,12 @@ class GestionClientes:
         try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
-            cursor.execute(
-                "SELECT id_cliente, nombre, telefono, correo, puntos, fecha_registro FROM clientes ORDER BY nombre")
+            cursor.execute("""
+                SELECT id_cliente, nombre, telefono, correo, puntos, credito_maximo, credito_usado,
+                    (credito_maximo - credito_usado) AS saldo_credito, fecha_registro
+                FROM clientes
+                ORDER BY nombre
+            """)
 
             for cliente in cursor.fetchall():
                 self.tabla.insert('', tk.END, values=cliente)
@@ -262,7 +300,7 @@ class GestionClientes:
 
             # Búsqueda por nombre, teléfono o correo
             consulta = """
-            SELECT id_cliente, nombre, telefono, correo, puntos, fecha_registro 
+            SELECT id_cliente, nombre, telefono, correo, puntos, credito, saldo_credito, fecha_registro 
             FROM clientes 
             WHERE nombre LIKE %s OR telefono LIKE %s OR correo LIKE %s
             ORDER BY nombre
@@ -279,24 +317,19 @@ class GestionClientes:
 
     def nuevo_cliente(self, event=None):
         """Abre ventana para crear un nuevo cliente"""
-        # Crear una nueva ventana para añadir cliente
         ventana_nuevo = tk.Toplevel(self.ventana)
         ventana_nuevo.title("Nuevo Cliente")
-        ventana_nuevo.geometry("500x400")
+        ventana_nuevo.geometry("500x450")
         ventana_nuevo.config(bg="#f5f5f5")
-        ventana_nuevo.grab_set()  # Hacer modal
+        ventana_nuevo.grab_set()
+        utl.centrar_ventana(ventana_nuevo, 500, 450)
 
-        # Centrar ventana
-        utl.centrar_ventana(ventana_nuevo, 500, 400)
-
-        # Establecer ícono si existe
         try:
             if os.path.exists("Img/lavadora.ico"):
                 ventana_nuevo.iconbitmap("Img/lavadora.ico")
         except Exception:
             pass
 
-        # Título
         tk.Label(
             ventana_nuevo,
             text="REGISTRO DE NUEVO CLIENTE",
@@ -305,67 +338,70 @@ class GestionClientes:
             fg="#3a7ff6"
         ).pack(pady=(20, 10))
 
-        # Separador
         ttk.Separator(ventana_nuevo, orient="horizontal").pack(fill=tk.X, padx=20)
 
-        # Frame para el formulario
         frame_form = tk.Frame(ventana_nuevo, bg="#f5f5f5")
         frame_form.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
 
-        # Etiquetas y campos
         tk.Label(frame_form, text="Nombre:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=0, column=0, sticky=tk.W, pady=10)
         entry_nombre = tk.Entry(frame_form, font=("Helvetica", 12), width=30)
-        entry_nombre.grid(row=0, column=1, sticky=tk.W + tk.E, pady=10, padx=10)
+        entry_nombre.grid(row=0, column=1, pady=10, padx=10)
 
         tk.Label(frame_form, text="Teléfono:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=1, column=0, sticky=tk.W, pady=10)
         entry_telefono = tk.Entry(frame_form, font=("Helvetica", 12), width=30)
-        entry_telefono.grid(row=1, column=1, sticky=tk.W + tk.E, pady=10, padx=10)
+        entry_telefono.grid(row=1, column=1, pady=10, padx=10)
 
         tk.Label(frame_form, text="Correo:", font=("Helvetica", 12), bg="#f5f5f5").grid(row=2, column=0, sticky=tk.W, pady=10)
         entry_correo = tk.Entry(frame_form, font=("Helvetica", 12), width=30)
-        entry_correo.grid(row=2, column=1, sticky=tk.W + tk.E, pady=10, padx=10)
+        entry_correo.grid(row=2, column=1, pady=10, padx=10)
 
-        # Botones
+        tk.Label(frame_form, text="Crédito (opcional):", font=("Helvetica", 12), bg="#f5f5f5").grid(row=3, column=0, sticky=tk.W, pady=10)
+        entry_credito = tk.Entry(frame_form, font=("Helvetica", 12), width=30)
+        entry_credito.grid(row=3, column=1, pady=10, padx=10)
+
         frame_botones = tk.Frame(ventana_nuevo, bg="#f5f5f5")
         frame_botones.pack(pady=20)
 
         def guardar_cliente():
-            # Validar campos
             nombre = entry_nombre.get().strip()
             telefono = entry_telefono.get().strip()
             correo = entry_correo.get().strip()
+            credito = entry_credito.get().strip()
 
             if not nombre:
                 messagebox.showwarning("Campo incompleto", "El nombre del cliente es obligatorio")
                 return
 
+            # Validar crédito
+            if credito == "":
+                credito_maximo = 0.00
+            else:
+                try:
+                    credito_maximo = float(credito)
+                except ValueError:
+                    messagebox.showwarning("Valor inválido", "El crédito debe ser un número válido.")
+                    return
+
             try:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
 
-                # Insertar nuevo cliente con 0 puntos iniciales
-                consulta = "INSERT INTO clientes (nombre, telefono, correo, puntos) VALUES (%s, %s, %s, 0)"
-                cursor.execute(consulta, (nombre, telefono, correo))
-
+                consulta = """
+                    INSERT INTO clientes (nombre, telefono, correo, puntos, credito_maximo, credito_usado)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(consulta, (nombre, telefono, correo, 0, credito_maximo, 0))
                 conexion.commit()
 
-                # Obtener el ID del cliente recién creado
                 cursor.execute("SELECT LAST_INSERT_ID()")
                 id_cliente = cursor.fetchone()[0]
-
                 conexion.close()
-
-                # Enviar correo de bienvenida si hay dirección de correo
-                if correo:
-                    html = obtener_plantilla_alta_cliente(nombre, correo)
-                    enviar_correo_html(correo, f"Bienvenido/a a Lavandería, {nombre}", html)
 
                 messagebox.showinfo("Éxito", "Cliente registrado correctamente")
                 ventana_nuevo.destroy()
-                self.cargar_clientes()  # Refrescar tabla
+                self.cargar_clientes()
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo registrar el cliente: {str(e)}")
-
 
         btn_guardar = tk.Button(
             frame_botones,
@@ -378,8 +414,6 @@ class GestionClientes:
             command=guardar_cliente
         )
         btn_guardar.pack(side=tk.LEFT, padx=5)
-
-        # Efecto hover
         btn_guardar.bind("<Enter>", lambda e: btn_guardar.config(bg="#1a5fce"))
         btn_guardar.bind("<Leave>", lambda e: btn_guardar.config(bg="#3a7ff6"))
 
@@ -394,8 +428,6 @@ class GestionClientes:
             command=ventana_nuevo.destroy
         )
         btn_cancelar.pack(side=tk.LEFT, padx=5)
-
-        # Efecto hover
         btn_cancelar.bind("<Enter>", lambda e: btn_cancelar.config(bg="#c62828"))
         btn_cancelar.bind("<Leave>", lambda e: btn_cancelar.config(bg="#e53935"))
 
@@ -448,6 +480,16 @@ class GestionClientes:
         entry_correo.grid(row=2, column=1, sticky=tk.W + tk.E, pady=5, padx=5)
         entry_correo.insert(0, correo_actual if correo_actual else "")
 
+        
+        lbl_credito = tk.Label(frame_form, text="Crédito inicial:", font=("Helvetica", 12), bg="#f5f5f5")
+        lbl_credito.grid(row=3, column=0, sticky=tk.W, pady=5)
+
+        entry_credito = tk.Entry(frame_form, font=("Helvetica", 12))
+        entry_credito.grid(row=3, column=1, sticky=tk.W + tk.E, pady=5, padx=5)
+
+        # Inserta el crédito actual del cliente
+        entry_credito.insert(0, valores[5])  # Asumiendo que `valores[5]` = credito actual
+        
         # Botones
         frame_botones = tk.Frame(ventana_editar, bg="#f5f5f5")
         frame_botones.pack(pady=10)
@@ -457,9 +499,16 @@ class GestionClientes:
             nuevo_nombre = entry_nombre.get().strip()
             nuevo_telefono = entry_telefono.get().strip()
             nuevo_correo = entry_correo.get().strip()
+            nuevo_credito = entry_credito.get().strip()
 
             if not nuevo_nombre:
                 messagebox.showwarning("Campo incompleto", "El nombre del cliente es obligatorio")
+                return
+
+            try:
+                nuevo_credito = float(nuevo_credito)
+            except ValueError:
+                messagebox.showwarning("Valor inválido", "El crédito debe ser un número válido.")
                 return
 
             try:
@@ -468,10 +517,10 @@ class GestionClientes:
 
                 # Actualizar cliente
                 consulta = """
-                UPDATE clientes SET nombre = %s, telefono = %s, correo = %s
+                UPDATE clientes SET nombre = %s, telefono = %s, correo = %s, credito_maximo = %s
                 WHERE id_cliente = %s
                 """
-                cursor.execute(consulta, (nuevo_nombre, nuevo_telefono, nuevo_correo, id_cliente))
+                cursor.execute(consulta, (nuevo_nombre, nuevo_telefono, nuevo_correo, nuevo_credito, id_cliente))
 
                 conexion.commit()
                 conexion.close()
@@ -491,6 +540,13 @@ class GestionClientes:
             command=actualizar_cliente
         )
         btn_actualizar.pack(side=tk.LEFT, padx=5)
+        
+        btn_ajustar_credito = tk.Button(
+            frame_botones, text="Ajustar Saldo de Crédito", font=("Helvetica", 11),
+            bg="#00838f", fg="white", activebackground="#006064", activeforeground="white",
+            relief="flat", cursor="hand2", command=self.abrir_ajuste_credito
+        )
+        btn_ajustar_credito.pack(side=tk.LEFT, padx=5)
 
         btn_cancelar = tk.Button(
             frame_botones,
@@ -501,7 +557,48 @@ class GestionClientes:
             command=ventana_editar.destroy
         )
         btn_cancelar.pack(side=tk.LEFT, padx=5)
+    
+    def abrir_ajuste_credito(self):
+        seleccionado = self.tabla_clientes.focus()
+        if not seleccionado:
+            messagebox.showwarning("Advertencia", "Selecciona un cliente primero.")
+            return
 
+        datos = self.tabla_clientes.item(seleccionado, "values")
+        id_cliente = datos[0]
+        nombre_cliente = datos[1]
+
+        ventana = tk.Toplevel(self.ventana)
+        ventana.title(f"Ajustar Crédito de {nombre_cliente}")
+        ventana.geometry("300x200")
+        ventana.config(bg="#e0f7fa")
+        ventana.transient(self.ventana)
+        ventana.grab_set()
+
+        tk.Label(ventana, text="Nuevo crédito máximo:", bg="#e0f7fa", font=("Helvetica", 12)).pack(pady=15)
+        entry_credito = tk.Entry(ventana, font=("Helvetica", 12))
+        entry_credito.pack(pady=5)
+        entry_credito.focus()
+
+        def guardar():
+            try:
+                nuevo_credito = float(entry_credito.get())
+                conexion = mysql.connector.connect(**config_bd)
+                cursor = conexion.cursor()
+                cursor.execute("UPDATE clientes SET credito_maximo = %s WHERE id_cliente = %s", (nuevo_credito, id_cliente))
+                conexion.commit()
+                conexion.close()
+                messagebox.showinfo("Éxito", f"Crédito actualizado a ${nuevo_credito:.2f}")
+                ventana.destroy()
+                self.cargar_datos_clientes()  # si tienes este método para refrescar
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo ajustar el crédito: {str(e)}")
+
+        tk.Button(
+            ventana, text="Guardar", font=("Helvetica", 11, "bold"),
+            bg="#00796b", fg="white", command=guardar
+        ).pack(pady=10)
+    
     def ver_historial(self, event=None):
         """Abre la ventana de historial del cliente seleccionado"""
         # Obtener el cliente seleccionado

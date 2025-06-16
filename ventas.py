@@ -86,17 +86,14 @@ class Ventas:
         tab_productos = tk.Frame(self.notebook, bg="#f5f7fa")
         tab_servicios = tk.Frame(self.notebook, bg="#f5f7fa")
         tab_encargo = tk.Frame(self.notebook, bg="#f5f7fa") 
-        tab_kilo = tk.Frame(self.notebook, bg="#f5f7fa")
 
         self.notebook.add(tab_productos, text="Productos")
         self.notebook.add(tab_servicios, text="Servicios")
         self.notebook.add(tab_encargo, text="Por Encargo")  
-        self.notebook.add(tab_kilo, text="Por Kilo")
 
         self.configurar_tab_productos(tab_productos)
         self.configurar_tab_servicios(tab_servicios)
         self.configurar_tab_encargo(tab_encargo)
-        self.configurar_tab_kilo(tab_kilo)
 
         # =================== TABLA ITEMS ====================
         frame_tabla = tk.Frame(self.frame_principal, bg="#f5f7fa")
@@ -305,66 +302,60 @@ class Ventas:
                 command=self.agregar_encargo
             )
             btn_agregar_encargo.pack(side=tk.LEFT, padx=10)
-    
-    def configurar_tab_kilo(self, tab):
-        tk.Label(
-            tab,
-            text="Selecciona una opción de Lavadora o Secadora:",
-            font=("Helvetica", 14, "bold"),
-            bg="#f5f7fa",
-            fg="#1976D2"
-        ).pack(pady=10)
-
-        frame_botones = tk.Frame(tab, bg="#f5f7fa")
-        frame_botones.pack(pady=10)
-
-        # Lavadoras
-        tk.Label(frame_botones, text="Lavadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=0, column=0, columnspan=3, pady=(0,5))
-
-        btn_lavadora_7 = tk.Button(frame_botones, text="Lavadora Chica\n7kg - $55", width=20, height=3,
-            command=lambda: self.agregar_kilo("Lavadora Chica", 7, 55.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
-        btn_lavadora_7.grid(row=1, column=0, padx=10, pady=5)
-
-        btn_lavadora_13 = tk.Button(frame_botones, text="Lavadora Mediana\n13kg - $85", width=20, height=3,
-            command=lambda: self.agregar_kilo("Lavadora Mediana", 13, 85.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
-        btn_lavadora_13.grid(row=1, column=1, padx=10, pady=5)
-
-        btn_lavadora_25 = tk.Button(frame_botones, text="Lavadora Grande\n25kg - $160", width=20, height=3,
-            command=lambda: self.agregar_kilo("Lavadora Grande", 25, 160.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
-        btn_lavadora_25.grid(row=1, column=2, padx=10, pady=5)
-
-        # Secadoras
-        tk.Label(frame_botones, text="Secadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=2, column=0, columnspan=3, pady=(20,5))
-
-        btn_secadora_7 = tk.Button(frame_botones, text="Secadora Chica\n7kg - $30", width=20, height=3,
-            command=lambda: self.agregar_kilo("Secadora Chica", 7, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
-        btn_secadora_7.grid(row=3, column=0, padx=10, pady=5)
-
-        btn_secadora_13 = tk.Button(frame_botones, text="Secadora Grande\n13kg - $30", width=20, height=3,
-            command=lambda: self.agregar_kilo("Secadora Grande", 13, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
-        btn_secadora_13.grid(row=3, column=1, padx=10, pady=5)
             
-    def agregar_kilo(self, nombre, precio, kilos):
+            tk.Label(
+                tab,
+                text="Selecciona una opción de Lavadora o Secadora:",
+                font=("Helvetica", 14, "bold"),
+                bg="#f5f7fa",
+                fg="#1976D2"
+            ).pack(pady=10)
+
+            frame_botones = tk.Frame(tab, bg="#f5f7fa")
+            frame_botones.pack(pady=10)
+
+            # Lavadoras
+            tk.Label(frame_botones, text="Lavadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=0, column=0, columnspan=3, pady=(0,5))
+
+            btn_lavadora_7 = tk.Button(frame_botones, text="Lavadora Chica\n7kg - $55", width=20, height=3,
+                command=lambda: self.agregar_kilo("Lavadora Chica", 7, 55.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+            btn_lavadora_7.grid(row=1, column=0, padx=10, pady=5)
+
+            btn_lavadora_13 = tk.Button(frame_botones, text="Lavadora Mediana\n13kg - $85", width=20, height=3,
+                command=lambda: self.agregar_kilo("Lavadora Mediana", 13, 85.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+            btn_lavadora_13.grid(row=1, column=1, padx=10, pady=5)
+
+            btn_lavadora_25 = tk.Button(frame_botones, text="Lavadora Grande\n25kg - $160", width=20, height=3,
+                command=lambda: self.agregar_kilo("Lavadora Grande", 25, 160.0), bg="#4CAF50", fg="white", font=("Helvetica", 11, "bold"))
+            btn_lavadora_25.grid(row=1, column=2, padx=10, pady=5)
+
+            # Secadoras
+            tk.Label(frame_botones, text="Secadoras", font=("Helvetica", 13, "bold"), bg="#f5f7fa").grid(row=2, column=0, columnspan=3, pady=(20,5))
+
+            btn_secadora_7 = tk.Button(frame_botones, text="Secadora Chica\n7kg - $30", width=20, height=3,
+                command=lambda: self.agregar_kilo("Secadora Chica", 7, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
+            btn_secadora_7.grid(row=3, column=0, padx=10, pady=5)
+
+            btn_secadora_13 = tk.Button(frame_botones, text="Secadora Grande\n13kg - $30", width=20, height=3,
+                command=lambda: self.agregar_kilo("Secadora Grande", 13, 30.0), bg="#2196F3", fg="white", font=("Helvetica", 11, "bold"))
+            btn_secadora_13.grid(row=3, column=1, padx=10, pady=5)
+                
+    def agregar_kilo(self, nombre, kilos, precio_total):
         try:
-            # Convertir valores a float en caso de venir como string
-            if isinstance(precio, str):
-                precio = precio.replace('$', '').strip()
-            if isinstance(kilos, str):
-                kilos = kilos.strip()
-
-            precio = float(precio)
-            kilos = float(kilos)
-
             if kilos <= 0:
                 raise ValueError("Los kilos deben ser mayores que cero.")
 
-            # No calculamos ni incluimos precio_unitario
+            # Calcular el precio por kilo
+            precio_unitario = round(precio_total / kilos, 2)
+            subtotal = precio_unitario * kilos
+
             item = {
                 'tipo': 'por kilo',
                 'id': None,
                 'nombre': f"{nombre} ({kilos:.0f} kg)",
                 'cantidad': kilos,
-                'subtotal': round(precio, 2)
+                'precio_unitario': precio_unitario,
+                'subtotal': subtotal
             }
 
             self.items_venta.append(item)
@@ -373,6 +364,7 @@ class Ventas:
 
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo agregar el servicio por kilo: {str(e)}")
+
                 
 
     def cargar_productos(self):
@@ -791,7 +783,7 @@ class Ventas:
         frame_metodos.pack(fill=tk.X, pady=10)
 
         # Opciones sin "Combinado"
-        metodos = ["Efectivo", "Tarjeta", "Transferencia"]
+        metodos = ["Efectivo", "Tarjeta", "Transferencia", "Crédito"]
         for i, metodo in enumerate(metodos):
             rb = tk.Radiobutton(
                 frame_metodos,
@@ -872,7 +864,7 @@ class Ventas:
 
     def actualizar_pago_efectivo(self, metodo, frame_efectivo, entry_recibido, lbl_cambio):
         """Muestra/oculta campos según el método de pago"""
-        if metodo == "Efectivo":
+        if metodo in ["Efectivo"]:
             frame_efectivo.pack(fill=tk.X, pady=10)
         else:
             frame_efectivo.pack_forget()
@@ -891,7 +883,7 @@ class Ventas:
 
     def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_recibido):
         """Procesa el pago final: registra ingreso por efectivo recibido y cambio."""
-        metodo_pago = metodo_pago_var.get()
+        metodo_pago = metodo_pago_var.get().strip()
         cambio = 0.0
         monto_recibido = 0.0
 
@@ -900,26 +892,40 @@ class Ventas:
                 try:
                     recibido = float(entry_recibido.get())
                 except ValueError:
-                    messagebox.showwarning(
-                        "Error", 
-                        "El monto en efectivo debe ser un número válido.",
-                        parent=self.ventana
-                    )
+                    messagebox.showwarning("Error", "El monto en efectivo debe ser un número válido.", parent=self.ventana)
                     return
 
                 if recibido < self.total_venta:
-                    messagebox.showwarning(
-                        "Efectivo insuficiente",
-                        "El monto recibido es menor al total a pagar.",
-                        parent=self.ventana
-                    )
+                    messagebox.showwarning("Efectivo insuficiente", "El monto recibido es menor al total a pagar.", parent=self.ventana)
                     return
 
                 cambio = recibido - self.total_venta
                 monto_recibido = recibido
 
+            elif metodo_pago == "Crédito":
+                # Validar que el cliente tenga crédito suficiente
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute("SELECT credito_maximo, credito_usado FROM clientes WHERE id_cliente = %s", (self.cliente_actual['id'],))
+                resultado = cursor.fetchone()
+                cursor.close()
+                conexion.close()
+
+                if not resultado:
+                    messagebox.showerror("Error", "Cliente no encontrado.", parent=self.ventana)
+                    return
+
+                credito_maximo, credito_usado = resultado
+                credito_disponible = credito_maximo - credito_usado
+
+                if credito_disponible < self.total_venta:
+                    messagebox.showerror("Crédito insuficiente", f"Este cliente solo tiene ${credito_disponible:.2f} disponibles.", parent=self.ventana)
+                    return
+
+                monto_recibido = 0.0  # No hay efectivo
+
             # Llamamos con el efectivo recibido y el cambio calculado
-            self.guardar_venta(metodo_pago, cambio, monto_recibido)
+            self.guardar_venta(metodo_pago.strip(), cambio, monto_recibido)
 
             ventana_pago.destroy()
 
@@ -970,6 +976,16 @@ class Ventas:
 
             puntos_ganados = int(self.total_venta / valor_punto)
 
+            # --- NORMALIZAR Y VERIFICAR EL MÉTODO DE PAGO ---
+            if isinstance(metodo_pago, tuple):
+                metodo_pago = metodo_pago[0]
+            if not isinstance(metodo_pago, str):
+                metodo_pago = str(metodo_pago)
+            metodo_pago = metodo_pago.strip()
+
+            # DEBUG opcional (puedes quitar después de probar)
+            print(f"[DEBUG] metodo_pago: {repr(metodo_pago)} tipo: {type(metodo_pago)} longitud: {len(metodo_pago)}")
+
             # 3) Iniciar transacción
             cursor.execute("START TRANSACTION")
             try:
@@ -987,6 +1003,8 @@ class Ventas:
                     puntos_ganados
                 ))
                 id_venta = cursor.lastrowid
+
+                # [Aquí seguiría el resto de tu lógica de detalle_venta, stock, puntos, caja, etc.]
 
                 # 3.2) Detalle de venta y ajuste de stock
                 for it in self.items_venta:
@@ -1011,43 +1029,32 @@ class Ventas:
                     WHERE id_cliente = %s
                 """, (puntos_ganados, self.cliente_actual['id']))
 
-                # 3.4) Movimientos en caja
-                if metodo_pago == "Efectivo":
-                    # Solo registrar el total de la venta como ingreso
+                # 3.4) Movimientos en caja (con verificación para evitar duplicados)
+                concepto_mov = f"Venta #{id_venta} – {metodo_pago}"
+
+                cursor.execute("""
+                    SELECT COUNT(*) FROM movimientos_caja 
+                    WHERE concepto = %s AND id_usuario = %s
+                """, (concepto_mov, responsable_caja))
+
+                if cursor.fetchone()[0] == 0:
                     cursor.execute("""
                         INSERT INTO movimientos_caja
                         (id_caja, tipo, concepto, monto, hora, id_usuario)
                         VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
                     """, (
                         id_caja_actual,
-                        f"Venta #{id_venta} – Efectivo",
+                        concepto_mov,
                         self.total_venta,
                         responsable_caja
                     ))
-                    cursor.execute("""
-                        UPDATE caja
-                        SET total_ingresos = total_ingresos + %s,
-                            saldo_final    = saldo_final    + %s
-                        WHERE id_caja = %s
-                    """, (self.total_venta, self.total_venta, id_caja_actual))
-                else:
-                    # Tarjeta/Transferencia (igual que antes)
-                    cursor.execute("""
-                        INSERT INTO movimientos_caja
-                        (id_caja, tipo, concepto, monto, hora, id_usuario)
-                        VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
-                    """, (
-                        id_caja_actual,
-                        f"Venta #{id_venta} – {metodo_pago}",
-                        self.total_venta,
-                        responsable_caja
-                    ))
-                    cursor.execute("""
-                        UPDATE caja
-                        SET total_ingresos = total_ingresos + %s,
-                            saldo_final    = saldo_final    + %s
-                        WHERE id_caja = %s
-                    """, (self.total_venta, self.total_venta, id_caja_actual))
+
+                cursor.execute("""
+                    UPDATE caja
+                    SET total_ingresos = total_ingresos + %s,
+                        saldo_final    = saldo_final    + %s
+                    WHERE id_caja = %s
+                """, (self.total_venta, self.total_venta, id_caja_actual))
 
                 # 3.5) Registrar en pagos
                 cursor.execute("""
@@ -1056,10 +1063,29 @@ class Ventas:
                     VALUES (%s, %s, %s, NOW())
                 """, (id_venta, self.total_venta, metodo_pago))
 
-                # 3.6) Commit
+                # 3.6) Si fue a crédito, validar y actualizar uso de crédito
+                if metodo_pago == "Crédito":
+                    cursor.execute("SELECT credito_maximo, credito_usado FROM clientes WHERE id_cliente = %s", (self.cliente_actual['id'],))
+                    resultado = cursor.fetchone()
+                    if not resultado:
+                        raise Exception("Cliente no encontrado")
+
+                    credito_maximo, credito_usado = resultado
+                    disponible = credito_maximo - credito_usado
+
+                    if self.total_venta > disponible:
+                        raise Exception(f"El cliente no tiene suficiente crédito. Disponible: ${disponible:.2f}")
+
+                    cursor.execute("""
+                        UPDATE clientes
+                        SET credito_usado = credito_usado + %s
+                        WHERE id_cliente = %s
+                    """, (self.total_venta, self.cliente_actual['id']))
+
+                # 3.7) Confirmar transacción
                 cursor.execute("COMMIT")
 
-                # 3.7) Obtener puntos finales del cliente
+                # 3.8) Obtener puntos finales
                 cursor.execute(
                     "SELECT puntos FROM clientes WHERE id_cliente = %s",
                     (self.cliente_actual['id'],)
@@ -1073,6 +1099,7 @@ class Ventas:
                 cursor.close()
                 conexion.close()
 
+      
             # 4) Generar ticket y preparar mensaje final
             ruta_ticket = self.generar_ticket_html(id_venta)
             mensajes = [
@@ -1087,6 +1114,9 @@ class Ventas:
                 mensajes.append(f"💵 Recibido: ${monto_recibido:.2f}")
                 if cambio > 0:
                     mensajes.append(f"💰 Cambio: ${cambio:.2f}")
+            
+            if metodo_pago == "Crédito":
+                mensajes.append("💳 Venta realizada con crédito")
 
             messagebox.showinfo("Venta Registrada", "\n".join(mensajes), parent=self.ventana)
 
@@ -1271,7 +1301,7 @@ class Ventas:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
                 if not texto_busqueda:
-                    cursor.execute("SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
+                    cursor.execute("SELECT id_cliente, nombre, telefono, puntos, credito_maximo, credito_usado FROM clientes ORDER BY nombre")
                 else:
                     cursor.execute("""
                         SELECT id_cliente, nombre, telefono, puntos FROM clientes 
@@ -1294,7 +1324,7 @@ class Ventas:
             try:
                 conexion = conectar_bd()
                 cursor = conexion.cursor()
-                cursor.execute("SELECT id_cliente, nombre, telefono, puntos FROM clientes ORDER BY nombre")
+                cursor.execute("SELECT id_cliente, nombre, telefono, puntos, credito_maximo, credito_usado FROM clientes ORDER BY nombre")
 
                 for cliente in cursor.fetchall():
                     tabla_clientes.insert('', tk.END, values=cliente)

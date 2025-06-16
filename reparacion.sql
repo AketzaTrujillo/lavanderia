@@ -262,3 +262,13 @@ SELECT 'Todas las duplicaciones han sido eliminadas.' as resultado;
 SELECT 'Los índices únicos previenen futuras duplicaciones.' as resultado;
 SELECT 'El trigger ha sido corregido.' as resultado;
 SELECT '========================================' as resultado;
+
+--Edito columna de clientes para agregar el apartado de crédito
+-- Agregar el crédito máximo asignado por el administrador
+ALTER TABLE clientes ADD COLUMN credito_maximo DECIMAL(10,2) DEFAULT 0.00;
+
+-- Agregar el monto que el cliente ha usado
+ALTER TABLE clientes ADD COLUMN credito_usado DECIMAL(10,2) DEFAULT 0.00;
+
+ALTER TABLE pagos MODIFY metodo_pago 
+  ENUM('Efectivo','Tarjeta','Transferencia','Crédito','Otro') NOT NULL;

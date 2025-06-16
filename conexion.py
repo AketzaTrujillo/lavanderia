@@ -24,7 +24,8 @@ def cargar_configuracion():
         "host": "localhost",
         "user": "root",
         "password": "tired2019.", # contraseña BD
-        "database": "lavanderiadb"
+        "database": "lavanderiadb",
+        "charset": 'utf8mb4'  # ← importante para evitar truncamientos Unicode
     }
 
     # Intentar cargar desde archivo

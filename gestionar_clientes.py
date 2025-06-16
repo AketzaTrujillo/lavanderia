@@ -84,6 +84,7 @@ class GestionClientes:
             ("Editar Cliente", self.editar_cliente, "✏️"),
             ("Ver Historial", self.ver_historial, "📋"),
             ("Gestionar Puntos", self.gestionar_puntos, "🎁"),
+            ("Pago de Crédito", self.abrir_ventana_pago_credito, "🎁")
             ("Eliminar Cliente", self.eliminar_cliente, "🗑️")
         ]
 
@@ -710,6 +711,84 @@ class GestionClientes:
         btn_cancelar.bind("<Enter>", lambda e: btn_cancelar.config(bg="#c62828"))
         btn_cancelar.bind("<Leave>", lambda e: btn_cancelar.config(bg="#e53935"))
 
+    def abrir_ventana_pago_credito(self):
+        ventana_pago = tk.Toplevel(self.ventana)
+        ventana_pago.title("Registrar Pago de Crédito")
+        ventana_pago.geometry("400x300")
+        ventana_pago.config(bg="#f9f9f9")
+        ventana_pago.transient(self.ventana)
+        ventana_pago.grab_set()
+
+        tk.Label(ventana_pago, text="Selecciona un cliente:", font=("Helvetica", 12), bg="#f9f9f9").pack(pady=10)
+
+        combo_clientes = ttk.Combobox(ventana_pago, state="readonly", width=35)
+        combo_clientes.pack(pady=5)
+
+        # Cargar clientes con crédito
+        import conexion
+        con = conexion.get_connection()
+        cursor = con.cursor()
+        cursor.execute("SELECT id, nombre, saldo_credito, deuda_credito, credito_original FROM clientes WHERE deuda_credito > 0")
+        clientes_credito = cursor.fetchall()
+        con.close()
+
+        clientes_dict = {}
+        for c in clientes_credito:
+            display = f"{c[1]} (Deuda: ${c[3]:.2f})"
+            combo_clientes["values"] = (*combo_clientes["values"], display)
+            clientes_dict[display] = {
+                'id': c[0], 'nombre': c[1],
+                'saldo': c[2], 'deuda': c[3], 'credito_original': c[4]
+            }
+
+        lbl_monto = tk.Label(ventana_pago, text="Monto a pagar:", font=("Helvetica", 11), bg="#f9f9f9")
+        lbl_monto.pack(pady=(20, 5))
+        entry_monto = tk.Entry(ventana_pago, font=("Helvetica", 11))
+        entry_monto.pack()
+
+        def registrar_pago():
+            seleccionado = combo_clientes.get()
+            datos = clientes_dict.get(seleccionado)
+            if not datos:
+                messagebox.showwarning("Advertencia", "Debes seleccionar un cliente.")
+                return
+
+            try:
+                pago = float(entry_monto.get())
+            except ValueError:
+                messagebox.showerror("Error", "Ingresa un número válido.")
+                return
+
+            if pago <= 0:
+                messagebox.showerror("Error", "El monto debe ser mayor a cero.")
+                return
+            if pago > datos['deuda']:
+                messagebox.showwarning("Advertencia", "El monto excede la deuda actual.")
+                return
+
+            nueva_deuda = datos['deuda'] - pago
+            nuevo_saldo = datos['saldo'] + pago if nueva_deuda == 0 else datos['saldo']
+
+            try:
+                con = conexion.get_connection()
+                cursor = con.cursor()
+                cursor.execute(
+                    "UPDATE clientes SET saldo_credito = %s, deuda_credito = %s WHERE id = %s",
+                    (nuevo_saldo if nueva_deuda == 0 else datos['saldo'], nueva_deuda, datos['id'])
+                )
+                con.commit()
+                con.close()
+                messagebox.showinfo("Éxito", "Pago registrado correctamente.")
+                ventana_pago.destroy()
+                self.cargar_datos()  # Recargar tabla si tienes esa función
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo actualizar la deuda: {str(e)}")
+
+        tk.Button(
+            ventana_pago, text="Registrar Pago", bg="#388E3C", fg="white",
+            font=("Helvetica", 11), command=registrar_pago
+        ).pack(pady=20)
+    
     def eliminar_cliente(self):
         """Elimina un cliente seleccionado"""
         # Obtener el cliente seleccionado
