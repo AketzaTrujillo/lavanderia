@@ -886,7 +886,7 @@ class Pedidos:
         lbl_cambio.grid(row=1, column=1, sticky="w", padx=5)
 
         # 10) Radiobuttons con callback
-        for m in ["Efectivo", "Tarjeta", "Transferencia"]:
+        for m in ["Efectivo", "Tarjeta", "Transferencia", "Crédito"]:
             tk.Radiobutton(
                 frame_rb,
                 text=m,
@@ -978,20 +978,12 @@ class Pedidos:
 
 
     def finalizar_pago(self, ventana_pago, metodo_pago_var, entry_rec):
-        """
-        Flujo completo de un pedido con actualización de caja:
-        1) calcular cambio/monto
-        2) guardar pedido → id_pedido
-        3) insertar en ventas → id_venta
-        4) detalle_venta
-        5) pagos
-        6) registrar movimientos en caja
-        7) marcar pedido como entregado
-        8) limpiar UI + ticket
-        """
         metodo = metodo_pago_var.get()
         try:
-            # 1) Calcular monto y cambio
+            recibido = 0.0
+            cambio = 0.0
+            monto = self.total_pedido
+
             if metodo == "Efectivo":
                 recibido = float(entry_rec.get())
                 if recibido < self.total_pedido:
@@ -1000,11 +992,34 @@ class Pedidos:
                         "El monto recibido es menor al total a pagar."
                     )
                 cambio = recibido - self.total_pedido
-                monto = self.total_pedido
-            else:
-                recibido = 0.0
-                cambio = 0.0
-                monto = self.total_pedido
+
+            elif metodo == "Crédito":
+                conn = conectar_bd()
+                cur = conn.cursor()
+                cur.execute("SELECT credito_maximo, credito_usado FROM clientes WHERE id_cliente = %s", (self.cliente_actual['id'],))
+                resultado = cur.fetchone()
+                credito_maximo, credito_usado = resultado
+                credito_maximo = float(credito_maximo)
+                credito_usado = float(credito_usado)
+                credito_disponible = credito_maximo - credito_usado
+
+                if self.total_pedido > credito_disponible:
+                    conn.close()
+                    messagebox.showerror("Crédito insuficiente", f"El cliente solo tiene ${credito_disponible:.2f} de crédito disponible.")
+                    return
+
+                nuevo_usado = credito_usado + float(self.total_pedido)
+                if not resultado:
+                    return messagebox.showerror("Error", "Cliente no encontrado.")
+
+                credito_maximo, credito_usado = resultado
+                credito_disponible = credito_maximo - credito_usado
+
+                if credito_disponible < self.total_pedido:
+                    return messagebox.showerror("Crédito insuficiente", f"Este cliente solo tiene ${credito_disponible:.2f} disponibles.")
+
+                cur.close()
+                conn.close()
 
             # 2) Guardar pedido
             id_pedido = self.guardar_pedido()
@@ -1012,15 +1027,15 @@ class Pedidos:
                 return
 
             conn = conectar_bd()
-            cur  = conn.cursor()
+            cur = conn.cursor()
 
-            # 2.1) Calcular puntos de fidelidad para este pedido usando valor_punto_en_dinero
+            # 2.1) Calcular puntos
             cur.execute("SELECT valor_punto_en_dinero FROM configuracion LIMIT 1")
             row = cur.fetchone()
-            valor_punto = float(row[0]) if row and row[0] else 10  # 10 es el valor por defecto si no hay registro
+            valor_punto = float(row[0]) if row and row[0] else 10
             puntos_ganados = int(self.total_pedido / valor_punto)
 
-            # 3) Insertar en ventas, incluyendo id_pedido y puntos_ganados
+            # 3) Insertar en ventas
             cur.execute("""
                 INSERT INTO ventas
                 (id_usuario, id_cliente, id_pedido, total, fecha, metodo_pago, puntos_ganados)
@@ -1036,55 +1051,46 @@ class Pedidos:
             cur.execute("SELECT LAST_INSERT_ID()")
             id_venta = cur.fetchone()[0]
 
-
-            # 4) Insertar detalle_venta 
+            # 4) Insertar detalle_venta
             for item in self.items_pedido:
                 subtotal = item.get('subtotal', item['cantidad'] * item['precio_unitario'])
-                cur.execute(
-                    """
+                cur.execute("""
                     INSERT INTO detalle_venta
                     (id_venta, tipo_item, id_item, cantidad, subtotal)
                     VALUES (%s, 'servicio', %s, %s, %s)
-                    """,
-                    (id_venta, item['id'], item['cantidad'], subtotal)
-                )
+                """, (id_venta, item['id'], item['cantidad'], subtotal))
 
             # 5) Insertar en pagos
-            cur.execute(
-                """
+            cur.execute("""
                 INSERT INTO pagos
                 (id_venta, monto, metodo_pago, fecha_hora)
                 VALUES (%s, %s, %s, NOW())
-                """,
-                (id_venta, monto, metodo)
-            )
+            """, (id_venta, monto, metodo))
 
-            # 6) *** Aquí registramos los movimientos en caja ***
-            #    6.1) Obtener la caja abierta
-            cur.execute("""
-                SELECT id_caja, responsable
-                FROM caja
-                WHERE fecha = CURDATE()
-                AND hora_cierre IS NULL
-                LIMIT 1
-            """)
-            fila = cur.fetchone()
-            if fila:
-                id_caja_act, resp = fila
-
-                # 6.2) Registrar solo el total de la venta como ingreso, sin egreso por cambio
-                concepto = f"Pedido #{id_pedido} – {metodo}"
+            # 6) Registrar en caja (si no es crédito)
+            if metodo != "Crédito":
                 cur.execute("""
-                    INSERT INTO movimientos_caja
-                    (id_caja, tipo, concepto, monto, hora, id_usuario)
-                    VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
-                """, (id_caja_act, concepto, monto, resp))
-                cur.execute("""
-                    UPDATE caja
-                    SET total_ingresos = total_ingresos + %s,
-                        saldo_final    = saldo_final    + %s
-                    WHERE id_caja = %s
-                """, (monto, monto, id_caja_act))
+                    SELECT id_caja, responsable
+                    FROM caja
+                    WHERE fecha = CURDATE()
+                    AND hora_cierre IS NULL
+                    LIMIT 1
+                """)
+                fila = cur.fetchone()
+                if fila:
+                    id_caja_act, resp = fila
+                    concepto = f"Pedido #{id_pedido} – {metodo}"
+                    cur.execute("""
+                        INSERT INTO movimientos_caja
+                        (id_caja, tipo, concepto, monto, hora, id_usuario)
+                        VALUES (%s, 'ingreso', %s, %s, NOW(), %s)
+                    """, (id_caja_act, concepto, monto, resp))
+                    cur.execute("""
+                        UPDATE caja
+                        SET total_ingresos = total_ingresos + %s,
+                            saldo_final    = saldo_final    + %s
+                        WHERE id_caja = %s
+                    """, (monto, monto, id_caja_act))
 
             # 7) Marcar pedido como recibido
             cur.execute(
@@ -1092,24 +1098,29 @@ class Pedidos:
                 (id_pedido,)
             )
 
-            # 7.2) **Actualizar puntos totales del cliente**
+            # 7.2) Actualizar puntos
             cur.execute("""
                 UPDATE clientes
                 SET puntos = puntos + %s
                 WHERE id_cliente = %s
             """, (puntos_ganados, self.cliente_actual['id']))
 
+            # 7.3) Actualizar crédito usado si fue a crédito
+            if metodo == "Crédito":
+                nuevo_usado = float(credito_usado) + float(self.total_pedido)
+                cur.execute("""
+                    UPDATE clientes
+                    SET credito_usado = %s
+                    WHERE id_cliente = %s
+                """, (nuevo_usado, self.cliente_actual['id']))
+
             conn.commit()
             conn.close()
 
-            # 8) Mensaje final con puntos
+            # 8) Cerrar ventana, generar ticket y limpiar
             ventana_pago.destroy()
             ruta_ticket = self.generar_ticket_pedido(
-                id_pedido,        # el pedido que se acaba de pagar
-                id_venta,         # la venta asociada
-                metodo,           # método de pago
-                recibido,         # efectivo recibido (0 si no aplica)
-                cambio            # cambio a devolver (0 si no aplica)
+                id_pedido, id_venta, metodo, recibido, cambio
             )
 
             mensajes = [
@@ -1122,10 +1133,11 @@ class Pedidos:
                 mensajes.append(f"💵 Recibido: ${recibido:.2f}")
                 if cambio > 0:
                     mensajes.append(f"💰 Cambio: ${cambio:.2f}")
+            elif metodo == "Crédito":
+                mensajes.append(f"💳 Se cargó al crédito del cliente.")
 
             messagebox.showinfo("Pago Registrado", "\n".join(mensajes), parent=self.ventana)
 
-            # 8) Limpiar la interfaz de Pedidos
             self.items_pedido.clear()
             self.actualizar_tabla_detalles()
             self.calcular_total()
@@ -1135,7 +1147,6 @@ class Pedidos:
             self.notebook.select(self.tab_lista)
             self.cargar_pedidos()
 
-            # 9) Abrir el ticket generado
             try:
                 import webbrowser, os
                 webbrowser.open(f"file://{os.path.abspath(ruta_ticket)}")
@@ -1146,7 +1157,6 @@ class Pedidos:
             messagebox.showwarning("Error", "El monto ingresado no es un número válido.")
         except Exception as e:
             messagebox.showerror("Error al procesar el pago", str(e))
-
 
     def generar_ticket_pedido(self, id_pedido, id_venta, metodo_pago, recibido, cambio):
         """

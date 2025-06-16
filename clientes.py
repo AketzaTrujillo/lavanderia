@@ -150,8 +150,7 @@ class GestionClientes:
         frame_tabla.pack(fill=tk.BOTH, expand=True, pady=10)
 
         # Tabla de clientes (TreeView)
-        columnas = ('id', 'nombre', 'telefono', 'correo', 'puntos', 'credito', 'saldo_credito', 'fecha_registro')
-
+        columnas = ('id', 'nombre', 'telefono', 'correo', 'puntos', 'credito_maximo', 'credito_usado', 'saldo_credito', 'fecha_registro')
         self.tabla = ttk.Treeview(frame_tabla, columns=columnas, show='headings', height=15)
 
         # Aplicar estilo a la tabla
@@ -164,7 +163,8 @@ class GestionClientes:
         self.tabla.heading('correo', text='Correo')
         self.tabla.heading('puntos', text='Puntos')
         self.tabla.heading('fecha_registro', text='Fecha Registro')
-        self.tabla.heading('credito', text='Crédito')
+        self.tabla.heading('credito_maximo', text='Crédito Máx.')
+        self.tabla.heading('credito_usado', text='Crédito Usado')
         self.tabla.heading('saldo_credito', text='Saldo Crédito')
 
         # Configurar anchos de columnas
@@ -174,7 +174,8 @@ class GestionClientes:
         self.tabla.column('correo', width=150)
         self.tabla.column('puntos', width=80, anchor=tk.CENTER)
         self.tabla.column('fecha_registro', width=150, anchor=tk.CENTER)
-        self.tabla.column('credito', width=80, anchor=tk.CENTER)
+        self.tabla.column('credito_maximo', width=100, anchor=tk.CENTER)
+        self.tabla.column('credito_usado', width=100, anchor=tk.CENTER)
         self.tabla.column('saldo_credito', width=120, anchor=tk.CENTER)
         # Scrollbar para la tabla
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla.yview)
@@ -446,11 +447,13 @@ class GestionClientes:
         nombre_actual = valores[1]
         telefono_actual = valores[2]
         correo_actual = valores[3]
+        credito_maximo = float(valores[5])
+        credito_usado = float(valores[6])  # <- esto es lo que probablemente te falta
 
         # Crear ventana de edición
         ventana_editar = tk.Toplevel(self.ventana)
         ventana_editar.title("Editar Cliente")
-        ventana_editar.geometry("400x300")
+        ventana_editar.geometry("500x400")
         ventana_editar.config(bg="#f5f5f5")
         ventana_editar.grab_set()  # Hacer modal
 
@@ -490,6 +493,14 @@ class GestionClientes:
         # Inserta el crédito actual del cliente
         entry_credito.insert(0, valores[5])  # Asumiendo que `valores[5]` = credito actual
         
+        # Mostrar el crédito usado (deuda actual)
+        lbl_deuda = tk.Label(frame_form, text=f"Crédito usado: ${credito_usado:.2f}", font=("Helvetica", 12), bg="#f5f5f5", fg="#d32f2f")
+        lbl_deuda.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=5)
+
+        # Mostrar el saldo restante (opcional)
+        saldo_restante = credito_maximo - credito_usado
+        lbl_saldo = tk.Label(frame_form, text=f"Saldo restante: ${saldo_restante:.2f}", font=("Helvetica", 12), bg="#f5f5f5", fg="#388e3c")
+        lbl_saldo.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=5)
         # Botones
         frame_botones = tk.Frame(ventana_editar, bg="#f5f5f5")
         frame_botones.pack(pady=10)
@@ -547,7 +558,18 @@ class GestionClientes:
             relief="flat", cursor="hand2", command=self.abrir_ajuste_credito
         )
         btn_ajustar_credito.pack(side=tk.LEFT, padx=5)
+        
+        btn_pagar_credito = tk.Button(
+            frame_botones,
+            text="Pagar Crédito",
+            font=("Helvetica", 11),
+            bg="#388E3C",
+            fg="white",
+            command=lambda: self.pagar_credito(id_cliente, nombre_actual, credito_usado, credito_maximo)
+        )
 
+        btn_pagar_credito.pack(side=tk.LEFT, padx=5)  # <- ESTA LÍNEA ES LA QUE TE FALTABA
+        
         btn_cancelar = tk.Button(
             frame_botones,
             text="Cancelar",
@@ -947,6 +969,48 @@ class GestionClientes:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo eliminar el cliente: {str(e)}")
 
+    def pagar_credito(self, id_cliente, nombre_cliente, credito_usado, credito_maximo):
+        saldo_restante = credito_maximo - credito_usado
+
+        if credito_usado <= 0:
+            messagebox.showinfo("Sin deuda", f"{nombre_cliente} no tiene deuda actualmente.")
+            return
+
+        ventana = tk.Toplevel(self.ventana)
+        ventana.title(f"Pagar Crédito de {nombre_cliente}")
+        ventana.geometry("300x200")
+        ventana.config(bg="#f0f0f0")
+        ventana.grab_set()
+
+        tk.Label(ventana, text=f"Deuda actual: ${credito_usado:.2f}", bg="#f0f0f0", font=("Helvetica", 12)).pack(pady=15)
+        tk.Label(ventana, text="Monto a pagar:", bg="#f0f0f0", font=("Helvetica", 12)).pack()
+
+        entry_pago = tk.Entry(ventana, font=("Helvetica", 12))
+        entry_pago.pack(pady=5)
+        entry_pago.focus()
+
+        def procesar_pago():
+            try:
+                monto = float(entry_pago.get())
+                if monto <= 0 or monto > credito_usado:
+                    raise ValueError("Monto inválido.")
+                
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute(
+                    "UPDATE clientes SET credito_usado = credito_usado - %s WHERE id_cliente = %s",
+                    (monto, id_cliente)
+                )
+                conexion.commit()
+                conexion.close()
+
+                messagebox.showinfo("Éxito", f"Pago de ${monto:.2f} registrado.")
+                ventana.destroy()
+                self.cargar_clientes()  # Refresca la tabla
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo registrar el pago: {str(e)}")
+
+        tk.Button(ventana, text="Registrar Pago", font=("Helvetica", 11), bg="#388E3C", fg="white", command=procesar_pago).pack(pady=10)
 # Para probar de forma independiente
 if __name__ == "__main__":
     GestionClientes()

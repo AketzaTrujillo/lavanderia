@@ -83,8 +83,8 @@ class GestionClientes:
             ("Nuevo Cliente", self.nuevo_cliente, "➕"),
             ("Editar Cliente", self.editar_cliente, "✏️"),
             ("Ver Historial", self.ver_historial, "📋"),
-            ("Gestionar Puntos", self.gestionar_puntos, "🎁"),
-            ("Pago de Crédito", self.abrir_ventana_pago_credito, "🎁")
+            ("Gestionar Puntos", self.gestionar_puntos, "🎁")
+            ("Pago de Crédito", self.abrir_ventana_pago_credito, "💳"),
             ("Eliminar Cliente", self.eliminar_cliente, "🗑️")
         ]
 

@@ -271,4 +271,9 @@ ALTER TABLE clientes ADD COLUMN credito_maximo DECIMAL(10,2) DEFAULT 0.00;
 ALTER TABLE clientes ADD COLUMN credito_usado DECIMAL(10,2) DEFAULT 0.00;
 
 ALTER TABLE pagos MODIFY metodo_pago 
-  ENUM('Efectivo','Tarjeta','Transferencia','Crédito','Otro') NOT NULL;
+
+ALTER TABLE detalle_venta 
+MODIFY id_item INT NULL;
+
+ALTER TABLE detalle_venta 
+MODIFY tipo_item ENUM('producto', 'servicio', 'por kilo', 'encargo');
